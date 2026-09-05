@@ -105,7 +105,6 @@
               <td class="p-3 font-mono text-slate-400">{{ player.jersey }}</td>
               <td class="p-3">
                 <div class="flex items-center gap-3">
-                  <!-- Photo Avatar / Fallback -->
                   <div class="w-9 h-9 rounded-full overflow-hidden flex-shrink-0 bg-slate-700 border border-slate-600 flex items-center justify-center font-bold text-xs text-blue-300">
                     <img v-if="player.photo_url && !failedImgs[player.id]" 
                          :src="formatImgUrl(player.photo_url)" 
@@ -313,7 +312,7 @@
                 </span>
               </td>
               <td class="p-3 text-right space-x-2 whitespace-nowrap" v-if="isCoach">
-                <button @click="openEditSessionModal(session)" class="bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 px-2.5 py-1 rounded text-xs">
+                <button @click="openEditSessionModal(session)" class="bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 px-2 py-1 rounded text-xs">
                   {{ t('edit') }}
                 </button>
                 <button @click="removeSession(session.id)" class="text-rose-400 hover:text-rose-300 text-xs">
@@ -985,32 +984,27 @@
         const chartMode = ref('velocity');
         const hasChartData = ref(false);
 
-        // Keep track of broken image URLs without modifying the user's saved data
         const failedImgs = reactive({});
         const markImgFailed = (playerId) => {
           failedImgs[playerId] = true;
         };
 
-        // Convert common cloud storage links (like Google Drive) to direct image source streams
         const formatImgUrl = (url) => {
           if (!url) return '';
           const trimmed = url.trim();
           
-          // If it's a Google Drive share link: https://drive.google.com/file/d/FILE_ID/view...
           if (trimmed.includes('drive.google.com/file/d/')) {
             const match = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
             if (match && match[1]) {
               return `https://drive.google.com/uc?export=view&id=${match[1]}`;
             }
           }
-          // If it's a Google Drive open link: https://drive.google.com/open?id=FILE_ID
-          if (trimmed.includes('drive.google.com/open?id='')) {
+          if (trimmed.includes('drive.google.com/open?id=')) {
             const match = trimmed.match(/id=([a-zA-Z0-9_-]+)/);
             if (match && match[1]) {
               return `https://drive.google.com/uc?export=view&id=${match[1]}`;
             }
           }
-          // If Dropbox share link: replace ?dl=0 with ?raw=1
           if (trimmed.includes('dropbox.com') && trimmed.endsWith('?dl=0')) {
             return trimmed.replace('?dl=0', '?raw=1');
           }
@@ -1018,7 +1012,6 @@
           return trimmed;
         };
 
-        // Dugout input speed units: 'kmh' or 'mph'
         const logSpeedUnit = ref('kmh');
         const editSpeedUnit = ref('kmh');
 
@@ -1101,7 +1094,6 @@
           sprint_time: null, grip_dom: null, pinch: null, shoulder_check: 'Pass' 
         });
 
-        // Toggle speed unit with automatic real-time numeric conversion
         const toggleSpeedUnit = (target, newUnit) => {
           const targetUnit = target === 'log' ? logSpeedUnit : editSpeedUnit;
           const targetObj = target === 'log' ? newSession.value : editingSession.value;
@@ -1189,7 +1181,6 @@
 
         const openEditPlayerModal = (player) => {
           if (!isCoach.value) return;
-          // Clone player object and ensure photo_url is preserved
           editingPlayer.value = { 
             ...player, 
             photo_url: player.photo_url ? String(player.photo_url) : '' 
@@ -1231,7 +1222,6 @@
             if (selectedPlayer.value && selectedPlayer.value.id === id) {
               selectedPlayer.value = { ...selectedPlayer.value, ...payload };
             }
-            // Reset error state for this player's photo in case new link works
             failedImgs[id] = false;
             showEditPlayerModal.value = false;
           } else {
