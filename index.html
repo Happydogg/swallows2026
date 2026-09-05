@@ -105,8 +105,14 @@
               <td class="p-3 font-mono text-slate-400">{{ player.jersey }}</td>
               <td class="p-3">
                 <div class="flex items-center gap-3">
+                  <!-- Photo Avatar / Fallback -->
                   <div class="w-9 h-9 rounded-full overflow-hidden flex-shrink-0 bg-slate-700 border border-slate-600 flex items-center justify-center font-bold text-xs text-blue-300">
-                    <img v-if="player.photo_url" :src="player.photo_url" :alt="player.name" class="w-full h-full object-cover" @error="player.photo_url = ''">
+                    <img v-if="player.photo_url && !failedImgs[player.id]" 
+                         :src="formatImgUrl(player.photo_url)" 
+                         :alt="player.name" 
+                         class="w-full h-full object-cover" 
+                         referrerpolicy="no-referrer"
+                         @error="markImgFailed(player.id)">
                     <span v-else>#{{ player.jersey }}</span>
                   </div>
                   <div>
@@ -171,7 +177,12 @@
       <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
         <div class="flex items-center gap-4">
           <div class="w-20 h-20 rounded-2xl overflow-hidden flex-shrink-0 bg-slate-700 border-2 border-slate-600 shadow-md flex items-center justify-center font-bold text-xl text-blue-300">
-            <img v-if="selectedPlayer.photo_url" :src="selectedPlayer.photo_url" :alt="selectedPlayer.name" class="w-full h-full object-cover" @error="selectedPlayer.photo_url = ''">
+            <img v-if="selectedPlayer.photo_url && !failedImgs[selectedPlayer.id]" 
+                 :src="formatImgUrl(selectedPlayer.photo_url)" 
+                 :alt="selectedPlayer.name" 
+                 class="w-full h-full object-cover" 
+                 referrerpolicy="no-referrer"
+                 @error="markImgFailed(selectedPlayer.id)">
             <span v-else>#{{ selectedPlayer.jersey }}</span>
           </div>
           <div>
@@ -302,7 +313,7 @@
                 </span>
               </td>
               <td class="p-3 text-right space-x-2 whitespace-nowrap" v-if="isCoach">
-                <button @click="openEditSessionModal(session)" class="bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 px-2 py-1 rounded text-xs">
+                <button @click="openEditSessionModal(session)" class="bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 px-2.5 py-1 rounded text-xs">
                   {{ t('edit') }}
                 </button>
                 <button @click="removeSession(session.id)" class="text-rose-400 hover:text-rose-300 text-xs">
@@ -341,6 +352,7 @@
           <div>
             <label class="block text-slate-400 text-xs mb-1">{{ t('photoUrl') }}</label>
             <input v-model="newPlayer.photo_url" placeholder="https://..." type="url" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none focus:border-blue-500">
+            <p class="text-[11px] text-slate-500 mt-1">Accepts direct URLs, Imgur, or public Google Drive links.</p>
           </div>
 
           <div>
@@ -414,6 +426,7 @@
           <div>
             <label class="block text-slate-400 text-xs mb-1">{{ t('photoUrl') }}</label>
             <input v-model="editingPlayer.photo_url" placeholder="https://..." type="url" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none focus:border-blue-500">
+            <p class="text-[11px] text-slate-500 mt-1">Accepts direct URLs, Imgur, or public Google Drive links.</p>
           </div>
 
           <div>
@@ -499,7 +512,6 @@
             <div class="flex items-center justify-between">
               <p class="text-xs font-semibold text-emerald-400 uppercase tracking-wider">{{ t('stationMetricsHeader') }}</p>
               
-              <!-- Speed Input Unit Switcher -->
               <div class="flex items-center gap-1 bg-slate-800 p-0.5 rounded border border-slate-700">
                 <button 
                   type="button" 
@@ -683,7 +695,7 @@
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6bnVsd2dyaHZqeXV3Y2xtaW9vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1OTY1MDcsImV4cCI6MjEwNDE3MjUwN30.NGk74QmSL1Q5fG8JYFM_6TaB0Uo25jve76H0X_VC5co';
 
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    const { createApp, ref, computed, onMounted, nextTick, watch } = Vue;
+    const { createApp, ref, reactive, computed, onMounted, nextTick, watch } = Vue;
 
     const translations = {
       en: {
@@ -973,6 +985,39 @@
         const chartMode = ref('velocity');
         const hasChartData = ref(false);
 
+        // Keep track of broken image URLs without modifying the user's saved data
+        const failedImgs = reactive({});
+        const markImgFailed = (playerId) => {
+          failedImgs[playerId] = true;
+        };
+
+        // Convert common cloud storage links (like Google Drive) to direct image source streams
+        const formatImgUrl = (url) => {
+          if (!url) return '';
+          const trimmed = url.trim();
+          
+          // If it's a Google Drive share link: https://drive.google.com/file/d/FILE_ID/view...
+          if (trimmed.includes('drive.google.com/file/d/')) {
+            const match = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+            if (match && match[1]) {
+              return `https://drive.google.com/uc?export=view&id=${match[1]}`;
+            }
+          }
+          // If it's a Google Drive open link: https://drive.google.com/open?id=FILE_ID
+          if (trimmed.includes('drive.google.com/open?id='')) {
+            const match = trimmed.match(/id=([a-zA-Z0-9_-]+)/);
+            if (match && match[1]) {
+              return `https://drive.google.com/uc?export=view&id=${match[1]}`;
+            }
+          }
+          // If Dropbox share link: replace ?dl=0 with ?raw=1
+          if (trimmed.includes('dropbox.com') && trimmed.endsWith('?dl=0')) {
+            return trimmed.replace('?dl=0', '?raw=1');
+          }
+
+          return trimmed;
+        };
+
         // Dugout input speed units: 'kmh' or 'mph'
         const logSpeedUnit = ref('kmh');
         const editSpeedUnit = ref('kmh');
@@ -1105,6 +1150,7 @@
 
         const openAddPlayerModal = () => {
           selectedAddPositions.value = ['IF'];
+          newPlayer.value = { name: '', jersey: null, position: 'IF', throws: 'R', bats: 'R', bat_spec: '', dob: null, parent_phone: '', photo_url: '' };
           showAddPlayerModal.value = true;
         };
 
@@ -1128,6 +1174,7 @@
           if (!isCoach.value || !newPlayer.value.name || !newPlayer.value.jersey) return;
           
           newPlayer.value.position = selectedAddPositions.value.join(', ');
+          newPlayer.value.photo_url = newPlayer.value.photo_url ? newPlayer.value.photo_url.trim() : null;
           
           const { data, error } = await supabaseClient.from('players').insert([newPlayer.value]).select();
           if (!error && data) {
@@ -1142,7 +1189,11 @@
 
         const openEditPlayerModal = (player) => {
           if (!isCoach.value) return;
-          editingPlayer.value = { ...player };
+          // Clone player object and ensure photo_url is preserved
+          editingPlayer.value = { 
+            ...player, 
+            photo_url: player.photo_url ? String(player.photo_url) : '' 
+          };
           selectedEditPositions.value = splitPositions(player.position);
           showEditPlayerModal.value = true;
         };
@@ -1152,7 +1203,8 @@
           
           const { id, name, jersey, throws, bats, bat_spec, dob, parent_phone, photo_url } = editingPlayer.value;
           const posString = selectedEditPositions.value.join(', ');
-          
+          const cleanPhoto = photo_url && photo_url.trim() !== '' ? photo_url.trim() : null;
+
           const payload = {
             name,
             jersey: Number(jersey),
@@ -1162,7 +1214,7 @@
             bat_spec,
             dob: dob || null,
             parent_phone,
-            photo_url: photo_url || null
+            photo_url: cleanPhoto
           };
 
           const { error } = await supabaseClient
@@ -1179,6 +1231,8 @@
             if (selectedPlayer.value && selectedPlayer.value.id === id) {
               selectedPlayer.value = { ...selectedPlayer.value, ...payload };
             }
+            // Reset error state for this player's photo in case new link works
+            failedImgs[id] = false;
             showEditPlayerModal.value = false;
           } else {
             alert('Failed to update player: ' + error.message);
@@ -1212,13 +1266,12 @@
         const openLogModal = (player) => {
           if (!isCoach.value) return;
           activePlayerForLog.value = player;
-          logSpeedUnit.value = 'kmh'; // Default to metric
+          logSpeedUnit.value = 'kmh';
           showLogModal.value = true;
         };
 
         const cleanVal = (v) => (v === '' || v === undefined ? null : v);
 
-        // Normalize speed to km/h for the cloud database
         const normalizeToKmh = (val, currentUnit) => {
           const cleaned = cleanVal(val);
           if (cleaned === null) return null;
@@ -1268,7 +1321,7 @@
         const openEditSessionModal = (session) => {
           if (!isCoach.value) return;
           editingSession.value = { ...session };
-          editSpeedUnit.value = 'kmh'; // Sessions stored in DB are in km/h
+          editSpeedUnit.value = 'kmh';
           showEditSessionModal.value = true;
         };
 
@@ -1597,6 +1650,7 @@
           toggleAddPosition, toggleEditPosition, openAddPlayerModal, splitPositions,
           players, sessions, newPlayer, newSession, 
           chartMode, setChartMode, hasChartData,
+          failedImgs, markImgFailed, formatImgUrl,
           logSpeedUnit, editSpeedUnit, toggleSpeedUnit,
           isCoach, unlockCoachMode, lockCoachMode,
           addPlayer, openEditPlayerModal, updatePlayer, removePlayer, selectPlayer, 
