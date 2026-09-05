@@ -13,7 +13,6 @@
   <style>
     [v-cloak] { display: none !important; }
 
-    /* Clean 1-Page Print / PDF Layout */
     @media print {
       body {
         background: #ffffff !important;
@@ -146,7 +145,7 @@
               <th class="p-3">{{ t('topExitVelo') }}</th>
               <th class="p-3">{{ t('throwingVelo') }}</th>
               <th class="p-3">{{ t('attackAngle') }}</th>
-              <th class="p-3">{{ t('broadJump') }}</th>
+              <th class="p-3">{{ t('broadJumpRatioHeader') }}</th>
               <th class="p-3 text-right">{{ t('actions') }}</th>
             </tr>
           </thead>
@@ -194,7 +193,16 @@
                   {{ getLatestMetric(player.id, 'attack_angle') ? getLatestMetric(player.id, 'attack_angle') + '°' : '--' }}
                 </span>
               </td>
-              <td class="p-3 font-mono">{{ getLatestMetric(player.id, 'broad_jump') ? getLatestMetric(player.id, 'broad_jump') + ' cm' : '--' }}</td>
+              <!-- Broad Jump With Height Ratio Format -->
+              <td class="p-3 font-mono">
+                <div v-if="getLatestMetric(player.id, 'broad_jump')">
+                  <span>{{ getLatestMetric(player.id, 'broad_jump') }} cm</span>
+                  <span v-if="calculateJumpRatio(player.id)" class="text-xs ml-1 font-bold" :class="getJumpRatioColor(calculateJumpRatio(player.id))">
+                    ({{ calculateJumpRatio(player.id) }}x)
+                  </span>
+                </div>
+                <span v-else class="text-slate-600">--</span>
+              </td>
               <td class="p-3 text-right space-x-2 whitespace-nowrap">
                 <template v-if="isCoach">
                   <button @click="openLogModal(player)" class="bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 px-2.5 py-1 rounded text-xs">+ {{ t('log') }}</button>
@@ -211,7 +219,7 @@
         </table>
       </div>
 
-      <!-- TAB B: Team Leaderboards & PR Badges (Feature 3) -->
+      <!-- TAB B: Team Leaderboards & PR Badges (Height-Normalized Broad Jump) -->
       <div v-else-if="overviewTab === 'leaderboard'" class="space-y-6">
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           
@@ -261,26 +269,26 @@
             </div>
           </div>
 
-          <!-- Leaderboard Card 3: Broad Jump (Lower-Body Power) -->
+          <!-- Leaderboard Card 3: Broad Jump (Normalized Height Ratio) -->
           <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
             <h4 class="text-sm font-bold text-purple-400 flex items-center justify-between mb-3">
-              <span>🚀 {{ t('broadJump') }}</span>
-              <span class="text-xs text-slate-500">cm</span>
+              <span>🚀 {{ t('broadJumpRatioTitle') }}</span>
+              <span class="text-xs text-slate-500">{{ t('ratioLabel') }}</span>
             </h4>
             <div class="space-y-2">
-              <div v-for="(item, idx) in getTopMetrics('broad_jump', 3)" :key="item.player.id" class="flex items-center justify-between p-2 rounded-lg bg-slate-900/60 border border-slate-800">
+              <div v-for="(item, idx) in getTopJumpRatios(3)" :key="item.player.id" class="flex items-center justify-between p-2 rounded-lg bg-slate-900/60 border border-slate-800">
                 <div class="flex items-center gap-2">
                   <span class="text-sm font-bold" :class="idx === 0 ? 'text-amber-400' : idx === 1 ? 'text-slate-300' : 'text-amber-600'">
                     {{ idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉' }}
                   </span>
                   <div>
                     <p class="text-xs font-semibold text-white">{{ item.player.name }}</p>
-                    <p class="text-[10px] text-slate-500 font-mono">#{{ item.player.jersey }}</p>
+                    <p class="text-[10px] text-slate-500 font-mono">#{{ item.player.jersey }} • {{ item.jump }}cm @ {{ item.height }}cm</p>
                   </div>
                 </div>
-                <span class="text-sm font-mono font-bold text-purple-400">{{ item.value }} cm</span>
+                <span class="text-sm font-mono font-bold text-purple-400">{{ item.ratio }}x</span>
               </div>
-              <p v-if="getTopMetrics('broad_jump', 3).length === 0" class="text-xs text-slate-500 text-center py-2">--</p>
+              <p v-if="getTopJumpRatios(3).length === 0" class="text-xs text-slate-500 text-center py-2">--</p>
             </div>
           </div>
 
@@ -312,14 +320,13 @@
 
     </div>
 
-    <!-- VIEW 2: Individual Player View & Report Card (Feature 1) -->
+    <!-- VIEW 2: Individual Player View & Report Card -->
     <div v-if="currentView === 'player' && selectedPlayer" class="space-y-6">
       
       <!-- Top Action Bar (Hidden on Print) -->
       <div class="flex items-center justify-between no-print">
         <button @click="currentView = 'overview'" class="text-sm text-slate-400 hover:text-white">← {{ t('backToOverview') }}</button>
         <div class="flex items-center gap-2">
-          <!-- 1-Click Print / PDF Button -->
           <button @click="triggerPrintReport" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-md text-sm font-medium transition flex items-center gap-1.5 shadow">
             🖨️ {{ t('printReportBtn') }}
           </button>
@@ -354,7 +361,6 @@
                   {{ pos }}
                 </span>
               </div>
-              <!-- 60 Club Badge -->
               <span v-if="Number(getLatestMetric(selectedPlayer.id, 'exit_velo')) >= 60" class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold">
                 🏅 60+ km/h Club
               </span>
@@ -366,6 +372,9 @@
             </p>
             <p class="text-sm text-blue-400 mt-1 font-mono font-medium">
               {{ t('latestMeasurements') }}: {{ formatHeightWeight(selectedPlayer.id) }}
+              <span v-if="calculateJumpRatio(selectedPlayer.id)" class="ml-2 font-bold" :class="getJumpRatioColor(calculateJumpRatio(selectedPlayer.id))">
+                • {{ t('jumpRatioLabel') }}: {{ calculateJumpRatio(selectedPlayer.id) }}x
+              </span>
             </p>
           </div>
         </div>
@@ -376,7 +385,7 @@
         </div>
       </div>
 
-      <!-- Interactive Chart with Mode Toggle (Hidden from direct printout to preserve clean table) -->
+      <!-- Interactive Chart (Hidden on Print) -->
       <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-5 no-print">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-slate-700/60 pb-3">
           <div>
@@ -438,7 +447,7 @@
         </div>
       </div>
 
-      <!-- Player Sessions History Table (Printed on Report Card) -->
+      <!-- Player Sessions History Table -->
       <div class="space-y-3">
         <h3 class="text-lg font-semibold flex items-center justify-between">
           <span>{{ t('sessionHistory') }}</span>
@@ -453,7 +462,7 @@
                 <th class="p-3">{{ t('exitVeloPersonalControl') }}</th>
                 <th class="p-3">{{ t('throwingVelo') }}</th>
                 <th class="p-3">{{ t('attackAngle') }}</th>
-                <th class="p-3">{{ t('broadJump') }}</th>
+                <th class="p-3">{{ t('broadJumpRatioHeader') }}</th>
                 <th class="p-3">{{ t('sprint18m') }}</th>
                 <th class="p-3">{{ t('gripPinch') }}</th>
                 <th class="p-3">{{ t('shoulderCheck') }}</th>
@@ -472,7 +481,18 @@
                 <td class="p-3 font-mono">{{ session.exit_velo || '--' }} / {{ session.control_exit_velo || '--' }} km/h</td>
                 <td class="p-3 font-mono text-emerald-400 font-semibold">{{ session.throwing_velo ? session.throwing_velo + ' km/h' : '--' }}</td>
                 <td class="p-3 font-mono" :class="getAttackAngleColor(session.attack_angle)">{{ session.attack_angle ? session.attack_angle + '°' : '--' }}</td>
-                <td class="p-3 font-mono">{{ session.broad_jump ? session.broad_jump + ' cm' : '--' }}</td>
+                
+                <!-- Session Broad Jump & Ratio -->
+                <td class="p-3 font-mono">
+                  <div v-if="session.broad_jump">
+                    <span>{{ session.broad_jump }} cm</span>
+                    <span v-if="getSessionJumpRatio(session)" class="text-xs ml-1 font-bold" :class="getJumpRatioColor(getSessionJumpRatio(session))">
+                      ({{ getSessionJumpRatio(session) }}x)
+                    </span>
+                  </div>
+                  <span v-else class="text-slate-600">--</span>
+                </td>
+
                 <td class="p-3 font-mono">{{ session.sprint_time ? session.sprint_time + 's' : '--' }}</td>
                 <td class="p-3 font-mono">{{ session.grip_dom || '--' }} / {{ session.pinch || '--' }} kg</td>
                 <td class="p-3">
@@ -481,7 +501,7 @@
                   </span>
                 </td>
                 <td class="p-3 text-right space-x-2 whitespace-nowrap no-print" v-if="isCoach">
-                  <button @click="openEditSessionModal(session)" class="bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 px-2 py-1 rounded text-xs">
+                  <button @click="openEditSessionModal(session)" class="bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 px-2.5 py-1 rounded text-xs">
                     {{ t('edit') }}
                   </button>
                   <button @click="removeSession(session.id)" class="text-rose-400 hover:text-rose-300 text-xs">
@@ -919,6 +939,10 @@
         needMoreGrowthData: 'Record at least 1 session with height or weight data to render graph.',
         attackAngle: 'Attack Angle',
         broadJump: 'Broad Jump',
+        broadJumpRatioHeader: 'Broad Jump (Ratio)',
+        broadJumpRatioTitle: 'Lower-Body Power',
+        jumpRatioLabel: 'Height Ratio',
+        ratioLabel: 'Jump / Height Ratio',
         domGrip: 'Grip (Dom)',
         actions: 'Actions',
         log: 'Log',
@@ -1018,6 +1042,10 @@
         needMoreGrowthData: '請至少記錄一次身高或體重數據以繪製生長圖表。',
         attackAngle: '擊球仰角 (Attack Angle)',
         broadJump: '立定跳遠',
+        broadJumpRatioHeader: '立定跳遠 (身高比)',
+        broadJumpRatioTitle: '下半身爆發力 (身高比)',
+        jumpRatioLabel: '立定跳遠/身高比',
+        ratioLabel: '跳遠/身高比',
         domGrip: '慣用手握力',
         actions: '操作',
         log: '記錄',
@@ -1117,6 +1145,10 @@
         needMoreGrowthData: 'グラフを描画するには身長または体重を1回以上記録してください。',
         attackAngle: 'アタックアングル',
         broadJump: '立ち幅跳び',
+        broadJumpRatioHeader: '立ち幅跳び (身長比)',
+        broadJumpRatioTitle: '下半身瞬発力 (身長比)',
+        jumpRatioLabel: '幅跳び/身長比',
+        ratioLabel: '跳躍/身長比',
         domGrip: '利き手握力',
         actions: '操作',
         log: '記録',
@@ -1190,7 +1222,7 @@
 
         let chartInstance = null;
         const chartMode = ref('velocity');
-        const overviewTab = ref('roster'); // 'roster' or 'leaderboard'
+        const overviewTab = ref('roster');
         const hasChartData = ref(false);
         const isUploadingPhoto = ref(false);
 
@@ -1675,7 +1707,34 @@
           return found ? found[key] : null;
         };
 
-        // Leaderboard Calculation Helper (Feature 3)
+        // BROAD JUMP HEIGHT RATIO COMPUTATIONS
+        const calculateJumpRatio = (playerId) => {
+          const jump = getLatestMetric(playerId, 'broad_jump');
+          const height = getLatestMetric(playerId, 'height_cm');
+          if (!jump || !height || Number(height) <= 0) return null;
+          return (Number(jump) / Number(height)).toFixed(2);
+        };
+
+        const getSessionJumpRatio = (session) => {
+          if (!session.broad_jump) return null;
+          let h = session.height_cm;
+          if (!h && session.player_id) {
+            h = getLatestMetric(session.player_id, 'height_cm');
+          }
+          if (!h || Number(h) <= 0) return null;
+          return (Number(session.broad_jump) / Number(h)).toFixed(2);
+        };
+
+        const getJumpRatioColor = (ratioStr) => {
+          if (!ratioStr) return 'text-slate-400';
+          const r = Number(ratioStr);
+          if (r >= 1.15) return 'text-emerald-400 font-bold';
+          if (r >= 1.05) return 'text-cyan-400 font-semibold';
+          if (r >= 0.90) return 'text-slate-300';
+          return 'text-amber-400 font-medium';
+        };
+
+        // Standard Leaderboard Helper
         const getTopMetrics = (key, count = 3, ascending = false) => {
           const results = [];
           
@@ -1692,6 +1751,43 @@
           });
 
           results.sort((a, b) => ascending ? a.value - b.value : b.value - a.value);
+          return results.slice(0, count);
+        };
+
+        // Normalized Broad Jump Leaderboard Helper (Ranked by Ratio)
+        const getTopJumpRatios = (count = 3) => {
+          const results = [];
+
+          players.value.forEach(p => {
+            const pSessions = getPlayerSessions(p.id);
+            const valid = [];
+
+            pSessions.forEach(s => {
+              if (s.broad_jump) {
+                let h = s.height_cm || getLatestMetric(p.id, 'height_cm');
+                if (h && Number(h) > 0) {
+                  const r = Number(s.broad_jump) / Number(h);
+                  valid.push({
+                    ratio: Number(r.toFixed(2)),
+                    jump: s.broad_jump,
+                    height: h
+                  });
+                }
+              }
+            });
+
+            if (valid.length > 0) {
+              valid.sort((a, b) => b.ratio - a.ratio);
+              results.push({
+                player: p,
+                ratio: valid[0].ratio.toFixed(2),
+                jump: valid[0].jump,
+                height: valid[0].height
+              });
+            }
+          });
+
+          results.sort((a, b) => Number(b.ratio) - Number(a.ratio));
           return results.slice(0, count);
         };
 
@@ -1953,7 +2049,8 @@
           players, sessions, newPlayer, newSession, 
           chartMode, setChartMode, hasChartData,
           failedImgs, markImgFailed, formatImgUrl, handleFileUpload, isUploadingPhoto,
-          logSpeedUnit, editSpeedUnit, toggleSpeedUnit, triggerPrintReport, getTopMetrics,
+          logSpeedUnit, editSpeedUnit, toggleSpeedUnit, triggerPrintReport, 
+          getTopMetrics, getTopJumpRatios, calculateJumpRatio, getSessionJumpRatio, getJumpRatioColor,
           isCoach, unlockCoachMode, lockCoachMode,
           addPlayer, openEditPlayerModal, updatePlayer, removePlayer, selectPlayer, 
           openLogModal, saveSession, openEditSessionModal, updateSession, removeSession,
