@@ -213,7 +213,6 @@
             </p>
           </div>
 
-          <!-- Chart Mode Switcher Buttons -->
           <div class="flex items-center gap-2 bg-slate-900/80 p-1 rounded-lg border border-slate-700 self-start sm:self-auto">
             <button 
               @click="setChartMode('velocity')" 
@@ -256,7 +255,6 @@
 
         <div class="relative h-64 w-full">
           <canvas id="playerVelocityChart"></canvas>
-          <!-- Empty State Overlay -->
           <div v-if="!hasChartData" class="absolute inset-0 flex items-center justify-center bg-slate-850/80 rounded-lg">
             <p class="text-sm text-slate-500 font-medium">
               {{ chartMode === 'velocity' ? t('needMoreDataForChart') : t('needMoreGrowthData') }}
@@ -496,21 +494,48 @@
             </div>
           </div>
 
-          <!-- Section: Hitting & Athletic Metrics -->
+          <!-- Section: Hitting & Athletic Metrics with Speed Unit Toggle -->
           <div class="p-3 bg-slate-900/60 border border-slate-700/60 rounded-lg space-y-2">
-            <p class="text-xs font-semibold text-emerald-400 uppercase tracking-wider">{{ t('stationMetricsHeader') }}</p>
+            <div class="flex items-center justify-between">
+              <p class="text-xs font-semibold text-emerald-400 uppercase tracking-wider">{{ t('stationMetricsHeader') }}</p>
+              
+              <!-- Speed Input Unit Switcher -->
+              <div class="flex items-center gap-1 bg-slate-800 p-0.5 rounded border border-slate-700">
+                <button 
+                  type="button" 
+                  @click="toggleSpeedUnit('log', 'kmh')" 
+                  :class="logSpeedUnit === 'kmh' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-white'"
+                  class="px-2 py-0.5 rounded text-xs transition">
+                  km/h
+                </button>
+                <button 
+                  type="button" 
+                  @click="toggleSpeedUnit('log', 'mph')" 
+                  :class="logSpeedUnit === 'mph' ? 'bg-amber-600 text-white font-bold' : 'text-slate-400 hover:text-white'"
+                  class="px-2 py-0.5 rounded text-xs transition">
+                  mph (Blast)
+                </button>
+              </div>
+            </div>
+
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block text-slate-400 text-xs mb-1">{{ t('personalBatExit') }}</label>
+                <label class="block text-slate-400 text-xs mb-1">
+                  {{ t('personalBatExit') }} ({{ logSpeedUnit === 'mph' ? 'mph' : 'km/h' }})
+                </label>
                 <input v-model.number="newSession.exit_velo" type="number" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
               </div>
               <div>
-                <label class="block text-slate-400 text-xs mb-1">{{ t('controlBatExit') }}</label>
+                <label class="block text-slate-400 text-xs mb-1">
+                  {{ t('controlBatExit') }} ({{ logSpeedUnit === 'mph' ? 'mph' : 'km/h' }})
+                </label>
                 <input v-model.number="newSession.control_exit_velo" type="number" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
               </div>
               <div>
-                <label class="block text-slate-400 text-xs mb-1">{{ t('throwingVeloInput') }}</label>
-                <input v-model.number="newSession.throwing_velo" placeholder="e.g. 65" type="number" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+                <label class="block text-slate-400 text-xs mb-1">
+                  {{ t('throwingVeloInput') }} ({{ logSpeedUnit === 'mph' ? 'mph' : 'km/h' }})
+                </label>
+                <input v-model.number="newSession.throwing_velo" placeholder="--" type="number" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
               </div>
               <div>
                 <label class="block text-slate-400 text-xs mb-1">{{ t('attackAngleDeg') }}</label>
@@ -576,20 +601,46 @@
             </div>
           </div>
 
-          <!-- Section: Hitting & Athletic Metrics -->
+          <!-- Section: Hitting & Athletic Metrics with Speed Unit Toggle -->
           <div class="p-3 bg-slate-900/60 border border-slate-700/60 rounded-lg space-y-2">
-            <p class="text-xs font-semibold text-emerald-400 uppercase tracking-wider">{{ t('stationMetricsHeader') }}</p>
+            <div class="flex items-center justify-between">
+              <p class="text-xs font-semibold text-emerald-400 uppercase tracking-wider">{{ t('stationMetricsHeader') }}</p>
+              
+              <div class="flex items-center gap-1 bg-slate-800 p-0.5 rounded border border-slate-700">
+                <button 
+                  type="button" 
+                  @click="toggleSpeedUnit('edit', 'kmh')" 
+                  :class="editSpeedUnit === 'kmh' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-white'"
+                  class="px-2 py-0.5 rounded text-xs transition">
+                  km/h
+                </button>
+                <button 
+                  type="button" 
+                  @click="toggleSpeedUnit('edit', 'mph')" 
+                  :class="editSpeedUnit === 'mph' ? 'bg-amber-600 text-white font-bold' : 'text-slate-400 hover:text-white'"
+                  class="px-2 py-0.5 rounded text-xs transition">
+                  mph (Blast)
+                </button>
+              </div>
+            </div>
+
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block text-slate-400 text-xs mb-1">{{ t('personalBatExit') }}</label>
+                <label class="block text-slate-400 text-xs mb-1">
+                  {{ t('personalBatExit') }} ({{ editSpeedUnit === 'mph' ? 'mph' : 'km/h' }})
+                </label>
                 <input v-model.number="editingSession.exit_velo" type="number" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
               </div>
               <div>
-                <label class="block text-slate-400 text-xs mb-1">{{ t('controlBatExit') }}</label>
+                <label class="block text-slate-400 text-xs mb-1">
+                  {{ t('controlBatExit') }} ({{ editSpeedUnit === 'mph' ? 'mph' : 'km/h' }})
+                </label>
                 <input v-model.number="editingSession.control_exit_velo" type="number" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
               </div>
               <div>
-                <label class="block text-slate-400 text-xs mb-1">{{ t('throwingVeloInput') }}</label>
+                <label class="block text-slate-400 text-xs mb-1">
+                  {{ t('throwingVeloInput') }} ({{ editSpeedUnit === 'mph' ? 'mph' : 'km/h' }})
+                </label>
                 <input v-model.number="editingSession.throwing_velo" placeholder="--" type="number" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
               </div>
               <div>
@@ -658,7 +709,7 @@
         heightWeight: 'Height / Weight',
         topExitVelo: 'Top Exit Velo',
         throwingVelo: 'Throwing Velo',
-        throwingVeloInput: 'Throwing Velo (km/h)',
+        throwingVeloInput: 'Throwing Velo',
         exitVelo: 'Exit Velocity',
         chartTitle: 'Velocity Progression Curve',
         chartSubtitle: 'Bat Exit Velocity vs. Throwing Velocity over time',
@@ -714,8 +765,8 @@
         heightCm: 'Height (cm)',
         weightKg: 'Weight (kg)',
         broadJumpCm: 'Broad Jump (cm)',
-        personalBatExit: 'Personal Bat Exit (km/h)',
-        controlBatExit: 'Control Bat Exit (km/h)',
+        personalBatExit: 'Personal Bat Exit',
+        controlBatExit: 'Control Bat Exit',
         attackAngleDeg: 'Attack Angle (°)',
         homeTo1stSec: 'Home-to-1st (s)',
         domGripKg: 'Dominant Grip (kg)',
@@ -750,7 +801,7 @@
         heightWeight: '最新身高 / 體重',
         topExitVelo: '最高擊球初速',
         throwingVelo: '傳球球速',
-        throwingVeloInput: '傳球球速 (km/h)',
+        throwingVeloInput: '傳球球速',
         exitVelo: '擊球初速',
         chartTitle: '球速成長軌跡圖',
         chartSubtitle: '打擊初速與傳球速度隨時間變化趨勢',
@@ -806,8 +857,8 @@
         heightCm: '身高 (cm)',
         weightKg: '體重 (kg)',
         broadJumpCm: '立定跳遠 (cm)',
-        personalBatExit: '個人球棒擊球初速 (km/h)',
-        controlBatExit: '標準測試棒擊球初速 (km/h)',
+        personalBatExit: '個人球棒擊球初速',
+        controlBatExit: '標準測試棒擊球初速',
         attackAngleDeg: 'Blast 擊球仰角 (°)',
         homeTo1stSec: '本壘到一壘時間 (秒)',
         domGripKg: '慣用手握力 (kg)',
@@ -842,7 +893,7 @@
         heightWeight: '最新 身長 / 体重',
         topExitVelo: '最高打球初速',
         throwingVelo: '送球速度',
-        throwingVeloInput: '送球速度 (km/h)',
+        throwingVeloInput: '送球速度',
         exitVelo: '打球初速',
         chartTitle: '球速・打球初速の成長曲線',
         chartSubtitle: '打球初速と送球速度の時系列推移',
@@ -898,8 +949,8 @@
         heightCm: '身長 (cm)',
         weightKg: '体重 (kg)',
         broadJumpCm: '立ち幅跳び (cm)',
-        personalBatExit: 'マイバット打球初速 (km/h)',
-        controlBatExit: '基準バット打球初速 (km/h)',
+        personalBatExit: 'マイバット打球初速',
+        controlBatExit: '基準バット打球初速',
         attackAngleDeg: 'アタックアングル (°)',
         homeTo1stSec: '一塁到達タイム (秒)',
         domGripKg: '利き手握力 (kg)',
@@ -919,8 +970,12 @@
         const t = (key) => translations[currentLang.value]?.[key] || translations['en'][key] || key;
 
         let chartInstance = null;
-        const chartMode = ref('velocity'); // 'velocity' or 'growth'
+        const chartMode = ref('velocity');
         const hasChartData = ref(false);
+
+        // Dugout input speed units: 'kmh' or 'mph'
+        const logSpeedUnit = ref('kmh');
+        const editSpeedUnit = ref('kmh');
 
         const setChartMode = (mode) => {
           chartMode.value = mode;
@@ -1000,6 +1055,28 @@
           exit_velo: null, control_exit_velo: null, throwing_velo: null, attack_angle: 10, 
           sprint_time: null, grip_dom: null, pinch: null, shoulder_check: 'Pass' 
         });
+
+        // Toggle speed unit with automatic real-time numeric conversion
+        const toggleSpeedUnit = (target, newUnit) => {
+          const targetUnit = target === 'log' ? logSpeedUnit : editSpeedUnit;
+          const targetObj = target === 'log' ? newSession.value : editingSession.value;
+
+          if (targetUnit.value === newUnit || !targetObj) return;
+
+          const convert = (val, toMph) => {
+            if (val === null || val === undefined || val === '') return null;
+            const num = Number(val);
+            if (isNaN(num)) return null;
+            return toMph ? Number((num / 1.60934).toFixed(1)) : Number((num * 1.60934).toFixed(1));
+          };
+
+          const toMph = newUnit === 'mph';
+          targetObj.exit_velo = convert(targetObj.exit_velo, toMph);
+          targetObj.control_exit_velo = convert(targetObj.control_exit_velo, toMph);
+          targetObj.throwing_velo = convert(targetObj.throwing_velo, toMph);
+
+          targetUnit.value = newUnit;
+        };
 
         const splitPositions = (posStr) => {
           if (!posStr) return ['IF'];
@@ -1135,10 +1212,20 @@
         const openLogModal = (player) => {
           if (!isCoach.value) return;
           activePlayerForLog.value = player;
+          logSpeedUnit.value = 'kmh'; // Default to metric
           showLogModal.value = true;
         };
 
         const cleanVal = (v) => (v === '' || v === undefined ? null : v);
+
+        // Normalize speed to km/h for the cloud database
+        const normalizeToKmh = (val, currentUnit) => {
+          const cleaned = cleanVal(val);
+          if (cleaned === null) return null;
+          const num = Number(cleaned);
+          if (isNaN(num)) return null;
+          return currentUnit === 'mph' ? Number((num * 1.60934).toFixed(1)) : Number(num.toFixed(1));
+        };
 
         const saveSession = async () => {
           if (!isCoach.value || !activePlayerForLog.value) return;
@@ -1149,9 +1236,9 @@
             height_cm: cleanVal(newSession.value.height_cm),
             weight_kg: cleanVal(newSession.value.weight_kg),
             broad_jump: cleanVal(newSession.value.broad_jump),
-            exit_velo: cleanVal(newSession.value.exit_velo),
-            control_exit_velo: cleanVal(newSession.value.control_exit_velo),
-            throwing_velo: cleanVal(newSession.value.throwing_velo),
+            exit_velo: normalizeToKmh(newSession.value.exit_velo, logSpeedUnit.value),
+            control_exit_velo: normalizeToKmh(newSession.value.control_exit_velo, logSpeedUnit.value),
+            throwing_velo: normalizeToKmh(newSession.value.throwing_velo, logSpeedUnit.value),
             attack_angle: cleanVal(newSession.value.attack_angle),
             sprint_time: cleanVal(newSession.value.sprint_time),
             grip_dom: cleanVal(newSession.value.grip_dom),
@@ -1165,7 +1252,10 @@
             newSession.value.height_cm = null;
             newSession.value.weight_kg = null;
             newSession.value.broad_jump = null;
+            newSession.value.exit_velo = null;
+            newSession.value.control_exit_velo = null;
             newSession.value.throwing_velo = null;
+            logSpeedUnit.value = 'kmh';
             showLogModal.value = false;
             nextTick(() => {
               renderPlayerChart();
@@ -1178,6 +1268,7 @@
         const openEditSessionModal = (session) => {
           if (!isCoach.value) return;
           editingSession.value = { ...session };
+          editSpeedUnit.value = 'kmh'; // Sessions stored in DB are in km/h
           showEditSessionModal.value = true;
         };
 
@@ -1190,9 +1281,9 @@
             height_cm: cleanVal(s.height_cm),
             weight_kg: cleanVal(s.weight_kg),
             broad_jump: cleanVal(s.broad_jump),
-            exit_velo: cleanVal(s.exit_velo),
-            control_exit_velo: cleanVal(s.control_exit_velo),
-            throwing_velo: cleanVal(s.throwing_velo),
+            exit_velo: normalizeToKmh(s.exit_velo, editSpeedUnit.value),
+            control_exit_velo: normalizeToKmh(s.control_exit_velo, editSpeedUnit.value),
+            throwing_velo: normalizeToKmh(s.throwing_velo, editSpeedUnit.value),
             attack_angle: cleanVal(s.attack_angle),
             sprint_time: cleanVal(s.sprint_time),
             grip_dom: cleanVal(s.grip_dom),
@@ -1296,7 +1387,6 @@
           return 'text-amber-400';
         };
 
-        // RENDER CHART.JS PROGRESSION GRAPH WITH TOGGLE SUPPORT
         const renderPlayerChart = () => {
           if (!selectedPlayer.value) return;
 
@@ -1312,7 +1402,6 @@
           let scalesConfig = {};
 
           if (chartMode.value === 'velocity') {
-            // Filter points with at least one speed entry
             validPoints = playerList.filter(s => (s.exit_velo !== null && s.exit_velo !== '') || (s.throwing_velo !== null && s.throwing_velo !== ''));
             hasChartData.value = validPoints.length > 0;
 
@@ -1321,7 +1410,7 @@
                 {
                   label: `${t('exitVelo')} (km/h)`,
                   data: validPoints.map(s => s.exit_velo ? Number(s.exit_velo) : null),
-                  borderColor: '#3b82f6', // Tailwind blue-500
+                  borderColor: '#3b82f6',
                   backgroundColor: 'rgba(59, 130, 246, 0.12)',
                   borderWidth: 2.5,
                   pointRadius: 5,
@@ -1336,7 +1425,7 @@
                 {
                   label: `${t('throwingVelo')} (km/h)`,
                   data: validPoints.map(s => s.throwing_velo ? Number(s.throwing_velo) : null),
-                  borderColor: '#10b981', // Tailwind emerald-500
+                  borderColor: '#10b981',
                   backgroundColor: 'rgba(16, 185, 129, 0.08)',
                   borderWidth: 2.5,
                   pointRadius: 5,
@@ -1368,7 +1457,6 @@
               };
             }
           } else {
-            // Physical Growth Mode (Height & Weight)
             validPoints = playerList.filter(s => (s.height_cm !== null && s.height_cm !== '') || (s.weight_kg !== null && s.weight_kg !== ''));
             hasChartData.value = validPoints.length > 0;
 
@@ -1377,7 +1465,7 @@
                 {
                   label: `${t('heightCm')}`,
                   data: validPoints.map(s => s.height_cm ? Number(s.height_cm) : null),
-                  borderColor: '#c084fc', // Tailwind purple-400
+                  borderColor: '#c084fc',
                   backgroundColor: 'rgba(192, 132, 252, 0.1)',
                   borderWidth: 2.5,
                   pointRadius: 5,
@@ -1393,7 +1481,7 @@
                 {
                   label: `${t('weightKg')}`,
                   data: validPoints.map(s => s.weight_kg ? Number(s.weight_kg) : null),
-                  borderColor: '#fbbf24', // Tailwind amber-400
+                  borderColor: '#fbbf24',
                   backgroundColor: 'rgba(251, 191, 36, 0.08)',
                   borderWidth: 2.5,
                   pointRadius: 5,
@@ -1509,6 +1597,7 @@
           toggleAddPosition, toggleEditPosition, openAddPlayerModal, splitPositions,
           players, sessions, newPlayer, newSession, 
           chartMode, setChartMode, hasChartData,
+          logSpeedUnit, editSpeedUnit, toggleSpeedUnit,
           isCoach, unlockCoachMode, lockCoachMode,
           addPlayer, openEditPlayerModal, updatePlayer, removePlayer, selectPlayer, 
           openLogModal, saveSession, openEditSessionModal, updateSession, removeSession,
