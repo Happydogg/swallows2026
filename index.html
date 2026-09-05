@@ -193,7 +193,6 @@
                   {{ getLatestMetric(player.id, 'attack_angle') ? getLatestMetric(player.id, 'attack_angle') + '°' : '--' }}
                 </span>
               </td>
-              <!-- Broad Jump With Height Ratio Format -->
               <td class="p-3 font-mono">
                 <div v-if="getLatestMetric(player.id, 'broad_jump')">
                   <span>{{ getLatestMetric(player.id, 'broad_jump') }} cm</span>
@@ -219,7 +218,7 @@
         </table>
       </div>
 
-      <!-- TAB B: Team Leaderboards & PR Badges (Height-Normalized Broad Jump) -->
+      <!-- TAB B: Team Leaderboards & PR Badges -->
       <div v-else-if="overviewTab === 'leaderboard'" class="space-y-6">
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           
@@ -447,13 +446,163 @@
         </div>
       </div>
 
-      <!-- Player Sessions History Table -->
+      <!-- DATED SESSION HISTORY (STRATEGY 2: RESPONSIVE ACCORDION CARDS ON MOBILE) -->
       <div class="space-y-3">
-        <h3 class="text-lg font-semibold flex items-center justify-between">
-          <span>{{ t('sessionHistory') }}</span>
-          <span class="text-xs text-slate-500 font-normal no-print">All metrics synced to cloud</span>
-        </h3>
-        <div class="bg-slate-800/40 border border-slate-700/80 rounded-xl overflow-x-auto print-card">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-semibold flex items-center gap-2">
+            <span>{{ t('sessionHistory') }}</span>
+            <span class="text-xs bg-slate-800 text-slate-400 border border-slate-700 px-2 py-0.5 rounded-full font-mono">
+              {{ getPlayerSessions(selectedPlayer.id).length }}
+            </span>
+          </h3>
+          <span class="text-xs text-slate-500 font-normal no-print hidden sm:inline">All metrics synced to cloud</span>
+        </div>
+
+        <!-- 1. MOBILE SMART ACCORDION CARDS (Visible only on < 768px screens) -->
+        <div class="block md:hidden space-y-2.5">
+          <div 
+            v-for="session in getPlayerSessions(selectedPlayer.id)" 
+            :key="'mob-' + session.id"
+            class="bg-slate-850 border border-slate-700/80 rounded-xl overflow-hidden shadow-sm transition">
+            
+            <!-- Tier 1: Collapsed Row (Always Visible, Touch-Friendly Tap Target) -->
+            <div 
+              @click="toggleSessionExpand(session.id)" 
+              class="p-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-800/60 transition active:bg-slate-800">
+              
+              <div class="flex items-center gap-3">
+                <div class="bg-slate-800 border border-slate-700 px-2 py-1 rounded-md text-xs font-mono font-bold text-slate-200">
+                  📅 {{ session.session_date }}
+                </div>
+                <!-- Primary Velo Tags -->
+                <div class="flex items-center gap-2 text-xs font-mono">
+                  <span class="text-blue-400 font-bold" title="Exit Velocity">
+                    ⚡ {{ session.exit_velo ? session.exit_velo + 'k' : '--' }}
+                  </span>
+                  <span class="text-emerald-400 font-bold" title="Throwing Velocity">
+                    🎯 {{ session.throwing_velo ? session.throwing_velo + 'k' : '--' }}
+                  </span>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <!-- Compact Shoulder Safety Pill -->
+                <span 
+                  class="text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider"
+                  :class="session.shoulder_check === 'Pass' ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-700/50' : 'bg-rose-950/60 text-rose-400 border border-rose-700/50'">
+                  {{ session.shoulder_check === 'Pass' ? 'PASS' : 'WARN' }}
+                </span>
+                
+                <!-- Rotating Chevron Indicator -->
+                <span 
+                  class="text-xs text-slate-400 transition-transform duration-200 inline-block"
+                  :class="isSessionExpanded(session.id) ? 'rotate-180 text-blue-400' : ''">
+                  ▼
+                </span>
+              </div>
+            </div>
+
+            <!-- Tier 2: Expanded Drawer Details (Smoothly Toggled) -->
+            <div 
+              v-if="isSessionExpanded(session.id)" 
+              class="border-t border-slate-800 bg-slate-900/90 p-4 space-y-3.5 text-xs">
+              
+              <!-- Category A: Hitting & Exit Speeds -->
+              <div class="space-y-1.5">
+                <p class="text-[11px] font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
+                  <span>⚡</span> {{ t('stationMetricsHeader') }}
+                </p>
+                <div class="grid grid-cols-2 gap-2 bg-slate-800/60 p-2.5 rounded-lg border border-slate-700/60 font-mono">
+                  <div>
+                    <span class="text-slate-400 block text-[10px]">{{ t('personalBatExit') }}:</span>
+                    <span class="text-white font-bold text-sm">{{ session.exit_velo ? session.exit_velo + ' km/h' : '--' }}</span>
+                  </div>
+                  <div>
+                    <span class="text-slate-400 block text-[10px]">{{ t('controlBatExit') }}:</span>
+                    <span class="text-slate-300 font-bold text-sm">{{ session.control_exit_velo ? session.control_exit_velo + ' km/h' : '--' }}</span>
+                  </div>
+                  <div class="col-span-2 pt-1 border-t border-slate-700/40 flex items-center justify-between">
+                    <span class="text-slate-400 text-[10px]">{{ t('attackAngleDeg') }}:</span>
+                    <span class="font-bold" :class="getAttackAngleColor(session.attack_angle)">
+                      {{ session.attack_angle ? session.attack_angle + '°' : '--' }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Category B: Athletic Power & Speed -->
+              <div class="space-y-1.5">
+                <p class="text-[11px] font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
+                  <span>🚀</span> {{ t('broadJumpRatioTitle') }} &amp; Speed
+                </p>
+                <div class="grid grid-cols-2 gap-2 bg-slate-800/60 p-2.5 rounded-lg border border-slate-700/60 font-mono">
+                  <div>
+                    <span class="text-slate-400 block text-[10px]">{{ t('broadJump') }}:</span>
+                    <span class="text-white font-semibold">
+                      {{ session.broad_jump ? session.broad_jump + ' cm' : '--' }}
+                      <span v-if="getSessionJumpRatio(session)" class="text-[11px] font-bold" :class="getJumpRatioColor(getSessionJumpRatio(session))">
+                        ({{ getSessionJumpRatio(session) }}x)
+                      </span>
+                    </span>
+                  </div>
+                  <div>
+                    <span class="text-slate-400 block text-[10px]">{{ t('homeTo1stSec') }}:</span>
+                    <span class="text-amber-300 font-semibold">{{ session.sprint_time ? session.sprint_time + 's' : '--' }}</span>
+                  </div>
+                  <div class="col-span-2 pt-1 border-t border-slate-700/40 grid grid-cols-2 gap-2">
+                    <div>
+                      <span class="text-slate-400 block text-[10px]">{{ t('domGripKg') }}:</span>
+                      <span class="text-slate-200">{{ session.grip_dom ? session.grip_dom + ' kg' : '--' }}</span>
+                    </div>
+                    <div>
+                      <span class="text-slate-400 block text-[10px]">{{ t('fingerPinchKg') }}:</span>
+                      <span class="text-slate-200">{{ session.pinch ? session.pinch + ' kg' : '--' }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Category C: Growth & Physical Baseline -->
+              <div class="space-y-1.5">
+                <p class="text-[11px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                  <span>📏</span> {{ t('growthSectionHeader') }}
+                </p>
+                <div class="flex items-center justify-between bg-slate-800/60 px-3 py-2 rounded-lg border border-slate-700/60 font-mono">
+                  <div>
+                    <span class="text-slate-400 text-[10px] mr-1.5">{{ t('heightCm') }}:</span>
+                    <span class="text-white font-bold">{{ session.height_cm ? session.height_cm + ' cm' : '--' }}</span>
+                  </div>
+                  <div>
+                    <span class="text-slate-400 text-[10px] mr-1.5">{{ t('weightKg') }}:</span>
+                    <span class="text-white font-bold">{{ session.weight_kg ? session.weight_kg + ' kg' : '--' }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Drawer Bottom Actions (Coach Only) -->
+              <div v-if="isCoach" class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button 
+                  @click="openEditSessionModal(session)" 
+                  class="bg-amber-600/30 hover:bg-amber-600/50 text-amber-300 border border-amber-600/40 px-3 py-1.5 rounded text-xs font-medium transition">
+                  ✏️ {{ t('edit') }}
+                </button>
+                <button 
+                  @click="removeSession(session.id)" 
+                  class="bg-rose-900/30 hover:bg-rose-900/50 text-rose-300 border border-rose-700/40 px-3 py-1.5 rounded text-xs font-medium transition">
+                  🗑️ {{ t('remove') }}
+                </button>
+              </div>
+
+            </div>
+          </div>
+
+          <div v-if="getPlayerSessions(selectedPlayer.id).length === 0" class="p-8 text-center bg-slate-850 rounded-xl border border-slate-800 text-slate-500 text-sm">
+            {{ t('noSessionsRecorded') }}
+          </div>
+        </div>
+
+        <!-- 2. DESKTOP & PRINT MULTI-COLUMN TABLE (Visible only on ≥ 768px screens or printing) -->
+        <div class="hidden md:block bg-slate-800/40 border border-slate-700/80 rounded-xl overflow-x-auto print-card">
           <table class="w-full text-left text-sm">
             <thead class="bg-slate-800/80 text-slate-300 text-xs uppercase tracking-wider">
               <tr>
@@ -470,7 +619,7 @@
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-800">
-              <tr v-for="session in getPlayerSessions(selectedPlayer.id)" :key="session.id" class="hover:bg-slate-800/40 transition">
+              <tr v-for="session in getPlayerSessions(selectedPlayer.id)" :key="'desk-' + session.id" class="hover:bg-slate-800/40 transition">
                 <td class="p-3 font-mono text-slate-300">{{ session.session_date }}</td>
                 <td class="p-3 font-mono">
                   <span v-if="session.height_cm || session.weight_kg">
@@ -592,7 +741,7 @@
       </div>
     </div>
 
-    <!-- MODAL: Edit Player Profile (With Camera & Compression) -->
+    <!-- MODAL: Edit Player Profile -->
     <div v-if="showEditPlayerModal && isCoach && editingPlayer" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 no-print">
       <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-bold">{{ t('editPlayerModalTitle') }}</h3>
@@ -1226,6 +1375,17 @@
         const hasChartData = ref(false);
         const isUploadingPhoto = ref(false);
 
+        // Responsive Accordion state: Stores open session IDs for mobile drawer
+        const expandedSessionIds = reactive(new Set());
+        const toggleSessionExpand = (sessionId) => {
+          if (expandedSessionIds.has(sessionId)) {
+            expandedSessionIds.delete(sessionId);
+          } else {
+            expandedSessionIds.add(sessionId);
+          }
+        };
+        const isSessionExpanded = (sessionId) => expandedSessionIds.has(sessionId);
+
         const failedImgs = reactive({});
         const markImgFailed = (playerId) => {
           failedImgs[playerId] = true;
@@ -1572,6 +1732,7 @@
         const selectPlayer = (player) => {
           selectedPlayer.value = player;
           currentView.value = 'player';
+          expandedSessionIds.clear();
           nextTick(() => {
             renderPlayerChart();
           });
@@ -1689,6 +1850,7 @@
 
           if (!error) {
             sessions.value = sessions.value.filter(s => s.id !== sessionId);
+            expandedSessionIds.delete(sessionId);
             nextTick(() => {
               renderPlayerChart();
             });
@@ -1707,7 +1869,6 @@
           return found ? found[key] : null;
         };
 
-        // BROAD JUMP HEIGHT RATIO COMPUTATIONS
         const calculateJumpRatio = (playerId) => {
           const jump = getLatestMetric(playerId, 'broad_jump');
           const height = getLatestMetric(playerId, 'height_cm');
@@ -1734,7 +1895,6 @@
           return 'text-amber-400 font-medium';
         };
 
-        // Standard Leaderboard Helper
         const getTopMetrics = (key, count = 3, ascending = false) => {
           const results = [];
           
@@ -1754,7 +1914,6 @@
           return results.slice(0, count);
         };
 
-        // Normalized Broad Jump Leaderboard Helper (Ranked by Ratio)
         const getTopJumpRatios = (count = 3) => {
           const results = [];
 
@@ -2048,6 +2207,7 @@
           toggleAddPosition, toggleEditPosition, openAddPlayerModal, splitPositions,
           players, sessions, newPlayer, newSession, 
           chartMode, setChartMode, hasChartData,
+          expandedSessionIds, toggleSessionExpand, isSessionExpanded,
           failedImgs, markImgFailed, formatImgUrl, handleFileUpload, isUploadingPhoto,
           logSpeedUnit, editSpeedUnit, toggleSpeedUnit, triggerPrintReport, 
           getTopMetrics, getTopJumpRatios, calculateJumpRatio, getSessionJumpRatio, getJumpRatioColor,
