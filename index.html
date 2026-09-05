@@ -9,7 +9,6 @@
   <!-- Supabase Official Client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    /* Keeps modals and templates hidden until Vue is initialized */
     [v-cloak] { display: none !important; }
   </style>
 </head>
@@ -22,11 +21,24 @@
         <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
           <span>🦅</span> Swallows Data Lab 2026
         </h1>
-        <p class="text-sm text-slate-400">Cloud-Synced • Real-Time Performance Lab</p>
+        <p class="text-sm text-slate-400">
+          Cloud-Synced • 
+          <span v-if="isCoach" class="text-emerald-400 font-medium">Coach Mode Unlocked</span>
+          <span v-else class="text-slate-500 font-medium">Read-Only View</span>
+        </p>
       </div>
+
       <div class="flex items-center gap-2">
         <button @click="currentView = 'overview'" :class="currentView === 'overview' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300'" class="px-3 py-1.5 rounded-md text-sm font-medium transition">Team Overview</button>
-        <button @click="showAddPlayerModal = true" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-md text-sm font-medium text-white transition">+ Add Player</button>
+        
+        <!-- Coach Controls -->
+        <template v-if="isCoach">
+          <button @click="showAddPlayerModal = true" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-md text-sm font-medium text-white transition">+ Add Player</button>
+          <button @click="lockCoachMode" class="bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 border border-slate-700 px-3 py-1.5 rounded-md text-sm font-medium transition">Lock</button>
+        </template>
+        <template v-else>
+          <button @click="unlockCoachMode" class="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-md text-sm font-medium transition">🔒 Coach Unlock</button>
+        </template>
       </div>
     </header>
 
@@ -87,12 +99,15 @@
               </td>
               <td class="p-3 font-mono">{{ getLatestMetric(player.id, 'grip_dom') || '--' }} kg</td>
               <td class="p-3 text-right space-x-2">
-                <button @click="openLogModal(player)" class="bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 px-2.5 py-1 rounded text-xs">+ Log</button>
-                <button @click="removePlayer(player.id)" class="text-rose-400 hover:text-rose-300 text-xs">Remove</button>
+                <template v-if="isCoach">
+                  <button @click="openLogModal(player)" class="bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 px-2.5 py-1 rounded text-xs">+ Log</button>
+                  <button @click="removePlayer(player.id)" class="text-rose-400 hover:text-rose-300 text-xs">Remove</button>
+                </template>
+                <span v-else class="text-xs text-slate-500 italic">View only</span>
               </td>
             </tr>
             <tr v-if="players.length === 0">
-              <td colspan="8" class="p-6 text-center text-slate-500">No players saved in database. Tap "+ Add Player" to begin.</td>
+              <td colspan="8" class="p-6 text-center text-slate-500">No players saved in database.</td>
             </tr>
           </tbody>
         </table>
@@ -103,7 +118,7 @@
     <div v-if="currentView === 'player' && selectedPlayer" class="space-y-6">
       <div class="flex items-center justify-between">
         <button @click="currentView = 'overview'" class="text-sm text-slate-400 hover:text-white">← Back to Overview</button>
-        <button @click="openLogModal(selectedPlayer)" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-md text-sm font-medium text-white transition">+ Log New Session</button>
+        <button v-if="isCoach" @click="openLogModal(selectedPlayer)" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-md text-sm font-medium text-white transition">+ Log New Session</button>
       </div>
 
       <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6 flex flex-col md:flex-row justify-between gap-4">
@@ -152,7 +167,7 @@
     </div>
 
     <!-- MODAL: Add Player -->
-    <div v-if="showAddPlayerModal" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+    <div v-if="showAddPlayerModal && isCoach" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
       <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full p-6 space-y-4">
         <h3 class="text-lg font-bold">Add Player to Cloud Database</h3>
         <div class="space-y-3 text-sm">
@@ -205,7 +220,7 @@
     </div>
 
     <!-- MODAL: Log Station Data -->
-    <div v-if="showLogModal && activePlayerForLog" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+    <div v-if="showLogModal && activePlayerForLog && isCoach" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
       <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-lg w-full p-6 space-y-4">
         <h3 class="text-lg font-bold">Log Session: {{ activePlayerForLog.name }}</h3>
         <div class="grid grid-cols-2 gap-3 text-sm">
@@ -253,8 +268,8 @@
     </div>
   </div>
 
- <script>
-    // 1. SUPABASE CREDENTIALS (Declared ONCE)
+  <script>
+    // Supabase Connection Credentials
     const SUPABASE_URL = 'https://yznulwgrhvjyuwclmioo.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6bnVsd2dyaHZqeXV3Y2xtaW9vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1OTY1MDcsImV4cCI6MjEwNDE3MjUwN30.NGk74QmSL1Q5fG8JYFM_6TaB0Uo25jve76H0X_VC5co';
 
@@ -269,6 +284,40 @@
         const showLogModal = ref(false);
         const selectedPlayer = ref(null);
         const activePlayerForLog = ref(null);
+
+        // Coach authentication state saved for the session
+        const isCoach = ref(sessionStorage.getItem('swallows_is_coach') === 'true');
+
+        // Verify PIN via Supabase RPC function (PIN is never stored in HTML)
+        const unlockCoachMode = async () => {
+          const entered = prompt('Enter Coach PIN:');
+          if (!entered) return;
+
+          try {
+            const { data: isValid, error } = await supabaseClient.rpc('verify_coach_pin', { entered_pin: entered });
+            
+            if (error) {
+              alert('Database connection error during verification.');
+              console.error(error);
+              return;
+            }
+
+            if (isValid === true) {
+              isCoach.value = true;
+              sessionStorage.setItem('swallows_is_coach', 'true');
+            } else {
+              alert('Incorrect Coach PIN.');
+            }
+          } catch (err) {
+            console.error('Verification failed:', err);
+            alert('Failed to verify PIN. Check your connection.');
+          }
+        };
+
+        const lockCoachMode = () => {
+          isCoach.value = false;
+          sessionStorage.removeItem('swallows_is_coach');
+        };
 
         const players = ref([]);
         const sessions = ref([]);
@@ -293,7 +342,7 @@
         };
 
         const addPlayer = async () => {
-          if (!newPlayer.value.name || !newPlayer.value.jersey) return;
+          if (!isCoach.value || !newPlayer.value.name || !newPlayer.value.jersey) return;
           const { data, error } = await supabaseClient.from('players').insert([newPlayer.value]).select();
           if (!error && data) {
             players.value.push(data[0]);
@@ -306,6 +355,7 @@
         };
 
         const removePlayer = async (id) => {
+          if (!isCoach.value) return;
           if (!confirm('Delete this player and all their cloud session records?')) return;
           const { error } = await supabaseClient.from('players').delete().eq('id', id);
           if (!error) {
@@ -322,12 +372,13 @@
         };
 
         const openLogModal = (player) => {
+          if (!isCoach.value) return;
           activePlayerForLog.value = player;
           showLogModal.value = true;
         };
 
         const saveSession = async () => {
-          if (!activePlayerForLog.value) return;
+          if (!isCoach.value || !activePlayerForLog.value) return;
           const payload = { player_id: activePlayerForLog.value.id, ...newSession.value };
           const { data, error } = await supabaseClient.from('sessions').insert([payload]).select();
           if (!error && data) {
@@ -378,6 +429,7 @@
         return {
           loading, currentView, showAddPlayerModal, showLogModal, selectedPlayer, activePlayerForLog,
           players, sessions, newPlayer, newSession,
+          isCoach, unlockCoachMode, lockCoachMode,
           addPlayer, removePlayer, selectPlayer, openLogModal, saveSession,
           getPlayerSessions, getLatestMetric, getClubCount, avgBatSpeed, safetyAlertCount, getAttackAngleColor
         };
