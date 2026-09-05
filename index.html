@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Swallows Performance Data Lab</title>
+  <title>Swallows DATALAB 2026-2027</title>
+  <link rel="icon" type="image/png" href="./logo.png">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <!-- Supabase Official Client -->
@@ -48,10 +49,11 @@
     <!-- Header (Hidden on Print) -->
     <header class="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-800 pb-4 mb-6 gap-4 no-print">
       <div>
-        <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-          <span>🦅</span> {{ t('appTitle') }}
+        <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-2.5">
+          <img src="./logo.png" alt="Swallows Logo" class="w-8 h-8 rounded-lg shadow-sm object-contain border border-slate-700 bg-slate-950">
+          <span>{{ t('appTitle') }}</span>
         </h1>
-        <p class="text-sm text-slate-400">
+        <p class="text-sm text-slate-400 mt-0.5">
           {{ t('cloudSynced') }} • 
           <span v-if="isCoach" class="text-emerald-400 font-medium">{{ t('coachUnlocked') }}</span>
           <span v-else class="text-slate-500 font-medium">{{ t('readOnlyView') }}</span>
@@ -113,7 +115,7 @@
         </div>
       </div>
 
-      <!-- Overview Sub-Tab Switcher: Roster vs Leaderboard -->
+      <!-- Overview Sub-Tab Switcher -->
       <div class="flex items-center justify-between border-b border-slate-800 pb-2">
         <div class="flex gap-2">
           <button 
@@ -446,7 +448,7 @@
         </div>
       </div>
 
-      <!-- DATED SESSION HISTORY (STRATEGY 2: RESPONSIVE ACCORDION CARDS ON MOBILE) -->
+      <!-- DATED SESSION HISTORY (RESPONSIVE ACCORDION CARDS ON MOBILE) -->
       <div class="space-y-3">
         <div class="flex items-center justify-between">
           <h3 class="text-lg font-semibold flex items-center gap-2">
@@ -458,14 +460,14 @@
           <span class="text-xs text-slate-500 font-normal no-print hidden sm:inline">All metrics synced to cloud</span>
         </div>
 
-        <!-- 1. MOBILE SMART ACCORDION CARDS (Visible only on < 768px screens) -->
+        <!-- 1. MOBILE SMART ACCORDION CARDS (Visible on < 768px screens) -->
         <div class="block md:hidden space-y-2.5">
           <div 
             v-for="session in getPlayerSessions(selectedPlayer.id)" 
             :key="'mob-' + session.id"
             class="bg-slate-850 border border-slate-700/80 rounded-xl overflow-hidden shadow-sm transition">
             
-            <!-- Tier 1: Collapsed Row (Always Visible, Touch-Friendly Tap Target) -->
+            <!-- Tier 1: Collapsed Row -->
             <div 
               @click="toggleSessionExpand(session.id)" 
               class="p-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-800/60 transition active:bg-slate-800">
@@ -474,7 +476,6 @@
                 <div class="bg-slate-800 border border-slate-700 px-2 py-1 rounded-md text-xs font-mono font-bold text-slate-200">
                   📅 {{ session.session_date }}
                 </div>
-                <!-- Primary Velo Tags -->
                 <div class="flex items-center gap-2 text-xs font-mono">
                   <span class="text-blue-400 font-bold" title="Exit Velocity">
                     ⚡ {{ session.exit_velo ? session.exit_velo + 'k' : '--' }}
@@ -486,14 +487,12 @@
               </div>
 
               <div class="flex items-center gap-2">
-                <!-- Compact Shoulder Safety Pill -->
                 <span 
                   class="text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider"
                   :class="session.shoulder_check === 'Pass' ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-700/50' : 'bg-rose-950/60 text-rose-400 border border-rose-700/50'">
                   {{ session.shoulder_check === 'Pass' ? 'PASS' : 'WARN' }}
                 </span>
                 
-                <!-- Rotating Chevron Indicator -->
                 <span 
                   class="text-xs text-slate-400 transition-transform duration-200 inline-block"
                   :class="isSessionExpanded(session.id) ? 'rotate-180 text-blue-400' : ''">
@@ -502,12 +501,12 @@
               </div>
             </div>
 
-            <!-- Tier 2: Expanded Drawer Details (Smoothly Toggled) -->
+            <!-- Tier 2: Expanded Drawer Details -->
             <div 
               v-if="isSessionExpanded(session.id)" 
               class="border-t border-slate-800 bg-slate-900/90 p-4 space-y-3.5 text-xs">
               
-              <!-- Category A: Hitting & Exit Speeds -->
+              <!-- Hitting & Exit Speeds -->
               <div class="space-y-1.5">
                 <p class="text-[11px] font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
                   <span>⚡</span> {{ t('stationMetricsHeader') }}
@@ -530,7 +529,7 @@
                 </div>
               </div>
 
-              <!-- Category B: Athletic Power & Speed -->
+              <!-- Athletic Power & Speed -->
               <div class="space-y-1.5">
                 <p class="text-[11px] font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
                   <span>🚀</span> {{ t('broadJumpRatioTitle') }} &amp; Speed
@@ -562,7 +561,7 @@
                 </div>
               </div>
 
-              <!-- Category C: Growth & Physical Baseline -->
+              <!-- Growth & Physical Baseline -->
               <div class="space-y-1.5">
                 <p class="text-[11px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
                   <span>📏</span> {{ t('growthSectionHeader') }}
@@ -579,7 +578,7 @@
                 </div>
               </div>
 
-              <!-- Drawer Bottom Actions (Coach Only) -->
+              <!-- Actions (Coach Only) -->
               <div v-if="isCoach" class="flex justify-end gap-2 pt-2 border-t border-slate-800">
                 <button 
                   @click="openEditSessionModal(session)" 
@@ -601,7 +600,7 @@
           </div>
         </div>
 
-        <!-- 2. DESKTOP & PRINT MULTI-COLUMN TABLE (Visible only on ≥ 768px screens or printing) -->
+        <!-- 2. DESKTOP & PRINT MULTI-COLUMN TABLE (Visible on ≥ 768px screens or printing) -->
         <div class="hidden md:block bg-slate-800/40 border border-slate-700/80 rounded-xl overflow-x-auto print-card">
           <table class="w-full text-left text-sm">
             <thead class="bg-slate-800/80 text-slate-300 text-xs uppercase tracking-wider">
@@ -631,7 +630,6 @@
                 <td class="p-3 font-mono text-emerald-400 font-semibold">{{ session.throwing_velo ? session.throwing_velo + ' km/h' : '--' }}</td>
                 <td class="p-3 font-mono" :class="getAttackAngleColor(session.attack_angle)">{{ session.attack_angle ? session.attack_angle + '°' : '--' }}</td>
                 
-                <!-- Session Broad Jump & Ratio -->
                 <td class="p-3 font-mono">
                   <div v-if="session.broad_jump">
                     <span>{{ session.broad_jump }} cm</span>
@@ -1054,7 +1052,7 @@
 
     const translations = {
       en: {
-        appTitle: 'Swallows Data Lab 2026',
+        appTitle: 'Swallows DATALAB 2026-2027',
         cloudSynced: 'Cloud-Synced',
         coachUnlocked: 'Coach Mode Unlocked',
         readOnlyView: 'Read-Only View',
@@ -1157,7 +1155,7 @@
         printReportBtn: 'Print / PDF Report'
       },
       zh: {
-        appTitle: 'Swallows 棒球數據實驗室 2026',
+        appTitle: 'Swallows 棒球數據實驗室 2026-2027',
         cloudSynced: '雲端同步',
         coachUnlocked: '教練模式已解鎖',
         readOnlyView: '家長/訪客只讀模式',
@@ -1260,7 +1258,7 @@
         printReportBtn: '列印 / 匯出 PDF 成績單'
       },
       ja: {
-        appTitle: 'スワローズ データラボ 2026',
+        appTitle: 'スワローズ DATALAB 2026-2027',
         cloudSynced: 'クラウド同期済',
         coachUnlocked: 'コーチモード解除中',
         readOnlyView: '閲覧専用モード',
@@ -1375,7 +1373,6 @@
         const hasChartData = ref(false);
         const isUploadingPhoto = ref(false);
 
-        // Responsive Accordion state: Stores open session IDs for mobile drawer
         const expandedSessionIds = reactive(new Set());
         const toggleSessionExpand = (sessionId) => {
           if (expandedSessionIds.has(sessionId)) {
