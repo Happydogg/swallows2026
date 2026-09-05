@@ -92,6 +92,7 @@
               <th class="p-3">{{ t('throwsBats') }}</th>
               <th class="p-3">{{ t('heightWeight') }}</th>
               <th class="p-3">{{ t('topExitVelo') }}</th>
+              <th class="p-3">{{ t('throwingVelo') }}</th>
               <th class="p-3">{{ t('attackAngle') }}</th>
               <th class="p-3">{{ t('broadJump') }}</th>
               <th class="p-3 text-right">{{ t('actions') }}</th>
@@ -115,6 +116,7 @@
                 {{ formatHeightWeight(player.id) }}
               </td>
               <td class="p-3 font-mono">{{ getLatestMetric(player.id, 'exit_velo') || '--' }} km/h</td>
+              <td class="p-3 font-mono text-emerald-400 font-semibold">{{ getLatestMetric(player.id, 'throwing_velo') ? getLatestMetric(player.id, 'throwing_velo') + ' km/h' : '--' }}</td>
               <td class="p-3 font-mono">
                 <span :class="getAttackAngleColor(getLatestMetric(player.id, 'attack_angle'))">
                   {{ getLatestMetric(player.id, 'attack_angle') ? getLatestMetric(player.id, 'attack_angle') + '°' : '--' }}
@@ -131,7 +133,7 @@
               </td>
             </tr>
             <tr v-if="players.length === 0">
-              <td colspan="9" class="p-6 text-center text-slate-500">{{ t('noPlayers') }}</td>
+              <td colspan="10" class="p-6 text-center text-slate-500">{{ t('noPlayers') }}</td>
             </tr>
           </tbody>
         </table>
@@ -186,15 +188,17 @@
               <th class="p-3">{{ t('date') }}</th>
               <th class="p-3">{{ t('heightWeight') }}</th>
               <th class="p-3">{{ t('exitVeloPersonalControl') }}</th>
+              <th class="p-3">{{ t('throwingVelo') }}</th>
               <th class="p-3">{{ t('attackAngle') }}</th>
               <th class="p-3">{{ t('broadJump') }}</th>
               <th class="p-3">{{ t('sprint18m') }}</th>
               <th class="p-3">{{ t('gripPinch') }}</th>
               <th class="p-3">{{ t('shoulderCheck') }}</th>
+              <th class="p-3 text-right" v-if="isCoach">{{ t('actions') }}</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-800">
-            <tr v-for="session in getPlayerSessions(selectedPlayer.id)" :key="session.id">
+            <tr v-for="session in getPlayerSessions(selectedPlayer.id)" :key="session.id" class="hover:bg-slate-800/40 transition">
               <td class="p-3 font-mono text-slate-300">{{ session.session_date }}</td>
               <td class="p-3 font-mono">
                 <span v-if="session.height_cm || session.weight_kg">
@@ -203,6 +207,7 @@
                 <span v-else class="text-slate-600">--</span>
               </td>
               <td class="p-3 font-mono">{{ session.exit_velo || '--' }} / {{ session.control_exit_velo || '--' }} km/h</td>
+              <td class="p-3 font-mono text-emerald-400 font-semibold">{{ session.throwing_velo ? session.throwing_velo + ' km/h' : '--' }}</td>
               <td class="p-3 font-mono" :class="getAttackAngleColor(session.attack_angle)">{{ session.attack_angle ? session.attack_angle + '°' : '--' }}</td>
               <td class="p-3 font-mono">{{ session.broad_jump ? session.broad_jump + ' cm' : '--' }}</td>
               <td class="p-3 font-mono">{{ session.sprint_time ? session.sprint_time + 's' : '--' }}</td>
@@ -212,9 +217,18 @@
                   {{ session.shoulder_check === 'Pass' ? t('pass') : t('adjust') }}
                 </span>
               </td>
+              <!-- Session Actions (Coach Only) -->
+              <td class="p-3 text-right space-x-2 whitespace-nowrap" v-if="isCoach">
+                <button @click="openEditSessionModal(session)" class="bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 px-2 py-1 rounded text-xs">
+                  {{ t('edit') }}
+                </button>
+                <button @click="removeSession(session.id)" class="text-rose-400 hover:text-rose-300 text-xs">
+                  {{ t('remove') }}
+                </button>
+              </td>
             </tr>
             <tr v-if="getPlayerSessions(selectedPlayer.id).length === 0">
-              <td colspan="8" class="p-6 text-center text-slate-500">{{ t('noSessionsRecorded') }}</td>
+              <td :colspan="isCoach ? 10 : 9" class="p-6 text-center text-slate-500">{{ t('noSessionsRecorded') }}</td>
             </tr>
           </tbody>
         </table>
@@ -370,7 +384,7 @@
             <input v-model="newSession.session_date" type="date" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
           </div>
 
-          <!-- Section: Physical Growth -->
+          <!-- Section: Physical Growth & Athletic Power -->
           <div class="p-3 bg-slate-900/60 border border-slate-700/60 rounded-lg space-y-2">
             <p class="text-xs font-semibold text-blue-400 uppercase tracking-wider">{{ t('growthSectionHeader') }}</p>
             <div class="grid grid-cols-3 gap-2">
@@ -402,6 +416,10 @@
                 <input v-model.number="newSession.control_exit_velo" type="number" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
               </div>
               <div>
+                <label class="block text-slate-400 text-xs mb-1">{{ t('throwingVeloInput') }}</label>
+                <input v-model.number="newSession.throwing_velo" placeholder="e.g. 65" type="number" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+              </div>
+              <div>
                 <label class="block text-slate-400 text-xs mb-1">{{ t('attackAngleDeg') }}</label>
                 <input v-model.number="newSession.attack_angle" type="number" step="0.5" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
               </div>
@@ -417,22 +435,100 @@
                 <label class="block text-slate-400 text-xs mb-1">{{ t('fingerPinchKg') }}</label>
                 <input v-model.number="newSession.pinch" type="number" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
               </div>
+              <div>
+                <label class="block text-slate-400 text-xs mb-1">{{ t('shoulderCheck') }}</label>
+                <select v-model="newSession.shoulder_check" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+                  <option value="Pass">{{ t('pass') }}</option>
+                  <option value="Adjust">{{ t('adjust') }}</option>
+                </select>
+              </div>
             </div>
-          </div>
-
-          <!-- Shoulder Safety -->
-          <div>
-            <label class="block text-slate-400 text-xs mb-1">{{ t('shoulderCheck') }}</label>
-            <select v-model="newSession.shoulder_check" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
-              <option value="Pass">{{ t('pass') }}</option>
-              <option value="Adjust">{{ t('adjust') }}</option>
-            </select>
           </div>
         </div>
 
         <div class="flex justify-end gap-2 pt-2">
           <button @click="showLogModal = false" class="px-3 py-1.5 rounded text-sm text-slate-400 hover:text-white">{{ t('cancel') }}</button>
           <button @click="saveSession" class="bg-blue-600 hover:bg-blue-500 px-4 py-1.5 rounded text-sm font-medium text-white transition">{{ t('saveRecord') }}</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: Edit Session Modal -->
+    <div v-if="showEditSessionModal && isCoach && editingSession" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+      <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+        <h3 class="text-lg font-bold">{{ t('editSessionModalTitle') }}</h3>
+        
+        <div class="space-y-4 text-sm">
+          <div>
+            <label class="block text-slate-400 text-xs mb-1">{{ t('date') }}</label>
+            <input v-model="editingSession.session_date" type="date" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+          </div>
+
+          <!-- Section: Physical Growth & Power -->
+          <div class="p-3 bg-slate-900/60 border border-slate-700/60 rounded-lg space-y-2">
+            <p class="text-xs font-semibold text-blue-400 uppercase tracking-wider">{{ t('growthSectionHeader') }}</p>
+            <div class="grid grid-cols-3 gap-2">
+              <div>
+                <label class="block text-slate-400 text-xs mb-1">{{ t('heightCm') }}</label>
+                <input v-model.number="editingSession.height_cm" placeholder="--" type="number" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+              </div>
+              <div>
+                <label class="block text-slate-400 text-xs mb-1">{{ t('weightKg') }}</label>
+                <input v-model.number="editingSession.weight_kg" placeholder="--" type="number" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+              </div>
+              <div>
+                <label class="block text-slate-400 text-xs mb-1">{{ t('broadJumpCm') }}</label>
+                <input v-model.number="editingSession.broad_jump" placeholder="--" type="number" step="1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+              </div>
+            </div>
+          </div>
+
+          <!-- Section: Hitting & Athletic Metrics -->
+          <div class="p-3 bg-slate-900/60 border border-slate-700/60 rounded-lg space-y-2">
+            <p class="text-xs font-semibold text-emerald-400 uppercase tracking-wider">{{ t('stationMetricsHeader') }}</p>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-slate-400 text-xs mb-1">{{ t('personalBatExit') }}</label>
+                <input v-model.number="editingSession.exit_velo" type="number" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+              </div>
+              <div>
+                <label class="block text-slate-400 text-xs mb-1">{{ t('controlBatExit') }}</label>
+                <input v-model.number="editingSession.control_exit_velo" type="number" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+              </div>
+              <div>
+                <label class="block text-slate-400 text-xs mb-1">{{ t('throwingVeloInput') }}</label>
+                <input v-model.number="editingSession.throwing_velo" placeholder="--" type="number" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+              </div>
+              <div>
+                <label class="block text-slate-400 text-xs mb-1">{{ t('attackAngleDeg') }}</label>
+                <input v-model.number="editingSession.attack_angle" type="number" step="0.5" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+              </div>
+              <div>
+                <label class="block text-slate-400 text-xs mb-1">{{ t('homeTo1stSec') }}</label>
+                <input v-model.number="editingSession.sprint_time" type="number" step="0.01" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+              </div>
+              <div>
+                <label class="block text-slate-400 text-xs mb-1">{{ t('domGripKg') }}</label>
+                <input v-model.number="editingSession.grip_dom" type="number" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+              </div>
+              <div>
+                <label class="block text-slate-400 text-xs mb-1">{{ t('fingerPinchKg') }}</label>
+                <input v-model.number="editingSession.pinch" type="number" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+              </div>
+              <div>
+                <label class="block text-slate-400 text-xs mb-1">{{ t('shoulderCheck') }}</label>
+                <select v-model="editingSession.shoulder_check" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+                  <option value="Pass">{{ t('pass') }}</option>
+                  <option value="Adjust">{{ t('adjust') }}</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button @click="showEditSessionModal = false" class="px-3 py-1.5 rounded text-sm text-slate-400 hover:text-white">{{ t('cancel') }}</button>
+          <button @click="updateSession" class="bg-amber-600 hover:bg-amber-500 px-4 py-1.5 rounded text-sm font-medium text-white transition">{{ t('saveChanges') }}</button>
         </div>
       </div>
     </div>
@@ -468,6 +564,8 @@
         throwsBats: 'Throws/Bats',
         heightWeight: 'Height / Weight',
         topExitVelo: 'Top Exit Velo',
+        throwingVelo: 'Throwing Velo',
+        throwingVeloInput: 'Throwing Velo (km/h)',
         attackAngle: 'Attack Angle',
         broadJump: 'Broad Jump',
         domGrip: 'Grip (Dom)',
@@ -497,6 +595,7 @@
         noSessionsRecorded: 'No session metrics recorded yet for this player.',
         addPlayerModalTitle: 'Add Player to Cloud Database',
         editPlayerModalTitle: 'Edit Player Profile',
+        editSessionModalTitle: 'Edit Session Record',
         fullName: 'Full Name',
         jerseyNum: 'Jersey #',
         right: 'Right',
@@ -522,7 +621,8 @@
         enterPinPrompt: 'Enter Coach PIN:',
         pinSuccess: 'Coach Mode Unlocked!',
         pinError: 'Incorrect Coach PIN.',
-        deleteConfirm: 'Delete this player and all their cloud session records?'
+        deleteConfirm: 'Delete this player and all their cloud session records?',
+        deleteSessionConfirm: 'Are you sure you want to delete this session record permanently?'
       },
       zh: {
         appTitle: 'Swallows 棒球數據實驗室 2026',
@@ -545,7 +645,9 @@
         selectPositions: '選擇守位 (可複選多個守備位置)',
         throwsBats: '投/打',
         heightWeight: '最新身高 / 體重',
-        topExitVelo: '個人最高擊球初速',
+        topExitVelo: '最高擊球初速',
+        throwingVelo: '傳球球速',
+        throwingVeloInput: '傳球球速 (km/h)',
         attackAngle: '擊球仰角 (Attack Angle)',
         broadJump: '立定跳遠',
         domGrip: '慣用手握力',
@@ -575,6 +677,7 @@
         noSessionsRecorded: '該球員暫無測試記錄。',
         addPlayerModalTitle: '新增球員到雲端數據庫',
         editPlayerModalTitle: '編輯球員基本資料',
+        editSessionModalTitle: '修改測試日誌數據',
         fullName: '球員全名',
         jerseyNum: '球衣號碼 #',
         right: '右',
@@ -586,7 +689,7 @@
         saveChanges: '儲存修改',
         logSessionTitle: '記錄站點測試數據',
         growthSectionHeader: '身體生長與爆發力 (可選 / 季度測量)',
-        stationMetricsHeader: '站點打擊與體能數據',
+        stationMetricsHeader: '站點打擊、傳球與體能數據',
         heightCm: '身高 (cm)',
         weightKg: '體重 (kg)',
         broadJumpCm: '立定跳遠 (cm)',
@@ -600,7 +703,8 @@
         enterPinPrompt: '請輸入教練 PIN 碼：',
         pinSuccess: '教練模式已解鎖！',
         pinError: 'PIN 碼錯誤。',
-        deleteConfirm: '確認要刪除此球員及其所有歷史測試記錄嗎？'
+        deleteConfirm: '確認要刪除此球員及其所有歷史測試記錄嗎？',
+        deleteSessionConfirm: '確認要永久刪除這條測試記錄嗎？'
       },
       ja: {
         appTitle: 'スワローズ データラボ 2026',
@@ -624,6 +728,8 @@
         throwsBats: '投/打',
         heightWeight: '最新 身長 / 体重',
         topExitVelo: '最高打球初速',
+        throwingVelo: '送球速度',
+        throwingVeloInput: '送球速度 (km/h)',
         attackAngle: 'アタックアングル',
         broadJump: '立ち幅跳び',
         domGrip: '利き手握力',
@@ -653,6 +759,7 @@
         noSessionsRecorded: '測定記録がありません。',
         addPlayerModalTitle: '選手新規登録',
         editPlayerModalTitle: '選手プロファイル編集',
+        editSessionModalTitle: 'セッションデータ編集',
         fullName: '選手氏名',
         jerseyNum: '背番号 #',
         right: '右',
@@ -664,7 +771,7 @@
         saveChanges: '変更を保存',
         logSessionTitle: '測定データ記録',
         growthSectionHeader: '身体測定・下半身パワー (任意 / 季次)',
-        stationMetricsHeader: 'ステーション打撃・走力データ',
+        stationMetricsHeader: 'ステーション打撃・送球・走力データ',
         heightCm: '身長 (cm)',
         weightKg: '体重 (kg)',
         broadJumpCm: '立ち幅跳び (cm)',
@@ -678,7 +785,8 @@
         enterPinPrompt: 'コーチ暗証番号(PIN)を入力してください:',
         pinSuccess: 'コーチモードが解除されました。',
         pinError: '暗証番号が正しくありません。',
-        deleteConfirm: 'この選手とすべての測定履歴を削除しますか？'
+        deleteConfirm: 'この選手とすべての測定履歴を削除しますか？',
+        deleteSessionConfirm: 'このセッションデータを完全に削除してもよろしいですか？'
       }
     };
 
@@ -696,11 +804,13 @@
         const showAddPlayerModal = ref(false);
         const showEditPlayerModal = ref(false);
         const showLogModal = ref(false);
+        const showEditSessionModal = ref(false);
+        
         const selectedPlayer = ref(null);
         const editingPlayer = ref(null);
         const activePlayerForLog = ref(null);
+        const editingSession = ref(null);
 
-        // Multi-Position selection trackers
         const selectedAddPositions = ref(['IF']);
         const selectedEditPositions = ref([]);
 
@@ -752,7 +862,7 @@
         const newSession = ref({ 
           session_date: new Date().toISOString().slice(0, 10), 
           height_cm: null, weight_kg: null, broad_jump: null,
-          exit_velo: null, control_exit_velo: null, attack_angle: 10, 
+          exit_velo: null, control_exit_velo: null, throwing_velo: null, attack_angle: 10, 
           sprint_time: null, grip_dom: null, pinch: null, shoulder_check: 'Pass' 
         });
 
@@ -889,10 +999,10 @@
           showLogModal.value = true;
         };
 
+        const cleanVal = (v) => (v === '' || v === undefined ? null : v);
+
         const saveSession = async () => {
           if (!isCoach.value || !activePlayerForLog.value) return;
-          
-          const cleanVal = (v) => (v === '' || v === undefined ? null : v);
 
           const payload = {
             player_id: activePlayerForLog.value.id,
@@ -902,6 +1012,7 @@
             broad_jump: cleanVal(newSession.value.broad_jump),
             exit_velo: cleanVal(newSession.value.exit_velo),
             control_exit_velo: cleanVal(newSession.value.control_exit_velo),
+            throwing_velo: cleanVal(newSession.value.throwing_velo),
             attack_angle: cleanVal(newSession.value.attack_angle),
             sprint_time: cleanVal(newSession.value.sprint_time),
             grip_dom: cleanVal(newSession.value.grip_dom),
@@ -915,9 +1026,68 @@
             newSession.value.height_cm = null;
             newSession.value.weight_kg = null;
             newSession.value.broad_jump = null;
+            newSession.value.throwing_velo = null;
             showLogModal.value = false;
           } else if (error) {
             alert('Failed to save session: ' + error.message);
+          }
+        };
+
+        const openEditSessionModal = (session) => {
+          if (!isCoach.value) return;
+          editingSession.value = { ...session };
+          showEditSessionModal.value = true;
+        };
+
+        const updateSession = async () => {
+          if (!isCoach.value || !editingSession.value) return;
+
+          const s = editingSession.value;
+          const payload = {
+            session_date: s.session_date,
+            height_cm: cleanVal(s.height_cm),
+            weight_kg: cleanVal(s.weight_kg),
+            broad_jump: cleanVal(s.broad_jump),
+            exit_velo: cleanVal(s.exit_velo),
+            control_exit_velo: cleanVal(s.control_exit_velo),
+            throwing_velo: cleanVal(s.throwing_velo),
+            attack_angle: cleanVal(s.attack_angle),
+            sprint_time: cleanVal(s.sprint_time),
+            grip_dom: cleanVal(s.grip_dom),
+            pinch: cleanVal(s.pinch),
+            shoulder_check: s.shoulder_check
+          };
+
+          const { error } = await supabaseClient
+            .from('sessions')
+            .update(payload)
+            .eq('id', s.id);
+
+          if (!error) {
+            const index = sessions.value.findIndex(item => item.id === s.id);
+            if (index !== -1) {
+              sessions.value[index] = { ...sessions.value[index], ...payload };
+              sessions.value.sort((a, b) => new Date(b.session_date) - new Date(a.session_date));
+            }
+            showEditSessionModal.value = false;
+          } else {
+            alert('Failed to update session: ' + error.message);
+          }
+        };
+
+        const removeSession = async (sessionId) => {
+          if (!isCoach.value) return;
+          if (!confirm(t('deleteSessionConfirm'))) return;
+
+          const { error } = await supabaseClient
+            .from('sessions')
+            .delete()
+            .eq('id', sessionId);
+
+          if (!error) {
+            sessions.value = sessions.value.filter(s => s.id !== sessionId);
+          } else {
+            alert('Failed to delete session: ' + error.message);
           }
         };
 
@@ -984,13 +1154,14 @@
 
         return {
           currentLang, t, saveLanguage,
-          loading, currentView, showAddPlayerModal, showEditPlayerModal, showLogModal, 
-          selectedPlayer, editingPlayer, activePlayerForLog,
+          loading, currentView, showAddPlayerModal, showEditPlayerModal, showLogModal, showEditSessionModal,
+          selectedPlayer, editingPlayer, activePlayerForLog, editingSession,
           selectedAddPositions, selectedEditPositions,
           toggleAddPosition, toggleEditPosition, openAddPlayerModal, splitPositions,
           players, sessions, newPlayer, newSession,
           isCoach, unlockCoachMode, lockCoachMode,
-          addPlayer, openEditPlayerModal, updatePlayer, removePlayer, selectPlayer, openLogModal, saveSession,
+          addPlayer, openEditPlayerModal, updatePlayer, removePlayer, selectPlayer, 
+          openLogModal, saveSession, openEditSessionModal, updateSession, removeSession,
           getPlayerSessions, getLatestMetric, formatHeightWeight, calculateAge,
           getClubCount, avgBatSpeed, safetyAlertCount, getAttackAngleColor
         };
