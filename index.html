@@ -40,7 +40,7 @@
         </button>
         
         <template v-if="isCoach">
-          <button @click="showAddPlayerModal = true" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-md text-sm font-medium text-white transition">
+          <button @click="openAddPlayerModal" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-md text-sm font-medium text-white transition">
             + {{ t('addPlayer') }}
           </button>
           <button @click="lockCoachMode" class="bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 border border-slate-700 px-3 py-1.5 rounded-md text-sm font-medium transition">
@@ -103,7 +103,13 @@
               <td class="p-3 font-semibold text-white">
                 <button @click="selectPlayer(player)" class="hover:underline text-blue-400">{{ player.name }}</button>
               </td>
-              <td class="p-3"><span class="px-2 py-0.5 rounded bg-slate-700 text-xs">{{ player.position }}</span></td>
+              <td class="p-3">
+                <div class="flex flex-wrap gap-1">
+                  <span v-for="pos in splitPositions(player.position)" :key="pos" class="px-2 py-0.5 rounded bg-slate-700 text-xs font-medium">
+                    {{ pos }}
+                  </span>
+                </div>
+              </td>
               <td class="p-3 text-slate-300">{{ player.throws }} / {{ player.bats }}</td>
               <td class="p-3 font-mono text-slate-300">
                 {{ formatHeightWeight(player.id) }}
@@ -115,7 +121,7 @@
                 </span>
               </td>
               <td class="p-3 font-mono">{{ getLatestMetric(player.id, 'broad_jump') ? getLatestMetric(player.id, 'broad_jump') + ' cm' : '--' }}</td>
-              <td class="p-3 text-right space-x-2">
+              <td class="p-3 text-right space-x-2 whitespace-nowrap">
                 <template v-if="isCoach">
                   <button @click="openLogModal(player)" class="bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 px-2.5 py-1 rounded text-xs">+ {{ t('log') }}</button>
                   <button @click="openEditPlayerModal(player)" class="bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 px-2.5 py-1 rounded text-xs">{{ t('edit') }}</button>
@@ -148,10 +154,17 @@
 
       <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6 flex flex-col md:flex-row justify-between gap-4">
         <div>
-          <span class="text-xs font-mono px-2 py-0.5 rounded bg-slate-700">#{{ selectedPlayer.jersey }}</span>
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-xs font-mono px-2 py-0.5 rounded bg-slate-700">#{{ selectedPlayer.jersey }}</span>
+            <div class="flex gap-1">
+              <span v-for="pos in splitPositions(selectedPlayer.position)" :key="pos" class="px-2 py-0.5 rounded bg-blue-900/60 text-blue-300 text-xs font-medium border border-blue-700/50">
+                {{ pos }}
+              </span>
+            </div>
+          </div>
           <h2 class="text-2xl font-bold mt-1">{{ selectedPlayer.name }}</h2>
           <p class="text-sm text-slate-400">
-            {{ selectedPlayer.position }} | {{ t('throws') }}: {{ selectedPlayer.throws }} | {{ t('bats') }}: {{ selectedPlayer.bats }}
+            {{ t('throws') }}: {{ selectedPlayer.throws }} | {{ t('bats') }}: {{ selectedPlayer.bats }}
             <span v-if="selectedPlayer.dob"> | {{ t('dob') }}: {{ selectedPlayer.dob }} ({{ calculateAge(selectedPlayer.dob) }})</span>
           </p>
           <p class="text-sm text-blue-400 mt-2 font-mono">
@@ -223,25 +236,27 @@
               <input v-model.number="newPlayer.jersey" type="number" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none focus:border-blue-500">
             </div>
             <div>
-              <label class="block text-slate-400 text-xs mb-1">{{ t('pos') }}</label>
-              <select v-model="newPlayer.position" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
-                <option value="IF">IF ({{ t('posIF') }})</option>
-                <option value="OF">OF ({{ t('posOF') }})</option>
-                <option value="P">P ({{ t('posP') }})</option>
-                <option value="C">C ({{ t('posC') }})</option>
-              </select>
-            </div>
-          </div>
-          <div class="grid grid-cols-2 gap-2">
-            <div>
               <label class="block text-slate-400 text-xs mb-1">{{ t('dob') }}</label>
               <input v-model="newPlayer.dob" type="date" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
             </div>
-            <div>
-              <label class="block text-slate-400 text-xs mb-1">{{ t('parentPhone') }}</label>
-              <input v-model="newPlayer.parent_phone" placeholder="+852 ..." type="text" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+          </div>
+
+          <!-- Multi-Position Selector -->
+          <div>
+            <label class="block text-slate-400 text-xs mb-1.5">{{ t('selectPositions') }}</label>
+            <div class="grid grid-cols-4 gap-2">
+              <button 
+                type="button" 
+                v-for="posKey in ['IF', 'OF', 'P', 'C']" 
+                :key="posKey" 
+                @click="toggleAddPosition(posKey)" 
+                :class="selectedAddPositions.includes(posKey) ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-900 text-slate-400 border-slate-700 hover:bg-slate-800'"
+                class="py-1.5 px-2 rounded border text-xs font-semibold transition text-center">
+                {{ posKey }}
+              </button>
             </div>
           </div>
+
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="block text-slate-400 text-xs mb-1">{{ t('throws') }}</label>
@@ -258,6 +273,10 @@
                 <option value="S">S ({{ t('switch') }})</option>
               </select>
             </div>
+          </div>
+          <div>
+            <label class="block text-slate-400 text-xs mb-1">{{ t('parentPhone') }}</label>
+            <input v-model="newPlayer.parent_phone" placeholder="+852 ..." type="text" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
           </div>
           <div>
             <label class="block text-slate-400 text-xs mb-1">{{ t('personalBatSpec') }}</label>
@@ -286,25 +305,27 @@
               <input v-model.number="editingPlayer.jersey" type="number" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none focus:border-blue-500">
             </div>
             <div>
-              <label class="block text-slate-400 text-xs mb-1">{{ t('pos') }}</label>
-              <select v-model="editingPlayer.position" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
-                <option value="IF">IF ({{ t('posIF') }})</option>
-                <option value="OF">OF ({{ t('posOF') }})</option>
-                <option value="P">P ({{ t('posP') }})</option>
-                <option value="C">C ({{ t('posC') }})</option>
-              </select>
-            </div>
-          </div>
-          <div class="grid grid-cols-2 gap-2">
-            <div>
               <label class="block text-slate-400 text-xs mb-1">{{ t('dob') }}</label>
               <input v-model="editingPlayer.dob" type="date" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
             </div>
-            <div>
-              <label class="block text-slate-400 text-xs mb-1">{{ t('parentPhone') }}</label>
-              <input v-model="editingPlayer.parent_phone" placeholder="+852 ..." type="text" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+          </div>
+
+          <!-- Multi-Position Selector for Editing -->
+          <div>
+            <label class="block text-slate-400 text-xs mb-1.5">{{ t('selectPositions') }}</label>
+            <div class="grid grid-cols-4 gap-2">
+              <button 
+                type="button" 
+                v-for="posKey in ['IF', 'OF', 'P', 'C']" 
+                :key="posKey" 
+                @click="toggleEditPosition(posKey)" 
+                :class="selectedEditPositions.includes(posKey) ? 'bg-amber-600 text-white border-amber-500' : 'bg-slate-900 text-slate-400 border-slate-700 hover:bg-slate-800'"
+                class="py-1.5 px-2 rounded border text-xs font-semibold transition text-center">
+                {{ posKey }}
+              </button>
             </div>
           </div>
+
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="block text-slate-400 text-xs mb-1">{{ t('throws') }}</label>
@@ -321,6 +342,10 @@
                 <option value="S">S ({{ t('switch') }})</option>
               </select>
             </div>
+          </div>
+          <div>
+            <label class="block text-slate-400 text-xs mb-1">{{ t('parentPhone') }}</label>
+            <input v-model="editingPlayer.parent_phone" placeholder="+852 ..." type="text" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
           </div>
           <div>
             <label class="block text-slate-400 text-xs mb-1">{{ t('personalBatSpec') }}</label>
@@ -345,7 +370,7 @@
             <input v-model="newSession.session_date" type="date" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
           </div>
 
-          <!-- Section: Physical Growth (Optional / Quarterly) -->
+          <!-- Section: Physical Growth -->
           <div class="p-3 bg-slate-900/60 border border-slate-700/60 rounded-lg space-y-2">
             <p class="text-xs font-semibold text-blue-400 uppercase tracking-wider">{{ t('growthSectionHeader') }}</p>
             <div class="grid grid-cols-3 gap-2">
@@ -439,6 +464,7 @@
         armSafetyFlags: 'Arm Safety Flags',
         name: 'Name',
         pos: 'Pos',
+        selectPositions: 'Select Positions (Tap all that apply)',
         throwsBats: 'Throws/Bats',
         heightWeight: 'Height / Weight',
         topExitVelo: 'Top Exit Velo',
@@ -473,10 +499,6 @@
         editPlayerModalTitle: 'Edit Player Profile',
         fullName: 'Full Name',
         jerseyNum: 'Jersey #',
-        posIF: 'Infield',
-        posOF: 'Outfield',
-        posP: 'Pitcher',
-        posC: 'Catcher',
         right: 'Right',
         left: 'Left',
         switch: 'Switch',
@@ -520,6 +542,7 @@
         armSafetyFlags: '手臂健康追蹤警示',
         name: '姓名',
         pos: '守位',
+        selectPositions: '選擇守位 (可複選多個守備位置)',
         throwsBats: '投/打',
         heightWeight: '最新身高 / 體重',
         topExitVelo: '個人最高擊球初速',
@@ -554,10 +577,6 @@
         editPlayerModalTitle: '編輯球員基本資料',
         fullName: '球員全名',
         jerseyNum: '球衣號碼 #',
-        posIF: '內野手',
-        posOF: '外野手',
-        posP: '投手',
-        posC: '捕手',
         right: '右',
         left: '左',
         switch: '左右開弓',
@@ -601,6 +620,7 @@
         armSafetyFlags: '肘・肩セーフティ警告',
         name: '選手名',
         pos: '守備位置',
+        selectPositions: '守備位置を選択 (複数選択可)',
         throwsBats: '投/打',
         heightWeight: '最新 身長 / 体重',
         topExitVelo: '最高打球初速',
@@ -635,10 +655,6 @@
         editPlayerModalTitle: '選手プロファイル編集',
         fullName: '選手氏名',
         jerseyNum: '背番号 #',
-        posIF: '内野手',
-        posOF: '外野手',
-        posP: '投手',
-        posC: '捕手',
         right: '右',
         left: '左',
         switch: '両打',
@@ -683,6 +699,10 @@
         const selectedPlayer = ref(null);
         const editingPlayer = ref(null);
         const activePlayerForLog = ref(null);
+
+        // Multi-Position selection trackers
+        const selectedAddPositions = ref(['IF']);
+        const selectedEditPositions = ref([]);
 
         const isCoach = ref(
           localStorage.getItem('swallows_is_coach') === 'true' || 
@@ -736,6 +756,36 @@
           sprint_time: null, grip_dom: null, pinch: null, shoulder_check: 'Pass' 
         });
 
+        const splitPositions = (posStr) => {
+          if (!posStr) return ['IF'];
+          return posStr.split(',').map(s => s.trim()).filter(Boolean);
+        };
+
+        const toggleAddPosition = (pos) => {
+          if (selectedAddPositions.value.includes(pos)) {
+            if (selectedAddPositions.value.length > 1) {
+              selectedAddPositions.value = selectedAddPositions.value.filter(p => p !== pos);
+            }
+          } else {
+            selectedAddPositions.value.push(pos);
+          }
+        };
+
+        const toggleEditPosition = (pos) => {
+          if (selectedEditPositions.value.includes(pos)) {
+            if (selectedEditPositions.value.length > 1) {
+              selectedEditPositions.value = selectedEditPositions.value.filter(p => p !== pos);
+            }
+          } else {
+            selectedEditPositions.value.push(pos);
+          }
+        };
+
+        const openAddPlayerModal = () => {
+          selectedAddPositions.value = ['IF'];
+          showAddPlayerModal.value = true;
+        };
+
         const fetchAllData = async () => {
           loading.value = true;
           try {
@@ -754,6 +804,9 @@
 
         const addPlayer = async () => {
           if (!isCoach.value || !newPlayer.value.name || !newPlayer.value.jersey) return;
+          
+          newPlayer.value.position = selectedAddPositions.value.join(', ');
+          
           const { data, error } = await supabaseClient.from('players').insert([newPlayer.value]).select();
           if (!error && data) {
             players.value.push(data[0]);
@@ -768,18 +821,20 @@
         const openEditPlayerModal = (player) => {
           if (!isCoach.value) return;
           editingPlayer.value = { ...player };
+          selectedEditPositions.value = splitPositions(player.position);
           showEditPlayerModal.value = true;
         };
 
         const updatePlayer = async () => {
           if (!isCoach.value || !editingPlayer.value) return;
           
-          const { id, name, jersey, position, throws, bats, bat_spec, dob, parent_phone } = editingPlayer.value;
+          const { id, name, jersey, throws, bats, bat_spec, dob, parent_phone } = editingPlayer.value;
+          const posString = selectedEditPositions.value.join(', ');
           
           const payload = {
             name,
             jersey: Number(jersey),
-            position,
+            position: posString,
             throws,
             bats,
             bat_spec,
@@ -931,6 +986,8 @@
           currentLang, t, saveLanguage,
           loading, currentView, showAddPlayerModal, showEditPlayerModal, showLogModal, 
           selectedPlayer, editingPlayer, activePlayerForLog,
+          selectedAddPositions, selectedEditPositions,
+          toggleAddPosition, toggleEditPosition, openAddPlayerModal, splitPositions,
           players, sessions, newPlayer, newSession,
           isCoach, unlockCoachMode, lockCoachMode,
           addPlayer, openEditPlayerModal, updatePlayer, removePlayer, selectPlayer, openLogModal, saveSession,
