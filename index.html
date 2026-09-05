@@ -342,7 +342,7 @@
         </div>
       </div>
 
-      <!-- Printable Player Report Header Card -->
+      <!-- Printable Player Report Header Card (Phone Row Completely Removed) -->
       <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 print-card">
         <div class="flex items-center gap-4">
           <div class="w-20 h-20 rounded-2xl overflow-hidden flex-shrink-0 bg-slate-700 border-2 border-slate-600 shadow-md flex items-center justify-center font-bold text-xl text-blue-300">
@@ -382,7 +382,6 @@
 
         <div class="text-sm text-slate-300 space-y-1 self-stretch md:self-auto border-t md:border-t-0 border-slate-700/60 pt-3 md:pt-0">
           <p><span class="text-slate-500">{{ t('batSpec') }}:</span> {{ selectedPlayer.bat_spec || t('notSpecified') }}</p>
-          <p><span class="text-slate-500">{{ t('parentPhone') }}:</span> {{ selectedPlayer.parent_phone || '--' }}</p>
         </div>
       </div>
 
@@ -724,10 +723,6 @@
             </div>
           </div>
           <div>
-            <label class="block text-slate-400 text-xs mb-1">{{ t('parentPhone') }}</label>
-            <input v-model="newPlayer.parent_phone" placeholder="+852 ..." type="text" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
-          </div>
-          <div>
             <label class="block text-slate-400 text-xs mb-1">{{ t('personalBatSpec') }}</label>
             <input v-model="newPlayer.bat_spec" placeholder='e.g., 29" / 19oz / -10' type="text" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
           </div>
@@ -815,10 +810,6 @@
                 <option value="S">S ({{ t('switch') }})</option>
               </select>
             </div>
-          </div>
-          <div>
-            <label class="block text-slate-400 text-xs mb-1">{{ t('parentPhone') }}</label>
-            <input v-model="editingPlayer.parent_phone" placeholder="+852 ..." type="text" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
           </div>
           <div>
             <label class="block text-slate-400 text-xs mb-1">{{ t('personalBatSpec') }}</label>
@@ -1109,7 +1100,6 @@
         compressNote: 'Auto-compresses to lightweight 500px avatar (~50KB)',
         batSpec: 'Bat',
         notSpecified: 'Not specified',
-        parentPhone: 'Parent WhatsApp',
         latestMeasurements: 'Latest Measurements',
         sessionHistory: 'Dated Session History',
         date: 'Date',
@@ -1212,7 +1202,6 @@
         compressNote: '瀏覽器自動壓縮至500px超清小檔 (~50KB)',
         batSpec: '專用球棒規格',
         notSpecified: '未提供',
-        parentPhone: '家長 WhatsApp',
         latestMeasurements: '最新體測數值',
         sessionHistory: '歷史測試日誌 (按日期)',
         date: '測試日期',
@@ -1315,7 +1304,6 @@
         compressNote: '500pxに自動圧縮 (~50KB)',
         batSpec: '使用バット規格',
         notSpecified: '未登録',
-        parentPhone: '保護者連絡先 (WhatsApp)',
         latestMeasurements: '最新計測値',
         sessionHistory: '測定履歴 (日付順)',
         date: '測定日',
@@ -1567,7 +1555,7 @@
         const players = ref([]);
         const sessions = ref([]);
 
-        const newPlayer = ref({ name: '', jersey: null, position: 'IF', throws: 'R', bats: 'R', bat_spec: '', dob: null, parent_phone: '', photo_url: '' });
+        const newPlayer = ref({ name: '', jersey: null, position: 'IF', throws: 'R', bats: 'R', bat_spec: '', dob: null, photo_url: '' });
         const newSession = ref({ 
           session_date: new Date().toISOString().slice(0, 10), 
           height_cm: null, weight_kg: null, broad_jump: null,
@@ -1623,15 +1611,24 @@
 
         const openAddPlayerModal = () => {
           selectedAddPositions.value = ['IF'];
-          newPlayer.value = { name: '', jersey: null, position: 'IF', throws: 'R', bats: 'R', bat_spec: '', dob: null, parent_phone: '', photo_url: '' };
+          newPlayer.value = { name: '', jersey: null, position: 'IF', throws: 'R', bats: 'R', bat_spec: '', dob: null, photo_url: '' };
           showAddPlayerModal.value = true;
         };
 
+        // Stripped parent_phone from query to protect privacy
         const fetchAllData = async () => {
           loading.value = true;
           try {
-            const { data: pData, error: pError } = await supabaseClient.from('players').select('*').order('jersey', { ascending: true });
-            const { data: sData, error: sError } = await supabaseClient.from('sessions').select('*').order('session_date', { ascending: false });
+            const { data: pData, error: pError } = await supabaseClient
+              .from('players')
+              .select('id, name, jersey, position, throws, bats, bat_spec, dob, photo_url')
+              .order('jersey', { ascending: true });
+            
+            const { data: sData, error: sError } = await supabaseClient
+              .from('sessions')
+              .select('*')
+              .order('session_date', { ascending: false });
+
             if (pError) console.error('Players Error:', pError);
             if (sError) console.error('Sessions Error:', sError);
             if (pData) players.value = pData;
@@ -1649,11 +1646,11 @@
           newPlayer.value.position = selectedAddPositions.value.join(', ');
           newPlayer.value.photo_url = newPlayer.value.photo_url ? newPlayer.value.photo_url.trim() : null;
           
-          const { data, error } = await supabaseClient.from('players').insert([newPlayer.value]).select();
+          const { data, error } = await supabaseClient.from('players').insert([newPlayer.value]).select('id, name, jersey, position, throws, bats, bat_spec, dob, photo_url');
           if (!error && data) {
             players.value.push(data[0]);
             players.value.sort((a, b) => a.jersey - b.jersey);
-            newPlayer.value = { name: '', jersey: null, position: 'IF', throws: 'R', bats: 'R', bat_spec: '', dob: null, parent_phone: '', photo_url: '' };
+            newPlayer.value = { name: '', jersey: null, position: 'IF', throws: 'R', bats: 'R', bat_spec: '', dob: null, photo_url: '' };
             showAddPlayerModal.value = false;
           } else if (error) {
             alert('Failed to save player: ' + error.message);
@@ -1673,7 +1670,7 @@
         const updatePlayer = async () => {
           if (!isCoach.value || !editingPlayer.value) return;
           
-          const { id, name, jersey, throws, bats, bat_spec, dob, parent_phone, photo_url } = editingPlayer.value;
+          const { id, name, jersey, throws, bats, bat_spec, dob, photo_url } = editingPlayer.value;
           const posString = selectedEditPositions.value.join(', ');
           const cleanPhoto = photo_url && photo_url.trim() !== '' ? photo_url.trim() : null;
 
@@ -1685,7 +1682,6 @@
             bats,
             bat_spec,
             dob: dob || null,
-            parent_phone,
             photo_url: cleanPhoto
           };
 
