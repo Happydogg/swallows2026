@@ -12,13 +12,42 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     [v-cloak] { display: none !important; }
+
+    /* Clean 1-Page Print / PDF Layout */
+    @media print {
+      body {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        padding: 0 !important;
+      }
+      header, .no-print, nav, button, select {
+        display: none !important;
+      }
+      .print-card {
+        background: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        box-shadow: none !important;
+        color: #0f172a !important;
+        page-break-inside: avoid;
+      }
+      table {
+        color: #0f172a !important;
+      }
+      thead {
+        background: #f1f5f9 !important;
+        color: #334155 !important;
+      }
+      th, td {
+        border-bottom: 1px solid #e2e8f0 !important;
+      }
+    }
   </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8 font-sans">
   <div id="app" v-cloak class="max-w-6xl mx-auto">
     
-    <!-- Header -->
-    <header class="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-800 pb-4 mb-6 gap-4">
+    <!-- Header (Hidden on Print) -->
+    <header class="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-800 pb-4 mb-6 gap-4 no-print">
       <div>
         <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
           <span>🦅</span> {{ t('appTitle') }}
@@ -58,12 +87,14 @@
     </header>
 
     <!-- Loading State -->
-    <div v-if="loading" class="p-8 text-center text-slate-400 font-mono text-sm">
+    <div v-if="loading" class="p-8 text-center text-slate-400 font-mono text-sm no-print">
       {{ t('syncingData') }}
     </div>
 
     <!-- VIEW 1: Team Overview -->
     <div v-else-if="currentView === 'overview'" class="space-y-6">
+      
+      <!-- Top Overview Stat Cards -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div class="bg-slate-800/60 border border-slate-700 p-4 rounded-xl">
           <p class="text-xs text-slate-400">{{ t('activeRoster') }}</p>
@@ -83,8 +114,27 @@
         </div>
       </div>
 
-      <!-- Roster Table -->
-      <div class="bg-slate-800/40 border border-slate-700/80 rounded-xl overflow-x-auto">
+      <!-- Overview Sub-Tab Switcher: Roster vs Leaderboard -->
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+        <div class="flex gap-2">
+          <button 
+            @click="overviewTab = 'roster'" 
+            :class="overviewTab === 'roster' ? 'border-b-2 border-blue-500 text-white font-bold' : 'text-slate-400 hover:text-slate-200'"
+            class="pb-2 px-3 text-sm transition">
+            📋 {{ t('rosterList') }}
+          </button>
+          <button 
+            @click="overviewTab = 'leaderboard'" 
+            :class="overviewTab === 'leaderboard' ? 'border-b-2 border-amber-500 text-white font-bold' : 'text-slate-400 hover:text-slate-200'"
+            class="pb-2 px-3 text-sm transition flex items-center gap-1.5">
+            🏆 {{ t('leaderboardTab') }}
+            <span class="bg-amber-500/20 text-amber-300 text-[10px] px-1.5 py-0.2 rounded-full font-bold">Top 3</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- TAB A: Roster Table -->
+      <div v-if="overviewTab === 'roster'" class="bg-slate-800/40 border border-slate-700/80 rounded-xl overflow-x-auto">
         <table class="w-full text-left text-sm">
           <thead class="bg-slate-800/80 text-slate-300 text-xs uppercase tracking-wider">
             <tr>
@@ -133,7 +183,11 @@
               <td class="p-3 font-mono text-slate-300">
                 {{ formatHeightWeight(player.id) }}
               </td>
-              <td class="p-3 font-mono">{{ getLatestMetric(player.id, 'exit_velo') || '--' }} km/h</td>
+              <td class="p-3 font-mono">
+                <span :class="Number(getLatestMetric(player.id, 'exit_velo')) >= 60 ? 'text-amber-400 font-bold' : ''">
+                  {{ getLatestMetric(player.id, 'exit_velo') || '--' }} km/h
+                </span>
+              </td>
               <td class="p-3 font-mono text-emerald-400 font-semibold">{{ getLatestMetric(player.id, 'throwing_velo') ? getLatestMetric(player.id, 'throwing_velo') + ' km/h' : '--' }}</td>
               <td class="p-3 font-mono">
                 <span :class="getAttackAngleColor(getLatestMetric(player.id, 'attack_angle'))">
@@ -156,24 +210,132 @@
           </tbody>
         </table>
       </div>
-    </div>
 
-    <!-- VIEW 2: Individual Player View -->
-    <div v-if="currentView === 'player' && selectedPlayer" class="space-y-6">
-      <div class="flex items-center justify-between">
-        <button @click="currentView = 'overview'" class="text-sm text-slate-400 hover:text-white">← {{ t('backToOverview') }}</button>
-        <div class="flex items-center gap-2" v-if="isCoach">
-          <button @click="openEditPlayerModal(selectedPlayer)" class="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 px-3 py-1.5 rounded-md text-sm font-medium transition">
-            ✏️ {{ t('editPlayer') }}
-          </button>
-          <button @click="openLogModal(selectedPlayer)" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-md text-sm font-medium text-white transition">
-            + {{ t('logNewSession') }}
-          </button>
+      <!-- TAB B: Team Leaderboards & PR Badges (Feature 3) -->
+      <div v-else-if="overviewTab === 'leaderboard'" class="space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          
+          <!-- Leaderboard Card 1: Exit Velocity -->
+          <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+            <h4 class="text-sm font-bold text-blue-400 flex items-center justify-between mb-3">
+              <span>⚡ {{ t('topExitVelo') }}</span>
+              <span class="text-xs text-slate-500">km/h</span>
+            </h4>
+            <div class="space-y-2">
+              <div v-for="(item, idx) in getTopMetrics('exit_velo', 3)" :key="item.player.id" class="flex items-center justify-between p-2 rounded-lg bg-slate-900/60 border border-slate-800">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-bold" :class="idx === 0 ? 'text-amber-400' : idx === 1 ? 'text-slate-300' : 'text-amber-600'">
+                    {{ idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉' }}
+                  </span>
+                  <div>
+                    <p class="text-xs font-semibold text-white">{{ item.player.name }}</p>
+                    <p class="text-[10px] text-slate-500 font-mono">#{{ item.player.jersey }}</p>
+                  </div>
+                </div>
+                <span class="text-sm font-mono font-bold text-blue-400">{{ item.value }} km/h</span>
+              </div>
+              <p v-if="getTopMetrics('exit_velo', 3).length === 0" class="text-xs text-slate-500 text-center py-2">--</p>
+            </div>
+          </div>
+
+          <!-- Leaderboard Card 2: Throwing Velocity -->
+          <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+            <h4 class="text-sm font-bold text-emerald-400 flex items-center justify-between mb-3">
+              <span>🎯 {{ t('throwingVelo') }}</span>
+              <span class="text-xs text-slate-500">km/h</span>
+            </h4>
+            <div class="space-y-2">
+              <div v-for="(item, idx) in getTopMetrics('throwing_velo', 3)" :key="item.player.id" class="flex items-center justify-between p-2 rounded-lg bg-slate-900/60 border border-slate-800">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-bold" :class="idx === 0 ? 'text-amber-400' : idx === 1 ? 'text-slate-300' : 'text-amber-600'">
+                    {{ idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉' }}
+                  </span>
+                  <div>
+                    <p class="text-xs font-semibold text-white">{{ item.player.name }}</p>
+                    <p class="text-[10px] text-slate-500 font-mono">#{{ item.player.jersey }}</p>
+                  </div>
+                </div>
+                <span class="text-sm font-mono font-bold text-emerald-400">{{ item.value }} km/h</span>
+              </div>
+              <p v-if="getTopMetrics('throwing_velo', 3).length === 0" class="text-xs text-slate-500 text-center py-2">--</p>
+            </div>
+          </div>
+
+          <!-- Leaderboard Card 3: Broad Jump (Lower-Body Power) -->
+          <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+            <h4 class="text-sm font-bold text-purple-400 flex items-center justify-between mb-3">
+              <span>🚀 {{ t('broadJump') }}</span>
+              <span class="text-xs text-slate-500">cm</span>
+            </h4>
+            <div class="space-y-2">
+              <div v-for="(item, idx) in getTopMetrics('broad_jump', 3)" :key="item.player.id" class="flex items-center justify-between p-2 rounded-lg bg-slate-900/60 border border-slate-800">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-bold" :class="idx === 0 ? 'text-amber-400' : idx === 1 ? 'text-slate-300' : 'text-amber-600'">
+                    {{ idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉' }}
+                  </span>
+                  <div>
+                    <p class="text-xs font-semibold text-white">{{ item.player.name }}</p>
+                    <p class="text-[10px] text-slate-500 font-mono">#{{ item.player.jersey }}</p>
+                  </div>
+                </div>
+                <span class="text-sm font-mono font-bold text-purple-400">{{ item.value }} cm</span>
+              </div>
+              <p v-if="getTopMetrics('broad_jump', 3).length === 0" class="text-xs text-slate-500 text-center py-2">--</p>
+            </div>
+          </div>
+
+          <!-- Leaderboard Card 4: Home-to-1st Sprint -->
+          <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+            <h4 class="text-sm font-bold text-amber-400 flex items-center justify-between mb-3">
+              <span>⏱️ {{ t('sprint18m') }}</span>
+              <span class="text-xs text-slate-500">sec (Lowest)</span>
+            </h4>
+            <div class="space-y-2">
+              <div v-for="(item, idx) in getTopMetrics('sprint_time', 3, true)" :key="item.player.id" class="flex items-center justify-between p-2 rounded-lg bg-slate-900/60 border border-slate-800">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-bold" :class="idx === 0 ? 'text-amber-400' : idx === 1 ? 'text-slate-300' : 'text-amber-600'">
+                    {{ idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉' }}
+                  </span>
+                  <div>
+                    <p class="text-xs font-semibold text-white">{{ item.player.name }}</p>
+                    <p class="text-[10px] text-slate-500 font-mono">#{{ item.player.jersey }}</p>
+                  </div>
+                </div>
+                <span class="text-sm font-mono font-bold text-amber-300">{{ item.value }}s</span>
+              </div>
+              <p v-if="getTopMetrics('sprint_time', 3, true).length === 0" class="text-xs text-slate-500 text-center py-2">--</p>
+            </div>
+          </div>
+
         </div>
       </div>
 
-      <!-- Player Profile Card with Headshot -->
-      <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+    </div>
+
+    <!-- VIEW 2: Individual Player View & Report Card (Feature 1) -->
+    <div v-if="currentView === 'player' && selectedPlayer" class="space-y-6">
+      
+      <!-- Top Action Bar (Hidden on Print) -->
+      <div class="flex items-center justify-between no-print">
+        <button @click="currentView = 'overview'" class="text-sm text-slate-400 hover:text-white">← {{ t('backToOverview') }}</button>
+        <div class="flex items-center gap-2">
+          <!-- 1-Click Print / PDF Button -->
+          <button @click="triggerPrintReport" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-md text-sm font-medium transition flex items-center gap-1.5 shadow">
+            🖨️ {{ t('printReportBtn') }}
+          </button>
+          <template v-if="isCoach">
+            <button @click="openEditPlayerModal(selectedPlayer)" class="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 px-3 py-1.5 rounded-md text-sm font-medium transition">
+              ✏️ {{ t('editPlayer') }}
+            </button>
+            <button @click="openLogModal(selectedPlayer)" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-md text-sm font-medium text-white transition">
+              + {{ t('logNewSession') }}
+            </button>
+          </template>
+        </div>
+      </div>
+
+      <!-- Printable Player Report Header Card -->
+      <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 print-card">
         <div class="flex items-center gap-4">
           <div class="w-20 h-20 rounded-2xl overflow-hidden flex-shrink-0 bg-slate-700 border-2 border-slate-600 shadow-md flex items-center justify-center font-bold text-xl text-blue-300">
             <img v-if="selectedPlayer.photo_url && !failedImgs[selectedPlayer.id]" 
@@ -186,19 +348,23 @@
           </div>
           <div>
             <div class="flex items-center gap-2 mb-1">
-              <span class="text-xs font-mono px-2 py-0.5 rounded bg-slate-700">#{{ selectedPlayer.jersey }}</span>
+              <span class="text-xs font-mono px-2 py-0.5 rounded bg-slate-700 text-white">#{{ selectedPlayer.jersey }}</span>
               <div class="flex gap-1">
                 <span v-for="pos in splitPositions(selectedPlayer.position)" :key="pos" class="px-2 py-0.5 rounded bg-blue-900/60 text-blue-300 text-xs font-medium border border-blue-700/50">
                   {{ pos }}
                 </span>
               </div>
+              <!-- 60 Club Badge -->
+              <span v-if="Number(getLatestMetric(selectedPlayer.id, 'exit_velo')) >= 60" class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold">
+                🏅 60+ km/h Club
+              </span>
             </div>
             <h2 class="text-2xl font-bold">{{ selectedPlayer.name }}</h2>
             <p class="text-sm text-slate-400">
               {{ t('throws') }}: {{ selectedPlayer.throws }} | {{ t('bats') }}: {{ selectedPlayer.bats }}
               <span v-if="selectedPlayer.dob"> | {{ t('dob') }}: {{ selectedPlayer.dob }} ({{ calculateAge(selectedPlayer.dob) }})</span>
             </p>
-            <p class="text-sm text-blue-400 mt-1 font-mono">
+            <p class="text-sm text-blue-400 mt-1 font-mono font-medium">
               {{ t('latestMeasurements') }}: {{ formatHeightWeight(selectedPlayer.id) }}
             </p>
           </div>
@@ -210,8 +376,8 @@
         </div>
       </div>
 
-      <!-- INTERACTIVE CHART.JS PROGRESSION GRAPH WITH METRIC TOGGLE -->
-      <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
+      <!-- Interactive Chart with Mode Toggle (Hidden from direct printout to preserve clean table) -->
+      <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-5 no-print">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-slate-700/60 pb-3">
           <div>
             <h3 class="text-base font-bold text-white flex items-center gap-2">
@@ -239,7 +405,6 @@
           </div>
         </div>
 
-        <!-- Legend Bar -->
         <div class="flex items-center gap-4 text-xs font-medium mb-3">
           <template v-if="chartMode === 'velocity'">
             <div class="flex items-center gap-1.5">
@@ -273,63 +438,69 @@
         </div>
       </div>
 
-      <!-- Player Sessions -->
-      <h3 class="text-lg font-semibold">{{ t('sessionHistory') }}</h3>
-      <div class="bg-slate-800/40 border border-slate-700/80 rounded-xl overflow-x-auto">
-        <table class="w-full text-left text-sm">
-          <thead class="bg-slate-800/80 text-slate-300 text-xs uppercase tracking-wider">
-            <tr>
-              <th class="p-3">{{ t('date') }}</th>
-              <th class="p-3">{{ t('heightWeight') }}</th>
-              <th class="p-3">{{ t('exitVeloPersonalControl') }}</th>
-              <th class="p-3">{{ t('throwingVelo') }}</th>
-              <th class="p-3">{{ t('attackAngle') }}</th>
-              <th class="p-3">{{ t('broadJump') }}</th>
-              <th class="p-3">{{ t('sprint18m') }}</th>
-              <th class="p-3">{{ t('gripPinch') }}</th>
-              <th class="p-3">{{ t('shoulderCheck') }}</th>
-              <th class="p-3 text-right" v-if="isCoach">{{ t('actions') }}</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-800">
-            <tr v-for="session in getPlayerSessions(selectedPlayer.id)" :key="session.id" class="hover:bg-slate-800/40 transition">
-              <td class="p-3 font-mono text-slate-300">{{ session.session_date }}</td>
-              <td class="p-3 font-mono">
-                <span v-if="session.height_cm || session.weight_kg">
-                  {{ session.height_cm ? session.height_cm + 'cm' : '--' }} / {{ session.weight_kg ? session.weight_kg + 'kg' : '--' }}
-                </span>
-                <span v-else class="text-slate-600">--</span>
-              </td>
-              <td class="p-3 font-mono">{{ session.exit_velo || '--' }} / {{ session.control_exit_velo || '--' }} km/h</td>
-              <td class="p-3 font-mono text-emerald-400 font-semibold">{{ session.throwing_velo ? session.throwing_velo + ' km/h' : '--' }}</td>
-              <td class="p-3 font-mono" :class="getAttackAngleColor(session.attack_angle)">{{ session.attack_angle ? session.attack_angle + '°' : '--' }}</td>
-              <td class="p-3 font-mono">{{ session.broad_jump ? session.broad_jump + ' cm' : '--' }}</td>
-              <td class="p-3 font-mono">{{ session.sprint_time ? session.sprint_time + 's' : '--' }}</td>
-              <td class="p-3 font-mono">{{ session.grip_dom || '--' }} / {{ session.pinch || '--' }} kg</td>
-              <td class="p-3">
-                <span :class="session.shoulder_check === 'Pass' ? 'text-emerald-400' : 'text-rose-400'">
-                  {{ session.shoulder_check === 'Pass' ? t('pass') : t('adjust') }}
-                </span>
-              </td>
-              <td class="p-3 text-right space-x-2 whitespace-nowrap" v-if="isCoach">
-                <button @click="openEditSessionModal(session)" class="bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 px-2 py-1 rounded text-xs">
-                  {{ t('edit') }}
-                </button>
-                <button @click="removeSession(session.id)" class="text-rose-400 hover:text-rose-300 text-xs">
-                  {{ t('remove') }}
-                </button>
-              </td>
-            </tr>
-            <tr v-if="getPlayerSessions(selectedPlayer.id).length === 0">
-              <td :colspan="isCoach ? 10 : 9" class="p-6 text-center text-slate-500">{{ t('noSessionsRecorded') }}</td>
-            </tr>
-          </tbody>
-        </table>
+      <!-- Player Sessions History Table (Printed on Report Card) -->
+      <div class="space-y-3">
+        <h3 class="text-lg font-semibold flex items-center justify-between">
+          <span>{{ t('sessionHistory') }}</span>
+          <span class="text-xs text-slate-500 font-normal no-print">All metrics synced to cloud</span>
+        </h3>
+        <div class="bg-slate-800/40 border border-slate-700/80 rounded-xl overflow-x-auto print-card">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-slate-800/80 text-slate-300 text-xs uppercase tracking-wider">
+              <tr>
+                <th class="p-3">{{ t('date') }}</th>
+                <th class="p-3">{{ t('heightWeight') }}</th>
+                <th class="p-3">{{ t('exitVeloPersonalControl') }}</th>
+                <th class="p-3">{{ t('throwingVelo') }}</th>
+                <th class="p-3">{{ t('attackAngle') }}</th>
+                <th class="p-3">{{ t('broadJump') }}</th>
+                <th class="p-3">{{ t('sprint18m') }}</th>
+                <th class="p-3">{{ t('gripPinch') }}</th>
+                <th class="p-3">{{ t('shoulderCheck') }}</th>
+                <th class="p-3 text-right no-print" v-if="isCoach">{{ t('actions') }}</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800">
+              <tr v-for="session in getPlayerSessions(selectedPlayer.id)" :key="session.id" class="hover:bg-slate-800/40 transition">
+                <td class="p-3 font-mono text-slate-300">{{ session.session_date }}</td>
+                <td class="p-3 font-mono">
+                  <span v-if="session.height_cm || session.weight_kg">
+                    {{ session.height_cm ? session.height_cm + 'cm' : '--' }} / {{ session.weight_kg ? session.weight_kg + 'kg' : '--' }}
+                  </span>
+                  <span v-else class="text-slate-600">--</span>
+                </td>
+                <td class="p-3 font-mono">{{ session.exit_velo || '--' }} / {{ session.control_exit_velo || '--' }} km/h</td>
+                <td class="p-3 font-mono text-emerald-400 font-semibold">{{ session.throwing_velo ? session.throwing_velo + ' km/h' : '--' }}</td>
+                <td class="p-3 font-mono" :class="getAttackAngleColor(session.attack_angle)">{{ session.attack_angle ? session.attack_angle + '°' : '--' }}</td>
+                <td class="p-3 font-mono">{{ session.broad_jump ? session.broad_jump + ' cm' : '--' }}</td>
+                <td class="p-3 font-mono">{{ session.sprint_time ? session.sprint_time + 's' : '--' }}</td>
+                <td class="p-3 font-mono">{{ session.grip_dom || '--' }} / {{ session.pinch || '--' }} kg</td>
+                <td class="p-3">
+                  <span :class="session.shoulder_check === 'Pass' ? 'text-emerald-400' : 'text-rose-400'">
+                    {{ session.shoulder_check === 'Pass' ? t('pass') : t('adjust') }}
+                  </span>
+                </td>
+                <td class="p-3 text-right space-x-2 whitespace-nowrap no-print" v-if="isCoach">
+                  <button @click="openEditSessionModal(session)" class="bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 px-2 py-1 rounded text-xs">
+                    {{ t('edit') }}
+                  </button>
+                  <button @click="removeSession(session.id)" class="text-rose-400 hover:text-rose-300 text-xs">
+                    {{ t('remove') }}
+                  </button>
+                </td>
+              </tr>
+              <tr v-if="getPlayerSessions(selectedPlayer.id).length === 0">
+                <td :colspan="isCoach ? 10 : 9" class="p-6 text-center text-slate-500">{{ t('noSessionsRecorded') }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
+
     </div>
 
     <!-- MODAL: Add Player -->
-    <div v-if="showAddPlayerModal && isCoach" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+    <div v-if="showAddPlayerModal && isCoach" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 no-print">
       <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-bold">{{ t('addPlayerModalTitle') }}</h3>
         <div class="space-y-3 text-sm">
@@ -401,8 +572,8 @@
       </div>
     </div>
 
-    <!-- MODAL: Edit Player Profile (With Direct Phone Compression & Upload) -->
-    <div v-if="showEditPlayerModal && isCoach && editingPlayer" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+    <!-- MODAL: Edit Player Profile (With Camera & Compression) -->
+    <div v-if="showEditPlayerModal && isCoach && editingPlayer" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 no-print">
       <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-bold">{{ t('editPlayerModalTitle') }}</h3>
         <div class="space-y-3 text-sm">
@@ -421,12 +592,11 @@
             </div>
           </div>
 
-          <!-- PHOTO UPLOAD & PREVIEW SECTION -->
+          <!-- Photo Upload & Compression Block -->
           <div class="p-3 bg-slate-900/60 border border-slate-700/80 rounded-lg space-y-2">
             <label class="block text-slate-300 text-xs font-semibold">{{ t('profilePhoto') }}</label>
             
             <div class="flex items-center gap-3">
-              <!-- Live Preview Avatar -->
               <div class="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-slate-800 border border-slate-600 flex items-center justify-center font-bold text-sm text-blue-300">
                 <img v-if="editingPlayer.photo_url" :src="formatImgUrl(editingPlayer.photo_url)" class="w-full h-full object-cover">
                 <span v-else>#{{ editingPlayer.jersey }}</span>
@@ -443,7 +613,7 @@
             </div>
 
             <div>
-              <input v-model="editingPlayer.photo_url" placeholder="Or paste image URL here..." type="url" class="w-full bg-slate-950 border border-slate-700 rounded p-1.5 text-xs text-slate-300 outline-none focus:border-blue-500">
+              <input v-model="editingPlayer.photo_url" placeholder="Or paste public image URL..." type="url" class="w-full bg-slate-950 border border-slate-700 rounded p-1.5 text-xs text-slate-300 outline-none focus:border-blue-500">
             </div>
           </div>
 
@@ -496,7 +666,7 @@
     </div>
 
     <!-- MODAL: Log Station Data -->
-    <div v-if="showLogModal && activePlayerForLog && isCoach" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+    <div v-if="showLogModal && activePlayerForLog && isCoach" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 no-print">
       <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-bold">{{ t('logSessionTitle') }}: {{ activePlayerForLog.name }}</h3>
         
@@ -506,7 +676,7 @@
             <input v-model="newSession.session_date" type="date" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
           </div>
 
-          <!-- Section: Physical Growth & Athletic Power -->
+          <!-- Growth & Power Section -->
           <div class="p-3 bg-slate-900/60 border border-slate-700/60 rounded-lg space-y-2">
             <p class="text-xs font-semibold text-blue-400 uppercase tracking-wider">{{ t('growthSectionHeader') }}</p>
             <div class="grid grid-cols-3 gap-2">
@@ -525,11 +695,10 @@
             </div>
           </div>
 
-          <!-- Section: Hitting & Athletic Metrics with Speed Unit Toggle -->
+          <!-- Station Metrics Section with Unit Switcher -->
           <div class="p-3 bg-slate-900/60 border border-slate-700/60 rounded-lg space-y-2">
             <div class="flex items-center justify-between">
               <p class="text-xs font-semibold text-emerald-400 uppercase tracking-wider">{{ t('stationMetricsHeader') }}</p>
-              
               <div class="flex items-center gap-1 bg-slate-800 p-0.5 rounded border border-slate-700">
                 <button 
                   type="button" 
@@ -602,7 +771,7 @@
     </div>
 
     <!-- MODAL: Edit Session Modal -->
-    <div v-if="showEditSessionModal && isCoach && editingSession" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+    <div v-if="showEditSessionModal && isCoach && editingSession" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 no-print">
       <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-bold">{{ t('editSessionModalTitle') }}</h3>
         
@@ -612,7 +781,7 @@
             <input v-model="editingSession.session_date" type="date" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
           </div>
 
-          <!-- Section: Physical Growth & Power -->
+          <!-- Growth & Power -->
           <div class="p-3 bg-slate-900/60 border border-slate-700/60 rounded-lg space-y-2">
             <p class="text-xs font-semibold text-blue-400 uppercase tracking-wider">{{ t('growthSectionHeader') }}</p>
             <div class="grid grid-cols-3 gap-2">
@@ -631,11 +800,10 @@
             </div>
           </div>
 
-          <!-- Section: Hitting & Athletic Metrics with Speed Unit Toggle -->
+          <!-- Station Metrics -->
           <div class="p-3 bg-slate-900/60 border border-slate-700/60 rounded-lg space-y-2">
             <div class="flex items-center justify-between">
               <p class="text-xs font-semibold text-emerald-400 uppercase tracking-wider">{{ t('stationMetricsHeader') }}</p>
-              
               <div class="flex items-center gap-1 bg-slate-800 p-0.5 rounded border border-slate-700">
                 <button 
                   type="button" 
@@ -810,7 +978,10 @@
         pinSuccess: 'Coach Mode Unlocked!',
         pinError: 'Incorrect Coach PIN.',
         deleteConfirm: 'Delete this player and all their cloud session records?',
-        deleteSessionConfirm: 'Are you sure you want to delete this session record permanently?'
+        deleteSessionConfirm: 'Are you sure you want to delete this session record permanently?',
+        rosterList: 'Roster Table',
+        leaderboardTab: 'Leaderboard & PRs',
+        printReportBtn: 'Print / PDF Report'
       },
       zh: {
         appTitle: 'Swallows 棒球數據實驗室 2026',
@@ -906,7 +1077,10 @@
         pinSuccess: '教練模式已解鎖！',
         pinError: 'PIN 碼錯誤。',
         deleteConfirm: '確認要刪除此球員及其所有歷史測試記錄嗎？',
-        deleteSessionConfirm: '確認要永久刪除這條測試記錄嗎？'
+        deleteSessionConfirm: '確認要永久刪除這條測試記錄嗎？',
+        rosterList: '球員名冊總覽',
+        leaderboardTab: '全隊龍虎榜 (PRs)',
+        printReportBtn: '列印 / 匯出 PDF 成績單'
       },
       ja: {
         appTitle: 'スワローズ データラボ 2026',
@@ -1002,7 +1176,10 @@
         pinSuccess: 'コーチモードが解除されました。',
         pinError: '暗証番号が正しくありません。',
         deleteConfirm: 'この選手とすべての測定履歴を削除しますか？',
-        deleteSessionConfirm: 'このセッションデータを完全に削除してもよろしいですか？'
+        deleteSessionConfirm: 'このセッションデータを完全に削除してもよろしいですか？',
+        rosterList: '選手名簿',
+        leaderboardTab: 'チームランキング (PRs)',
+        printReportBtn: '印刷 / PDF 出力'
       }
     };
 
@@ -1013,6 +1190,7 @@
 
         let chartInstance = null;
         const chartMode = ref('velocity');
+        const overviewTab = ref('roster'); // 'roster' or 'leaderboard'
         const hasChartData = ref(false);
         const isUploadingPhoto = ref(false);
 
@@ -1044,7 +1222,6 @@
           return trimmed;
         };
 
-        // Client-side image compressor using HTML Canvas
         const compressImage = (file, maxWidth = 500, quality = 0.8) => {
           return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -1089,17 +1266,13 @@
           });
         };
 
-        // Handles photo selection, compress, and Supabase Storage upload
         const handleFileUpload = async (event) => {
           const file = event.target.files[0];
           if (!file || !editingPlayer.value) return;
 
           isUploadingPhoto.value = true;
           try {
-            // 1. Compress image in browser memory
             const compressedBlob = await compressImage(file, 500, 0.8);
-            
-            // 2. Upload to Supabase bucket 'avatars' with upsert
             const playerId = editingPlayer.value.id;
             const filePath = `${playerId}.jpg`;
 
@@ -1112,7 +1285,6 @@
 
             if (uploadError) throw uploadError;
 
-            // 3. Obtain public URL with cache-busting timestamp
             const { data: publicUrlData } = supabaseClient.storage
               .from('avatars')
               .getPublicUrl(filePath);
@@ -1141,6 +1313,10 @@
         const saveLanguage = () => {
           localStorage.setItem('swallows_lang', currentLang.value);
           renderPlayerChart();
+        };
+
+        const triggerPrintReport = () => {
+          window.print();
         };
 
         const loading = ref(true);
@@ -1499,6 +1675,26 @@
           return found ? found[key] : null;
         };
 
+        // Leaderboard Calculation Helper (Feature 3)
+        const getTopMetrics = (key, count = 3, ascending = false) => {
+          const results = [];
+          
+          players.value.forEach(p => {
+            const pSessions = getPlayerSessions(p.id);
+            const vals = pSessions
+              .map(s => Number(s[key]))
+              .filter(v => !isNaN(v) && v > 0);
+            
+            if (vals.length > 0) {
+              const best = ascending ? Math.min(...vals) : Math.max(...vals);
+              results.push({ player: p, value: best });
+            }
+          });
+
+          results.sort((a, b) => ascending ? a.value - b.value : b.value - a.value);
+          return results.slice(0, count);
+        };
+
         const formatHeightWeight = (playerId) => {
           const h = getLatestMetric(playerId, 'height_cm');
           const w = getLatestMetric(playerId, 'weight_kg');
@@ -1750,14 +1946,14 @@
 
         return {
           currentLang, t, saveLanguage,
-          loading, currentView, showAddPlayerModal, showEditPlayerModal, showLogModal, showEditSessionModal,
+          loading, currentView, overviewTab, showAddPlayerModal, showEditPlayerModal, showLogModal, showEditSessionModal,
           selectedPlayer, editingPlayer, activePlayerForLog, editingSession,
           selectedAddPositions, selectedEditPositions,
           toggleAddPosition, toggleEditPosition, openAddPlayerModal, splitPositions,
           players, sessions, newPlayer, newSession, 
           chartMode, setChartMode, hasChartData,
           failedImgs, markImgFailed, formatImgUrl, handleFileUpload, isUploadingPhoto,
-          logSpeedUnit, editSpeedUnit, toggleSpeedUnit,
+          logSpeedUnit, editSpeedUnit, toggleSpeedUnit, triggerPrintReport, getTopMetrics,
           isCoach, unlockCoachMode, lockCoachMode,
           addPlayer, openEditPlayerModal, updatePlayer, removePlayer, selectPlayer, 
           openLogModal, saveSession, openEditSessionModal, updateSession, removeSession,
