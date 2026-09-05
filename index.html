@@ -1950,14 +1950,24 @@
           return `${h ? h + 'cm' : '--'} / ${w ? w + 'kg' : '--'}`;
         };
 
-        const calculateAge = (dob) => {
-          if (!dob) return '';
-          const birth = new Date(dob);
-          const diff = Date.now() - birth.getTime();
-          const ageDate = new Date(diff);
-          const age = Math.abs(ageDate.getUTCFullYear() - 1970);
-          return `${age} yo`;
-        };
+   const calculateAge = (dob) => {
+  if (!dob) return '';
+  const birth = new Date(dob);
+  const now = new Date();
+
+  let years = now.getFullYear() - birth.getFullYear();
+  let months = now.getMonth() - birth.getMonth();
+
+  if (months < 0 || (months === 0 && now.getDate() < birth.getDate())) {
+    years--;
+    months += 12;
+  }
+  if (now.getDate() < birth.getDate()) {
+    months = Math.max(0, months - 1);
+  }
+
+  return `${years}y ${months}m`;
+};
 
         const getClubCount = (threshold) => {
           return players.value.filter(p => {
