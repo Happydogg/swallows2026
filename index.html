@@ -118,6 +118,7 @@
               <td class="p-3 text-right space-x-2">
                 <template v-if="isCoach">
                   <button @click="openLogModal(player)" class="bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 px-2.5 py-1 rounded text-xs">+ {{ t('log') }}</button>
+                  <button @click="openEditPlayerModal(player)" class="bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 px-2.5 py-1 rounded text-xs">{{ t('edit') }}</button>
                   <button @click="removePlayer(player.id)" class="text-rose-400 hover:text-rose-300 text-xs">{{ t('remove') }}</button>
                 </template>
                 <span v-else class="text-xs text-slate-500 italic">{{ t('viewOnly') }}</span>
@@ -135,7 +136,14 @@
     <div v-if="currentView === 'player' && selectedPlayer" class="space-y-6">
       <div class="flex items-center justify-between">
         <button @click="currentView = 'overview'" class="text-sm text-slate-400 hover:text-white">← {{ t('backToOverview') }}</button>
-        <button v-if="isCoach" @click="openLogModal(selectedPlayer)" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-md text-sm font-medium text-white transition">+ {{ t('logNewSession') }}</button>
+        <div class="flex items-center gap-2" v-if="isCoach">
+          <button @click="openEditPlayerModal(selectedPlayer)" class="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 px-3 py-1.5 rounded-md text-sm font-medium transition">
+            ✏️ {{ t('editPlayer') }}
+          </button>
+          <button @click="openLogModal(selectedPlayer)" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-md text-sm font-medium text-white transition">
+            + {{ t('logNewSession') }}
+          </button>
+        </div>
       </div>
 
       <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6 flex flex-col md:flex-row justify-between gap-4">
@@ -263,13 +271,75 @@
       </div>
     </div>
 
+    <!-- MODAL: Edit Player Profile -->
+    <div v-if="showEditPlayerModal && isCoach && editingPlayer" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+      <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full p-6 space-y-4">
+        <h3 class="text-lg font-bold">{{ t('editPlayerModalTitle') }}</h3>
+        <div class="space-y-3 text-sm">
+          <div>
+            <label class="block text-slate-400 text-xs mb-1">{{ t('fullName') }}</label>
+            <input v-model="editingPlayer.name" type="text" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none focus:border-blue-500">
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-slate-400 text-xs mb-1">{{ t('jerseyNum') }}</label>
+              <input v-model.number="editingPlayer.jersey" type="number" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none focus:border-blue-500">
+            </div>
+            <div>
+              <label class="block text-slate-400 text-xs mb-1">{{ t('pos') }}</label>
+              <select v-model="editingPlayer.position" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+                <option value="IF">IF ({{ t('posIF') }})</option>
+                <option value="OF">OF ({{ t('posOF') }})</option>
+                <option value="P">P ({{ t('posP') }})</option>
+                <option value="C">C ({{ t('posC') }})</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-slate-400 text-xs mb-1">{{ t('dob') }}</label>
+              <input v-model="editingPlayer.dob" type="date" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+            </div>
+            <div>
+              <label class="block text-slate-400 text-xs mb-1">{{ t('parentPhone') }}</label>
+              <input v-model="editingPlayer.parent_phone" placeholder="+852 ..." type="text" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-slate-400 text-xs mb-1">{{ t('throws') }}</label>
+              <select v-model="editingPlayer.throws" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+                <option value="R">R ({{ t('right') }})</option>
+                <option value="L">L ({{ t('left') }})</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-slate-400 text-xs mb-1">{{ t('bats') }}</label>
+              <select v-model="editingPlayer.bats" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+                <option value="R">R ({{ t('right') }})</option>
+                <option value="L">L ({{ t('left') }})</option>
+                <option value="S">S ({{ t('switch') }})</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="block text-slate-400 text-xs mb-1">{{ t('personalBatSpec') }}</label>
+            <input v-model="editingPlayer.bat_spec" placeholder='e.g., 29" / 19oz / -10' type="text" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button @click="showEditPlayerModal = false" class="px-3 py-1.5 rounded text-sm text-slate-400 hover:text-white">{{ t('cancel') }}</button>
+          <button @click="updatePlayer" class="bg-amber-600 hover:bg-amber-500 px-4 py-1.5 rounded text-sm font-medium text-white transition">{{ t('saveChanges') }}</button>
+        </div>
+      </div>
+    </div>
+
     <!-- MODAL: Log Station Data -->
     <div v-if="showLogModal && activePlayerForLog && isCoach" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
       <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-bold">{{ t('logSessionTitle') }}: {{ activePlayerForLog.name }}</h3>
         
         <div class="space-y-4 text-sm">
-          <!-- Session Date -->
           <div>
             <label class="block text-slate-400 text-xs mb-1">{{ t('date') }}</label>
             <input v-model="newSession.session_date" type="date" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
@@ -358,6 +428,7 @@
         readOnlyView: 'Read-Only View',
         teamOverview: 'Team Overview',
         addPlayer: 'Add Player',
+        editPlayer: 'Edit Player',
         lock: 'Lock',
         coachUnlock: 'Coach Unlock',
         syncingData: 'Syncing data from cloud...',
@@ -376,6 +447,7 @@
         domGrip: 'Grip (Dom)',
         actions: 'Actions',
         log: 'Log',
+        edit: 'Edit',
         remove: 'Remove',
         viewOnly: 'View only',
         noPlayers: 'No players saved in database. Tap "+ Add Player" to begin.',
@@ -398,6 +470,7 @@
         adjust: 'Adjust',
         noSessionsRecorded: 'No session metrics recorded yet for this player.',
         addPlayerModalTitle: 'Add Player to Cloud Database',
+        editPlayerModalTitle: 'Edit Player Profile',
         fullName: 'Full Name',
         jerseyNum: 'Jersey #',
         posIF: 'Infield',
@@ -410,6 +483,7 @@
         personalBatSpec: 'Personal Bat Spec',
         cancel: 'Cancel',
         saveToCloud: 'Save to Cloud',
+        saveChanges: 'Save Changes',
         logSessionTitle: 'Log Session',
         growthSectionHeader: 'Growth & Power (Optional / Quarterly)',
         stationMetricsHeader: 'Station Metrics',
@@ -435,6 +509,7 @@
         readOnlyView: '家長/訪客只讀模式',
         teamOverview: '球隊總覽',
         addPlayer: '新增球員',
+        editPlayer: '編輯球員資料',
         lock: '鎖定',
         coachUnlock: '教練解鎖',
         syncingData: '正在從雲端同步數據...',
@@ -453,6 +528,7 @@
         domGrip: '慣用手握力',
         actions: '操作',
         log: '記錄',
+        edit: '編輯',
         remove: '刪除',
         viewOnly: '僅供檢視',
         noPlayers: '雲端數據庫中暫無球員資料。請點擊「新增球員」。',
@@ -475,6 +551,7 @@
         adjust: '待調整 (Adjust)',
         noSessionsRecorded: '該球員暫無測試記錄。',
         addPlayerModalTitle: '新增球員到雲端數據庫',
+        editPlayerModalTitle: '編輯球員基本資料',
         fullName: '球員全名',
         jerseyNum: '球衣號碼 #',
         posIF: '內野手',
@@ -487,6 +564,7 @@
         personalBatSpec: '個人球棒規格',
         cancel: '取消',
         saveToCloud: '儲存至雲端',
+        saveChanges: '儲存修改',
         logSessionTitle: '記錄站點測試數據',
         growthSectionHeader: '身體生長與爆發力 (可選 / 季度測量)',
         stationMetricsHeader: '站點打擊與體能數據',
@@ -512,6 +590,7 @@
         readOnlyView: '閲覧専用モード',
         teamOverview: 'チーム概要',
         addPlayer: '選手追加',
+        editPlayer: '選手情報編集',
         lock: 'ロック',
         coachUnlock: 'コーチ解除',
         syncingData: 'クラウドから同期中...',
@@ -530,6 +609,7 @@
         domGrip: '利き手握力',
         actions: '操作',
         log: '記録',
+        edit: '編集',
         remove: '削除',
         viewOnly: '閲覧のみ',
         noPlayers: '登録選手がいません。「選手追加」から登録してください。',
@@ -552,6 +632,7 @@
         adjust: '要調整 (Adjust)',
         noSessionsRecorded: '測定記録がありません。',
         addPlayerModalTitle: '選手新規登録',
+        editPlayerModalTitle: '選手プロファイル編集',
         fullName: '選手氏名',
         jerseyNum: '背番号 #',
         posIF: '内野手',
@@ -564,6 +645,7 @@
         personalBatSpec: 'マイバットスペック',
         cancel: 'キャンセル',
         saveToCloud: 'クラウドに保存',
+        saveChanges: '変更を保存',
         logSessionTitle: '測定データ記録',
         growthSectionHeader: '身体測定・下半身パワー (任意 / 季次)',
         stationMetricsHeader: 'ステーション打撃・走力データ',
@@ -596,8 +678,10 @@
         const loading = ref(true);
         const currentView = ref('overview');
         const showAddPlayerModal = ref(false);
+        const showEditPlayerModal = ref(false);
         const showLogModal = ref(false);
         const selectedPlayer = ref(null);
+        const editingPlayer = ref(null);
         const activePlayerForLog = ref(null);
 
         const isCoach = ref(
@@ -681,6 +765,48 @@
           }
         };
 
+        const openEditPlayerModal = (player) => {
+          if (!isCoach.value) return;
+          editingPlayer.value = { ...player };
+          showEditPlayerModal.value = true;
+        };
+
+        const updatePlayer = async () => {
+          if (!isCoach.value || !editingPlayer.value) return;
+          
+          const { id, name, jersey, position, throws, bats, bat_spec, dob, parent_phone } = editingPlayer.value;
+          
+          const payload = {
+            name,
+            jersey: Number(jersey),
+            position,
+            throws,
+            bats,
+            bat_spec,
+            dob: dob || null,
+            parent_phone
+          };
+
+          const { error } = await supabaseClient
+            .from('players')
+            .update(payload)
+            .eq('id', id);
+
+          if (!error) {
+            const index = players.value.findIndex(p => p.id === id);
+            if (index !== -1) {
+              players.value[index] = { ...players.value[index], ...payload };
+              players.value.sort((a, b) => a.jersey - b.jersey);
+            }
+            if (selectedPlayer.value && selectedPlayer.value.id === id) {
+              selectedPlayer.value = { ...selectedPlayer.value, ...payload };
+            }
+            showEditPlayerModal.value = false;
+          } else {
+            alert('Failed to update player: ' + error.message);
+          }
+        };
+
         const removePlayer = async (id) => {
           if (!isCoach.value) return;
           if (!confirm(t('deleteConfirm'))) return;
@@ -688,6 +814,10 @@
           if (!error) {
             players.value = players.value.filter(p => p.id !== id);
             sessions.value = sessions.value.filter(s => s.player_id !== id);
+            if (selectedPlayer.value && selectedPlayer.value.id === id) {
+              currentView.value = 'overview';
+              selectedPlayer.value = null;
+            }
           } else {
             alert('Failed to delete player: ' + error.message);
           }
@@ -727,7 +857,6 @@
           const { data, error } = await supabaseClient.from('sessions').insert([payload]).select();
           if (!error && data) {
             sessions.value.unshift(data[0]);
-            // Reset growth numbers so they don't accidentally carry over to the next player
             newSession.value.height_cm = null;
             newSession.value.weight_kg = null;
             newSession.value.broad_jump = null;
@@ -800,10 +929,11 @@
 
         return {
           currentLang, t, saveLanguage,
-          loading, currentView, showAddPlayerModal, showLogModal, selectedPlayer, activePlayerForLog,
+          loading, currentView, showAddPlayerModal, showEditPlayerModal, showLogModal, 
+          selectedPlayer, editingPlayer, activePlayerForLog,
           players, sessions, newPlayer, newSession,
           isCoach, unlockCoachMode, lockCoachMode,
-          addPlayer, removePlayer, selectPlayer, openLogModal, saveSession,
+          addPlayer, openEditPlayerModal, updatePlayer, removePlayer, selectPlayer, openLogModal, saveSession,
           getPlayerSessions, getLatestMetric, formatHeightWeight, calculateAge,
           getClubCount, avgBatSpeed, safetyAlertCount, getAttackAngleColor
         };
