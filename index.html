@@ -253,14 +253,12 @@
     </div>
   </div>
 
-  <script>
-    // ==========================================
-    // SUPABASE CREDENTIALS (Wrapped in quotes)
+ <script>
+    // 1. SUPABASE CREDENTIALS (Declared ONCE)
     const SUPABASE_URL = 'https://yznulwgrhvjyuwclmioo.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6bnVsd2dyaHZqeXV3Y2xtaW9vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1OTY1MDcsImV4cCI6MjEwNDE3MjUwN30.NGk74QmSL1Q5fG8JYFM_6TaB0Uo25jve76H0X_VC5co';
-    // ==========================================
 
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const { createApp, ref, computed, onMounted } = Vue;
 
     createApp({
@@ -281,8 +279,8 @@
         const fetchAllData = async () => {
           loading.value = true;
           try {
-            const { data: pData, error: pError } = await supabase.from('players').select('*').order('jersey', { ascending: true });
-            const { data: sData, error: sError } = await supabase.from('sessions').select('*').order('session_date', { ascending: false });
+            const { data: pData, error: pError } = await supabaseClient.from('players').select('*').order('jersey', { ascending: true });
+            const { data: sData, error: sError } = await supabaseClient.from('sessions').select('*').order('session_date', { ascending: false });
             if (pError) console.error('Players Error:', pError);
             if (sError) console.error('Sessions Error:', sError);
             if (pData) players.value = pData;
@@ -296,7 +294,7 @@
 
         const addPlayer = async () => {
           if (!newPlayer.value.name || !newPlayer.value.jersey) return;
-          const { data, error } = await supabase.from('players').insert([newPlayer.value]).select();
+          const { data, error } = await supabaseClient.from('players').insert([newPlayer.value]).select();
           if (!error && data) {
             players.value.push(data[0]);
             players.value.sort((a, b) => a.jersey - b.jersey);
@@ -309,7 +307,7 @@
 
         const removePlayer = async (id) => {
           if (!confirm('Delete this player and all their cloud session records?')) return;
-          const { error } = await supabase.from('players').delete().eq('id', id);
+          const { error } = await supabaseClient.from('players').delete().eq('id', id);
           if (!error) {
             players.value = players.value.filter(p => p.id !== id);
             sessions.value = sessions.value.filter(s => s.player_id !== id);
@@ -331,7 +329,7 @@
         const saveSession = async () => {
           if (!activePlayerForLog.value) return;
           const payload = { player_id: activePlayerForLog.value.id, ...newSession.value };
-          const { data, error } = await supabase.from('sessions').insert([payload]).select();
+          const { data, error } = await supabaseClient.from('sessions').insert([payload]).select();
           if (!error && data) {
             sessions.value.unshift(data[0]);
             showLogModal.value = false;
