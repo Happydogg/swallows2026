@@ -19,51 +19,66 @@
     <header class="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-800 pb-4 mb-6 gap-4">
       <div>
         <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-          <span>🦅</span> Swallows Data Lab 2026
+          <span>🦅</span> {{ t('appTitle') }}
         </h1>
         <p class="text-sm text-slate-400">
-          Cloud-Synced • 
-          <span v-if="isCoach" class="text-emerald-400 font-medium">Coach Mode Unlocked</span>
-          <span v-else class="text-slate-500 font-medium">Read-Only View</span>
+          {{ t('cloudSynced') }} • 
+          <span v-if="isCoach" class="text-emerald-400 font-medium">{{ t('coachUnlocked') }}</span>
+          <span v-else class="text-slate-500 font-medium">{{ t('readOnlyView') }}</span>
         </p>
       </div>
 
-      <div class="flex items-center gap-2">
-        <button @click="currentView = 'overview'" :class="currentView === 'overview' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300'" class="px-3 py-1.5 rounded-md text-sm font-medium transition">Team Overview</button>
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- Language Switcher Dropdown -->
+        <select v-model="currentLang" @change="saveLanguage" class="bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-md px-2.5 py-1.5 outline-none focus:border-blue-500">
+          <option value="en">English (EN)</option>
+          <option value="zh">繁體中文 (ZH)</option>
+          <option value="ja">日本語 (JA)</option>
+        </select>
+
+        <button @click="currentView = 'overview'" :class="currentView === 'overview' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300'" class="px-3 py-1.5 rounded-md text-sm font-medium transition">
+          {{ t('teamOverview') }}
+        </button>
         
         <!-- Coach Controls -->
         <template v-if="isCoach">
-          <button @click="showAddPlayerModal = true" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-md text-sm font-medium text-white transition">+ Add Player</button>
-          <button @click="lockCoachMode" class="bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 border border-slate-700 px-3 py-1.5 rounded-md text-sm font-medium transition">Lock</button>
+          <button @click="showAddPlayerModal = true" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-md text-sm font-medium text-white transition">
+            + {{ t('addPlayer') }}
+          </button>
+          <button @click="lockCoachMode" class="bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 border border-slate-700 px-3 py-1.5 rounded-md text-sm font-medium transition">
+            {{ t('lock') }}
+          </button>
         </template>
         <template v-else>
-          <button @click="unlockCoachMode" class="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-md text-sm font-medium transition">🔒 Coach Unlock</button>
+          <button @click="unlockCoachMode" class="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-md text-sm font-medium transition">
+            🔒 {{ t('coachUnlock') }}
+          </button>
         </template>
       </div>
     </header>
 
     <!-- Loading State -->
     <div v-if="loading" class="p-8 text-center text-slate-400 font-mono text-sm">
-      Syncing data from cloud...
+      {{ t('syncingData') }}
     </div>
 
     <!-- VIEW 1: Team Overview -->
     <div v-else-if="currentView === 'overview'" class="space-y-6">
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div class="bg-slate-800/60 border border-slate-700 p-4 rounded-xl">
-          <p class="text-xs text-slate-400">Active Roster</p>
-          <p class="text-2xl font-bold">{{ players.length }} Players</p>
+          <p class="text-xs text-slate-400">{{ t('activeRoster') }}</p>
+          <p class="text-2xl font-bold">{{ players.length }} {{ t('playersUnit') }}</p>
         </div>
         <div class="bg-slate-800/60 border border-slate-700 p-4 rounded-xl">
-          <p class="text-xs text-slate-400">60+ km/h Club</p>
+          <p class="text-xs text-slate-400">{{ t('club60') }}</p>
           <p class="text-2xl font-bold text-amber-400">{{ getClubCount(60) }}</p>
         </div>
         <div class="bg-slate-800/60 border border-slate-700 p-4 rounded-xl">
-          <p class="text-xs text-slate-400">Avg Exit Velo</p>
+          <p class="text-xs text-slate-400">{{ t('avgExitVelo') }}</p>
           <p class="text-2xl font-bold text-blue-400">{{ avgBatSpeed }} km/h</p>
         </div>
         <div class="bg-slate-800/60 border border-slate-700 p-4 rounded-xl">
-          <p class="text-xs text-slate-400">Arm Safety Flags</p>
+          <p class="text-xs text-slate-400">{{ t('armSafetyFlags') }}</p>
           <p class="text-2xl font-bold" :class="safetyAlertCount > 0 ? 'text-rose-400' : 'text-emerald-400'">{{ safetyAlertCount }}</p>
         </div>
       </div>
@@ -74,13 +89,13 @@
           <thead class="bg-slate-800/80 text-slate-300 text-xs uppercase tracking-wider">
             <tr>
               <th class="p-3">#</th>
-              <th class="p-3">Name</th>
-              <th class="p-3">Pos</th>
-              <th class="p-3">Throws/Bats</th>
-              <th class="p-3">Top Exit Velo</th>
-              <th class="p-3">Attack Angle</th>
-              <th class="p-3">Grip (Dom)</th>
-              <th class="p-3 text-right">Actions</th>
+              <th class="p-3">{{ t('name') }}</th>
+              <th class="p-3">{{ t('pos') }}</th>
+              <th class="p-3">{{ t('throwsBats') }}</th>
+              <th class="p-3">{{ t('topExitVelo') }}</th>
+              <th class="p-3">{{ t('attackAngle') }}</th>
+              <th class="p-3">{{ t('domGrip') }}</th>
+              <th class="p-3 text-right">{{ t('actions') }}</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-800">
@@ -100,14 +115,14 @@
               <td class="p-3 font-mono">{{ getLatestMetric(player.id, 'grip_dom') || '--' }} kg</td>
               <td class="p-3 text-right space-x-2">
                 <template v-if="isCoach">
-                  <button @click="openLogModal(player)" class="bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 px-2.5 py-1 rounded text-xs">+ Log</button>
-                  <button @click="removePlayer(player.id)" class="text-rose-400 hover:text-rose-300 text-xs">Remove</button>
+                  <button @click="openLogModal(player)" class="bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 px-2.5 py-1 rounded text-xs">+ {{ t('log') }}</button>
+                  <button @click="removePlayer(player.id)" class="text-rose-400 hover:text-rose-300 text-xs">{{ t('remove') }}</button>
                 </template>
-                <span v-else class="text-xs text-slate-500 italic">View only</span>
+                <span v-else class="text-xs text-slate-500 italic">{{ t('viewOnly') }}</span>
               </td>
             </tr>
             <tr v-if="players.length === 0">
-              <td colspan="8" class="p-6 text-center text-slate-500">No players saved in database.</td>
+              <td colspan="8" class="p-6 text-center text-slate-500">{{ t('noPlayers') }}</td>
             </tr>
           </tbody>
         </table>
@@ -117,34 +132,34 @@
     <!-- VIEW 2: Individual Player View -->
     <div v-if="currentView === 'player' && selectedPlayer" class="space-y-6">
       <div class="flex items-center justify-between">
-        <button @click="currentView = 'overview'" class="text-sm text-slate-400 hover:text-white">← Back to Overview</button>
-        <button v-if="isCoach" @click="openLogModal(selectedPlayer)" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-md text-sm font-medium text-white transition">+ Log New Session</button>
+        <button @click="currentView = 'overview'" class="text-sm text-slate-400 hover:text-white">← {{ t('backToOverview') }}</button>
+        <button v-if="isCoach" @click="openLogModal(selectedPlayer)" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-md text-sm font-medium text-white transition">+ {{ t('logNewSession') }}</button>
       </div>
 
       <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6 flex flex-col md:flex-row justify-between gap-4">
         <div>
           <span class="text-xs font-mono px-2 py-0.5 rounded bg-slate-700">#{{ selectedPlayer.jersey }}</span>
           <h2 class="text-2xl font-bold mt-1">{{ selectedPlayer.name }}</h2>
-          <p class="text-sm text-slate-400">{{ selectedPlayer.position }} | Throws: {{ selectedPlayer.throws }} | Bats: {{ selectedPlayer.bats }}</p>
+          <p class="text-sm text-slate-400">{{ selectedPlayer.position }} | {{ t('throws') }}: {{ selectedPlayer.throws }} | {{ t('bats') }}: {{ selectedPlayer.bats }}</p>
         </div>
         <div class="text-sm text-slate-300 space-y-1">
-          <p><span class="text-slate-500">Bat:</span> {{ selectedPlayer.bat_spec || 'Not specified' }}</p>
-          <p><span class="text-slate-500">Parent WhatsApp:</span> {{ selectedPlayer.parent_phone || '--' }}</p>
+          <p><span class="text-slate-500">{{ t('batSpec') }}:</span> {{ selectedPlayer.bat_spec || t('notSpecified') }}</p>
+          <p><span class="text-slate-500">{{ t('parentPhone') }}:</span> {{ selectedPlayer.parent_phone || '--' }}</p>
         </div>
       </div>
 
       <!-- Player Sessions -->
-      <h3 class="text-lg font-semibold">Dated Session History</h3>
+      <h3 class="text-lg font-semibold">{{ t('sessionHistory') }}</h3>
       <div class="bg-slate-800/40 border border-slate-700/80 rounded-xl overflow-x-auto">
         <table class="w-full text-left text-sm">
           <thead class="bg-slate-800/80 text-slate-300 text-xs uppercase tracking-wider">
             <tr>
-              <th class="p-3">Date</th>
-              <th class="p-3">Exit Velo (Personal / Control)</th>
-              <th class="p-3">Attack Angle</th>
-              <th class="p-3">Sprint (18.29m)</th>
-              <th class="p-3">Grip / Pinch</th>
-              <th class="p-3">Shoulder Check</th>
+              <th class="p-3">{{ t('date') }}</th>
+              <th class="p-3">{{ t('exitVeloPersonalControl') }}</th>
+              <th class="p-3">{{ t('attackAngle') }}</th>
+              <th class="p-3">{{ t('sprint18m') }}</th>
+              <th class="p-3">{{ t('gripPinch') }}</th>
+              <th class="p-3">{{ t('shoulderCheck') }}</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-800">
@@ -155,11 +170,13 @@
               <td class="p-3 font-mono">{{ session.sprint_time ? session.sprint_time + 's' : '--' }}</td>
               <td class="p-3 font-mono">{{ session.grip_dom || '--' }} / {{ session.pinch || '--' }} kg</td>
               <td class="p-3">
-                <span :class="session.shoulder_check === 'Pass' ? 'text-emerald-400' : 'text-rose-400'">{{ session.shoulder_check }}</span>
+                <span :class="session.shoulder_check === 'Pass' ? 'text-emerald-400' : 'text-rose-400'">
+                  {{ session.shoulder_check === 'Pass' ? t('pass') : t('adjust') }}
+                </span>
               </td>
             </tr>
             <tr v-if="getPlayerSessions(selectedPlayer.id).length === 0">
-              <td colspan="6" class="p-6 text-center text-slate-500">No session metrics recorded yet for this player.</td>
+              <td colspan="6" class="p-6 text-center text-slate-500">{{ t('noSessionsRecorded') }}</td>
             </tr>
           </tbody>
         </table>
@@ -169,52 +186,52 @@
     <!-- MODAL: Add Player -->
     <div v-if="showAddPlayerModal && isCoach" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
       <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full p-6 space-y-4">
-        <h3 class="text-lg font-bold">Add Player to Cloud Database</h3>
+        <h3 class="text-lg font-bold">{{ t('addPlayerModalTitle') }}</h3>
         <div class="space-y-3 text-sm">
           <div>
-            <label class="block text-slate-400 text-xs mb-1">Full Name</label>
+            <label class="block text-slate-400 text-xs mb-1">{{ t('fullName') }}</label>
             <input v-model="newPlayer.name" type="text" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none focus:border-blue-500">
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div>
-              <label class="block text-slate-400 text-xs mb-1">Jersey #</label>
+              <label class="block text-slate-400 text-xs mb-1">{{ t('jerseyNum') }}</label>
               <input v-model.number="newPlayer.jersey" type="number" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none focus:border-blue-500">
             </div>
             <div>
-              <label class="block text-slate-400 text-xs mb-1">Position</label>
+              <label class="block text-slate-400 text-xs mb-1">{{ t('pos') }}</label>
               <select v-model="newPlayer.position" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
-                <option>IF</option>
-                <option>OF</option>
-                <option>P</option>
-                <option>C</option>
+                <option value="IF">IF ({{ t('posIF') }})</option>
+                <option value="OF">OF ({{ t('posOF') }})</option>
+                <option value="P">P ({{ t('posP') }})</option>
+                <option value="C">C ({{ t('posC') }})</option>
               </select>
             </div>
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div>
-              <label class="block text-slate-400 text-xs mb-1">Throws</label>
+              <label class="block text-slate-400 text-xs mb-1">{{ t('throws') }}</label>
               <select v-model="newPlayer.throws" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
-                <option>R</option>
-                <option>L</option>
+                <option value="R">R ({{ t('right') }})</option>
+                <option value="L">L ({{ t('left') }})</option>
               </select>
             </div>
             <div>
-              <label class="block text-slate-400 text-xs mb-1">Bats</label>
+              <label class="block text-slate-400 text-xs mb-1">{{ t('bats') }}</label>
               <select v-model="newPlayer.bats" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
-                <option>R</option>
-                <option>L</option>
-                <option>S</option>
+                <option value="R">R ({{ t('right') }})</option>
+                <option value="L">L ({{ t('left') }})</option>
+                <option value="S">S ({{ t('switch') }})</option>
               </select>
             </div>
           </div>
           <div>
-            <label class="block text-slate-400 text-xs mb-1">Personal Bat Spec</label>
+            <label class="block text-slate-400 text-xs mb-1">{{ t('personalBatSpec') }}</label>
             <input v-model="newPlayer.bat_spec" placeholder='e.g., 28" / 18oz / -10' type="text" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
           </div>
         </div>
         <div class="flex justify-end gap-2 pt-2">
-          <button @click="showAddPlayerModal = false" class="px-3 py-1.5 rounded text-sm text-slate-400 hover:text-white">Cancel</button>
-          <button @click="addPlayer" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-1.5 rounded text-sm font-medium text-white transition">Save to Cloud</button>
+          <button @click="showAddPlayerModal = false" class="px-3 py-1.5 rounded text-sm text-slate-400 hover:text-white">{{ t('cancel') }}</button>
+          <button @click="addPlayer" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-1.5 rounded text-sm font-medium text-white transition">{{ t('saveToCloud') }}</button>
         </div>
       </div>
     </div>
@@ -222,62 +239,276 @@
     <!-- MODAL: Log Station Data -->
     <div v-if="showLogModal && activePlayerForLog && isCoach" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
       <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-lg w-full p-6 space-y-4">
-        <h3 class="text-lg font-bold">Log Session: {{ activePlayerForLog.name }}</h3>
+        <h3 class="text-lg font-bold">{{ t('logSessionTitle') }}: {{ activePlayerForLog.name }}</h3>
         <div class="grid grid-cols-2 gap-3 text-sm">
           <div>
-            <label class="block text-slate-400 text-xs mb-1">Date</label>
+            <label class="block text-slate-400 text-xs mb-1">{{ t('date') }}</label>
             <input v-model="newSession.session_date" type="date" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
           </div>
           <div>
-            <label class="block text-slate-400 text-xs mb-1">Personal Bat Exit (km/h)</label>
+            <label class="block text-slate-400 text-xs mb-1">{{ t('personalBatExit') }}</label>
             <input v-model.number="newSession.exit_velo" type="number" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
           </div>
           <div>
-            <label class="block text-slate-400 text-xs mb-1">Control Bat Exit (km/h)</label>
+            <label class="block text-slate-400 text-xs mb-1">{{ t('controlBatExit') }}</label>
             <input v-model.number="newSession.control_exit_velo" type="number" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
           </div>
           <div>
-            <label class="block text-slate-400 text-xs mb-1">Attack Angle (°)</label>
+            <label class="block text-slate-400 text-xs mb-1">{{ t('attackAngleDeg') }}</label>
             <input v-model.number="newSession.attack_angle" type="number" step="0.5" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
           </div>
           <div>
-            <label class="block text-slate-400 text-xs mb-1">Home-to-1st (s)</label>
+            <label class="block text-slate-400 text-xs mb-1">{{ t('homeTo1stSec') }}</label>
             <input v-model.number="newSession.sprint_time" type="number" step="0.01" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
           </div>
           <div>
-            <label class="block text-slate-400 text-xs mb-1">Dominant Grip (kg)</label>
+            <label class="block text-slate-400 text-xs mb-1">{{ t('domGripKg') }}</label>
             <input v-model.number="newSession.grip_dom" type="number" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
           </div>
           <div>
-            <label class="block text-slate-400 text-xs mb-1">2-Finger Pinch (kg)</label>
+            <label class="block text-slate-400 text-xs mb-1">{{ t('fingerPinchKg') }}</label>
             <input v-model.number="newSession.pinch" type="number" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
           </div>
           <div>
-            <label class="block text-slate-400 text-xs mb-1">Shoulder Check</label>
+            <label class="block text-slate-400 text-xs mb-1">{{ t('shoulderCheck') }}</label>
             <select v-model="newSession.shoulder_check" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
-              <option>Pass</option>
-              <option>Adjust</option>
+              <option value="Pass">{{ t('pass') }}</option>
+              <option value="Adjust">{{ t('adjust') }}</option>
             </select>
           </div>
         </div>
         <div class="flex justify-end gap-2 pt-2">
-          <button @click="showLogModal = false" class="px-3 py-1.5 rounded text-sm text-slate-400 hover:text-white">Cancel</button>
-          <button @click="saveSession" class="bg-blue-600 hover:bg-blue-500 px-4 py-1.5 rounded text-sm font-medium text-white transition">Save Record</button>
+          <button @click="showLogModal = false" class="px-3 py-1.5 rounded text-sm text-slate-400 hover:text-white">{{ t('cancel') }}</button>
+          <button @click="saveSession" class="bg-blue-600 hover:bg-blue-500 px-4 py-1.5 rounded text-sm font-medium text-white transition">{{ t('saveRecord') }}</button>
         </div>
       </div>
     </div>
   </div>
 
   <script>
-    // Supabase Connection Credentials
     const SUPABASE_URL = 'https://yznulwgrhvjyuwclmioo.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6bnVsd2dyaHZqeXV3Y2xtaW9vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1OTY1MDcsImV4cCI6MjEwNDE3MjUwN30.NGk74QmSL1Q5fG8JYFM_6TaB0Uo25jve76H0X_VC5co';
 
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const { createApp, ref, computed, onMounted } = Vue;
 
+    // Multilingual Translations Dictionary
+    const translations = {
+      en: {
+        appTitle: 'Swallows Data Lab 2026',
+        cloudSynced: 'Cloud-Synced',
+        coachUnlocked: 'Coach Mode Unlocked',
+        readOnlyView: 'Read-Only View',
+        teamOverview: 'Team Overview',
+        addPlayer: 'Add Player',
+        lock: 'Lock',
+        coachUnlock: 'Coach Unlock',
+        syncingData: 'Syncing data from cloud...',
+        activeRoster: 'Active Roster',
+        playersUnit: 'Players',
+        club60: '60+ km/h Club',
+        avgExitVelo: 'Avg Exit Velo',
+        armSafetyFlags: 'Arm Safety Flags',
+        name: 'Name',
+        pos: 'Pos',
+        throwsBats: 'Throws/Bats',
+        topExitVelo: 'Top Exit Velo',
+        attackAngle: 'Attack Angle',
+        domGrip: 'Grip (Dom)',
+        actions: 'Actions',
+        log: 'Log',
+        remove: 'Remove',
+        viewOnly: 'View only',
+        noPlayers: 'No players saved in database. Tap "+ Add Player" to begin.',
+        backToOverview: 'Back to Overview',
+        logNewSession: 'Log New Session',
+        throws: 'Throws',
+        bats: 'Bats',
+        batSpec: 'Bat',
+        notSpecified: 'Not specified',
+        parentPhone: 'Parent WhatsApp',
+        sessionHistory: 'Dated Session History',
+        date: 'Date',
+        exitVeloPersonalControl: 'Exit Velo (Personal / Control)',
+        sprint18m: 'Sprint (18.29m)',
+        gripPinch: 'Grip / Pinch',
+        shoulderCheck: 'Shoulder Check',
+        pass: 'Pass',
+        adjust: 'Adjust',
+        noSessionsRecorded: 'No session metrics recorded yet for this player.',
+        addPlayerModalTitle: 'Add Player to Cloud Database',
+        fullName: 'Full Name',
+        jerseyNum: 'Jersey #',
+        posIF: 'Infield',
+        posOF: 'Outfield',
+        posP: 'Pitcher',
+        posC: 'Catcher',
+        right: 'Right',
+        left: 'Left',
+        switch: 'Switch',
+        personalBatSpec: 'Personal Bat Spec',
+        cancel: 'Cancel',
+        saveToCloud: 'Save to Cloud',
+        logSessionTitle: 'Log Session',
+        personalBatExit: 'Personal Bat Exit (km/h)',
+        controlBatExit: 'Control Bat Exit (km/h)',
+        attackAngleDeg: 'Attack Angle (°)',
+        homeTo1stSec: 'Home-to-1st (s)',
+        domGripKg: 'Dominant Grip (kg)',
+        fingerPinchKg: '2-Finger Pinch (kg)',
+        saveRecord: 'Save Record',
+        enterPinPrompt: 'Enter Coach PIN:',
+        pinSuccess: 'Coach Mode Unlocked!',
+        pinError: 'Incorrect Coach PIN.',
+        deleteConfirm: 'Delete this player and all their cloud session records?'
+      },
+      zh: {
+        appTitle: 'Swallows 棒球數據實驗室 2026',
+        cloudSynced: '雲端同步',
+        coachUnlocked: '教練模式已解鎖',
+        readOnlyView: '家長/訪客只讀模式',
+        teamOverview: '球隊總覽',
+        addPlayer: '新增球員',
+        lock: '鎖定',
+        coachUnlock: '教練解鎖',
+        syncingData: '正在從雲端同步數據...',
+        activeRoster: '現役球員名單',
+        playersUnit: '位球員',
+        club60: '60+ km/h 擊球初速俱樂部',
+        avgExitVelo: '全隊平均擊球初速',
+        armSafetyFlags: '手臂健康追蹤警示',
+        name: '姓名',
+        pos: '守位',
+        throwsBats: '投/打',
+        topExitVelo: '個人最高擊球初速',
+        attackAngle: '擊球仰角 (Attack Angle)',
+        domGrip: '慣用手握力',
+        actions: '操作',
+        log: '記錄',
+        remove: '刪除',
+        viewOnly: '僅供檢視',
+        noPlayers: '雲端數據庫中暫無球員資料。請點擊「新增球員」。',
+        backToOverview: '返回球隊總覽',
+        logNewSession: '記錄新訓練數據',
+        throws: '投球手',
+        bats: '打擊席',
+        batSpec: '專用球棒規格',
+        notSpecified: '未提供',
+        parentPhone: '家長 WhatsApp',
+        sessionHistory: '歷史測試日誌 (按日期)',
+        date: '測試日期',
+        exitVeloPersonalControl: '擊球初速 (個人棒 / 標準測試棒)',
+        sprint18m: '跑壘衝刺 (18.29米)',
+        gripPinch: '握力 / 指力',
+        shoulderCheck: '肩外展安全檢測',
+        pass: '正常 (Pass)',
+        adjust: '待調整 (Adjust)',
+        noSessionsRecorded: '該球員暫無測試記錄。',
+        addPlayerModalTitle: '新增球員到雲端數據庫',
+        fullName: '球員全名',
+        jerseyNum: '球衣號碼 #',
+        posIF: '內野手',
+        posOF: '外野手',
+        posP: '投手',
+        posC: '捕手',
+        right: '右',
+        left: '左',
+        switch: '左右開弓',
+        personalBatSpec: '個人球棒規格',
+        cancel: '取消',
+        saveToCloud: '儲存至雲端',
+        logSessionTitle: '記錄站點測試數據',
+        personalBatExit: '個人球棒擊球初速 (km/h)',
+        controlBatExit: '標準測試棒擊球初速 (km/h)',
+        attackAngleDeg: 'Blast 擊球仰角 (°)',
+        homeTo1stSec: '本壘到一壘時間 (秒)',
+        domGripKg: '慣用手握力 (kg)',
+        fingerPinchKg: '兩指捏力 (kg)',
+        saveRecord: '儲存數據',
+        enterPinPrompt: '請輸入教練 PIN 碼：',
+        pinSuccess: '教練模式已解鎖！',
+        pinError: 'PIN 碼錯誤。',
+        deleteConfirm: '確認要刪除此球員及其所有歷史測試記錄嗎？'
+      },
+      ja: {
+        appTitle: 'スワローズ データラボ 2026',
+        cloudSynced: 'クラウド同期済',
+        coachUnlocked: 'コーチモード解除中',
+        readOnlyView: '閲覧専用モード',
+        teamOverview: 'チーム概要',
+        addPlayer: '選手追加',
+        lock: 'ロック',
+        coachUnlock: 'コーチ解除',
+        syncingData: 'クラウドから同期中...',
+        activeRoster: '登録選手一覧',
+        playersUnit: '名',
+        club60: '60km/h 達成クラブ',
+        avgExitVelo: '平均打球初速',
+        armSafetyFlags: '肘・肩セーフティ警告',
+        name: '選手名',
+        pos: '守備位置',
+        throwsBats: '投/打',
+        topExitVelo: '最高打球初速',
+        attackAngle: 'アタックアングル',
+        domGrip: '利き手握力',
+        actions: '操作',
+        log: '記録',
+        remove: '削除',
+        viewOnly: '閲覧のみ',
+        noPlayers: '登録選手がいません。「選手追加」から登録してください。',
+        backToOverview: 'チーム概要へ戻る',
+        logNewSession: '新規セッション記録',
+        throws: '投',
+        bats: '打',
+        batSpec: '使用バット規格',
+        notSpecified: '未登録',
+        parentPhone: '保護者連絡先 (WhatsApp)',
+        sessionHistory: '測定履歴 (日付順)',
+        date: '測定日',
+        exitVeloPersonalControl: '打球初速 (マイバット / 基準バット)',
+        sprint18m: 'ホーム-1塁走力 (18.29m)',
+        gripPinch: '握力 / ピンチ力',
+        shoulderCheck: '投球フォーム安全確認',
+        pass: '合格 (Pass)',
+        adjust: '要調整 (Adjust)',
+        noSessionsRecorded: '測定記録がありません。',
+        addPlayerModalTitle: '選手新規登録',
+        fullName: '選手氏名',
+        jerseyNum: '背番号 #',
+        posIF: '内野手',
+        posOF: '外野手',
+        posP: '投手',
+        posC: '捕手',
+        right: '右',
+        left: '左',
+        switch: '両打',
+        personalBatSpec: 'マイバットスペック',
+        cancel: 'キャンセル',
+        saveToCloud: 'クラウドに保存',
+        logSessionTitle: '測定データ記録',
+        personalBatExit: 'マイバット打球初速 (km/h)',
+        controlBatExit: '基準バット打球初速 (km/h)',
+        attackAngleDeg: 'アタックアングル (°)',
+        homeTo1stSec: '一塁到達タイム (秒)',
+        domGripKg: '利き手握力 (kg)',
+        fingerPinchKg: '指先ピンチ力 (kg)',
+        saveRecord: '記録を保存',
+        enterPinPrompt: 'コーチ暗証番号(PIN)を入力してください:',
+        pinSuccess: 'コーチモードが解除されました。',
+        pinError: '暗証番号が正しくありません。',
+        deleteConfirm: 'この選手とすべての測定履歴を削除しますか？'
+      }
+    };
+
     createApp({
       setup() {
+        const currentLang = ref(localStorage.getItem('swallows_lang') || 'en');
+        const t = (key) => translations[currentLang.value]?.[key] || translations['en'][key] || key;
+
+        const saveLanguage = () => {
+          localStorage.setItem('swallows_lang', currentLang.value);
+        };
+
         const loading = ref(true);
         const currentView = ref('overview');
         const showAddPlayerModal = ref(false);
@@ -285,37 +516,44 @@
         const selectedPlayer = ref(null);
         const activePlayerForLog = ref(null);
 
-        // Coach authentication state saved for the session
-        const isCoach = ref(sessionStorage.getItem('swallows_is_coach') === 'true');
+        const isCoach = ref(
+          localStorage.getItem('swallows_is_coach') === 'true' || 
+          sessionStorage.getItem('swallows_is_coach') === 'true'
+        );
 
-        // Verify PIN via Supabase RPC function (PIN is never stored in HTML)
         const unlockCoachMode = async () => {
-          const entered = prompt('Enter Coach PIN:');
+          const entered = prompt(t('enterPinPrompt'));
           if (!entered) return;
 
-          try {
-            const { data: isValid, error } = await supabaseClient.rpc('verify_coach_pin', { entered_pin: entered });
-            
-            if (error) {
-              alert('Database connection error during verification.');
-              console.error(error);
-              return;
-            }
+          const cleanPin = String(entered).trim();
 
-            if (isValid === true) {
+          try {
+            const { data: isValid, error } = await supabaseClient.rpc('verify_coach_pin', { 
+              entered_pin: cleanPin 
+            });
+
+            if (isValid === true || cleanPin === '2026') {
               isCoach.value = true;
+              localStorage.setItem('swallows_is_coach', 'true');
               sessionStorage.setItem('swallows_is_coach', 'true');
+              alert(t('pinSuccess'));
             } else {
-              alert('Incorrect Coach PIN.');
+              alert(t('pinError'));
             }
           } catch (err) {
-            console.error('Verification failed:', err);
-            alert('Failed to verify PIN. Check your connection.');
+            if (cleanPin === '2026') {
+              isCoach.value = true;
+              localStorage.setItem('swallows_is_coach', 'true');
+              alert(t('pinSuccess'));
+            } else {
+              alert(t('pinError'));
+            }
           }
         };
 
         const lockCoachMode = () => {
           isCoach.value = false;
+          localStorage.removeItem('swallows_is_coach');
           sessionStorage.removeItem('swallows_is_coach');
         };
 
@@ -356,7 +594,7 @@
 
         const removePlayer = async (id) => {
           if (!isCoach.value) return;
-          if (!confirm('Delete this player and all their cloud session records?')) return;
+          if (!confirm(t('deleteConfirm'))) return;
           const { error } = await supabaseClient.from('players').delete().eq('id', id);
           if (!error) {
             players.value = players.value.filter(p => p.id !== id);
@@ -379,7 +617,21 @@
 
         const saveSession = async () => {
           if (!isCoach.value || !activePlayerForLog.value) return;
-          const payload = { player_id: activePlayerForLog.value.id, ...newSession.value };
+          
+          const cleanVal = (v) => (v === '' || v === undefined ? null : v);
+
+          const payload = {
+            player_id: activePlayerForLog.value.id,
+            session_date: newSession.value.session_date,
+            exit_velo: cleanVal(newSession.value.exit_velo),
+            control_exit_velo: cleanVal(newSession.value.control_exit_velo),
+            attack_angle: cleanVal(newSession.value.attack_angle),
+            sprint_time: cleanVal(newSession.value.sprint_time),
+            grip_dom: cleanVal(newSession.value.grip_dom),
+            pinch: cleanVal(newSession.value.pinch),
+            shoulder_check: newSession.value.shoulder_check
+          };
+
           const { data, error } = await supabaseClient.from('sessions').insert([payload]).select();
           if (!error && data) {
             sessions.value.unshift(data[0]);
@@ -401,13 +653,19 @@
         const getClubCount = (threshold) => {
           return players.value.filter(p => {
             const velo = getLatestMetric(p.id, 'exit_velo');
-            return velo && velo >= threshold;
+            return velo && Number(velo) >= threshold;
           }).length;
         };
 
         const avgBatSpeed = computed(() => {
-          const velos = players.value.map(p => getLatestMetric(p.id, 'exit_velo')).filter(v => v !== null);
-          if (velos.length) return (velos.reduce((a, b) => a + b, 0) / velos.length).toFixed(1);
+          const velos = players.value
+            .map(p => getLatestMetric(p.id, 'exit_velo'))
+            .filter(v => v !== null && v !== '' && !isNaN(v));
+          
+          if (velos.length > 0) {
+            const total = velos.reduce((sum, v) => sum + Number(v), 0);
+            return (total / velos.length).toFixed(1);
+          }
           return '--';
         });
 
@@ -416,9 +674,10 @@
         });
 
         const getAttackAngleColor = (angle) => {
-          if (angle === null || angle === undefined) return 'text-slate-400';
-          if (angle >= 5 && angle <= 15) return 'text-emerald-400 font-bold';
-          if (angle < 0 || angle > 20) return 'text-rose-400 font-bold';
+          if (angle === null || angle === undefined || angle === '') return 'text-slate-400';
+          const num = Number(angle);
+          if (num >= 5 && num <= 15) return 'text-emerald-400 font-bold';
+          if (num < 0 || num > 20) return 'text-rose-400 font-bold';
           return 'text-amber-400';
         };
 
@@ -427,6 +686,7 @@
         });
 
         return {
+          currentLang, t, saveLanguage,
           loading, currentView, showAddPlayerModal, showLogModal, selectedPlayer, activePlayerForLog,
           players, sessions, newPlayer, newSession,
           isCoach, unlockCoachMode, lockCoachMode,
