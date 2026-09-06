@@ -7,7 +7,9 @@
   <link rel="icon" type="image/png" href="./logo.png">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <!-- Supabase Official Client Library -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Chart.js Official Client Library -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     [v-cloak] { display: none !important; }
@@ -44,6 +46,7 @@
 <body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8 font-sans">
   <div id="app" v-cloak class="max-w-6xl mx-auto">
     
+    <!-- Top Header Bar (Hidden during printing) -->
     <header class="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-800 pb-4 mb-6 gap-4 no-print">
       <div>
         <h1 class="text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
@@ -58,34 +61,43 @@
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
+        <!-- Language Switcher Dropdown -->
         <select v-model="currentLang" @change="saveLanguage" class="bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-md px-2.5 py-1.5 outline-none focus:border-blue-500">
           <option value="en">English (EN)</option>
           <option value="zh">繁體中文 (ZH)</option>
           <option value="ja">日本語 (JA)</option>
         </select>
 
+        <!-- Navigation: Team Overview -->
         <button @click="currentView = 'overview'" :class="currentView === 'overview' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300'" class="px-3 py-1.5 rounded-md text-sm font-medium transition">
           {{ t('teamOverview') }}
         </button>
         
+        <!-- Coach Only Action Toolbar -->
         <template v-if="isCoach">
+          <!-- Export CSV Roster / Parent Check-in Template -->
           <button @click="exportTeamCSV" class="bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 rounded-md text-sm font-medium text-white transition flex items-center gap-1">
             📊 {{ t('exportCSV') }}
           </button>
           
+          <!-- Batch Import CSV Roster / Quarterly Check-in Updates -->
           <label class="bg-purple-600 hover:bg-purple-500 px-3 py-1.5 rounded-md text-sm font-medium text-white transition cursor-pointer flex items-center gap-1">
             📂 {{ t('importCSV') }}
             <input type="file" accept=".csv" class="hidden" @change="importTeamCSV">
           </label>
 
+          <!-- Add Single Player Button -->
           <button @click="openAddPlayerModal" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-md text-sm font-medium text-white transition">
             + {{ t('addPlayer') }}
           </button>
+          
+          <!-- Lock Coach Mode -->
           <button @click="lockCoachMode" class="bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 border border-slate-700 px-3 py-1.5 rounded-md text-sm font-medium transition">
             {{ t('lock') }}
           </button>
         </template>
         
+        <!-- Public/Parent View: Coach Unlock Trigger -->
         <template v-else>
           <button @click="unlockCoachMode" class="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-md text-sm font-medium transition">
             🔒 {{ t('coachUnlock') }}
@@ -94,12 +106,15 @@
       </div>
     </header>
 
+    <!-- Loading Indicator -->
     <div v-if="loading" class="p-8 text-center text-slate-400 font-mono text-sm no-print">
       {{ t('syncingData') }}
     </div>
 
+    <!-- VIEW 1: Team Overview Dashboard -->
     <div v-else-if="currentView === 'overview'" class="space-y-6">
       
+      <!-- Top Overview Stat Summary Cards -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div class="bg-slate-800/60 border border-slate-700 p-4 rounded-xl">
           <p class="text-xs text-slate-400">{{ t('activeRoster') }}</p>
@@ -119,6 +134,7 @@
         </div>
       </div>
 
+      <!-- Tab Switcher & Quick Roster Search -->
       <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-3 gap-3">
         <div class="flex gap-2">
           <button 
@@ -145,8 +161,10 @@
         </div>
       </div>
 
+      <!-- TAB A: Roster (Responsive Layout) -->
       <div v-if="overviewTab === 'roster'">
         
+        <!-- Mobile Player Cards (< 768px): Prioritizes Throws/Bats and Sprint -->
         <div class="block md:hidden space-y-3">
           <div v-for="player in filteredPlayers" :key="'m-rost-' + player.id" class="bg-slate-800/60 border border-slate-700/80 rounded-xl p-4 space-y-3 shadow-sm">
             <div class="flex items-center justify-between">
@@ -180,6 +198,7 @@
               </div>
             </div>
 
+            <!-- Core High-Signal Stats Grid -->
             <div class="grid grid-cols-2 gap-2 bg-slate-900/60 p-2.5 rounded-lg border border-slate-800 text-xs font-mono">
               <div>
                 <span class="text-slate-400 text-[10px] block">{{ t('throwsBats') }}:</span>
@@ -201,6 +220,7 @@
               </div>
             </div>
 
+            <!-- Mobile Card Actions Footer -->
             <div class="flex items-center justify-between pt-1 border-t border-slate-700/60">
               <button @click="selectPlayer(player)" class="text-xs text-blue-400 font-semibold hover:underline">
                 View Profile &amp; History →
@@ -217,6 +237,7 @@
           </div>
         </div>
 
+        <!-- Desktop Multi-Column Roster Table (≥ 768px) -->
         <div class="hidden md:block bg-slate-800/40 border border-slate-700/80 rounded-xl overflow-x-auto">
           <table class="w-full text-left text-sm">
             <thead class="bg-slate-800/80 text-slate-300 text-xs uppercase tracking-wider">
@@ -304,9 +325,11 @@
 
       </div>
 
+      <!-- TAB B: Team Leaderboards & PR Badges -->
       <div v-else-if="overviewTab === 'leaderboard'" class="space-y-6">
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           
+          <!-- Exit Velocity Leaderboard -->
           <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
             <h4 class="text-sm font-bold text-blue-400 flex items-center justify-between mb-3">
               <span>⚡ {{ t('topExitVelo') }}</span>
@@ -329,6 +352,7 @@
             </div>
           </div>
 
+          <!-- Throwing Velocity Leaderboard -->
           <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
             <h4 class="text-sm font-bold text-emerald-400 flex items-center justify-between mb-3">
               <span>🎯 {{ t('throwingVelo') }}</span>
@@ -351,6 +375,7 @@
             </div>
           </div>
 
+          <!-- Broad Jump Height Ratio Leaderboard -->
           <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
             <h4 class="text-sm font-bold text-purple-400 flex items-center justify-between mb-3">
               <span>🚀 {{ t('broadJumpRatioTitle') }}</span>
@@ -373,6 +398,7 @@
             </div>
           </div>
 
+          <!-- Home-to-1st Sprint Leaderboard -->
           <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
             <h4 class="text-sm font-bold text-amber-400 flex items-center justify-between mb-3">
               <span>⏱️ {{ t('sprint18m') }}</span>
@@ -400,8 +426,10 @@
 
     </div>
 
+    <!-- VIEW 2: Individual Player Profile & Dated Session History -->
     <div v-if="currentView === 'player' && selectedPlayer" class="space-y-6">
       
+      <!-- Top Action Navigation Bar -->
       <div class="flex items-center justify-between no-print">
         <button @click="currentView = 'overview'" class="text-sm text-slate-400 hover:text-white">← {{ t('backToOverview') }}</button>
         <div class="flex items-center gap-2">
@@ -419,6 +447,7 @@
         </div>
       </div>
 
+      <!-- Printable Player Summary Card -->
       <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 print-card">
         <div class="flex items-center gap-4">
           <div class="w-20 h-20 rounded-2xl overflow-hidden flex-shrink-0 bg-slate-700 border-2 border-slate-600 shadow-md flex items-center justify-center font-bold text-xl text-blue-300">
@@ -461,6 +490,7 @@
         </div>
       </div>
 
+      <!-- Chart.js Trend Visualizer (Hidden on Print) -->
       <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-5 no-print">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-slate-700/60 pb-3">
           <div>
@@ -522,6 +552,7 @@
         </div>
       </div>
 
+      <!-- Dated Session History Details -->
       <div class="space-y-3">
         <div class="flex items-center justify-between">
           <h3 class="text-lg font-semibold flex items-center gap-2">
@@ -533,6 +564,7 @@
           <span class="text-xs text-slate-500 font-normal no-print hidden sm:inline">All metrics synced to cloud</span>
         </div>
 
+        <!-- Mobile Accordion Cards (< 768px screens) -->
         <div class="block md:hidden space-y-2.5">
           <div 
             v-for="session in getPlayerSessions(selectedPlayer.id)" 
@@ -576,6 +608,7 @@
               v-if="isSessionExpanded(session.id)" 
               class="border-t border-slate-800 bg-slate-900/90 p-4 space-y-3.5 text-xs">
               
+              <!-- Hitting Metrics Group -->
               <div class="space-y-1.5">
                 <p class="text-[11px] font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
                   <span>⚡</span> {{ t('stationMetricsHeader') }}
@@ -598,6 +631,7 @@
                 </div>
               </div>
 
+              <!-- Speed and Power Group -->
               <div class="space-y-1.5">
                 <p class="text-[11px] font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
                   <span>🚀</span> {{ t('broadJumpRatioTitle') }} &amp; Speed
@@ -629,6 +663,7 @@
                 </div>
               </div>
 
+              <!-- Physical Measurements Baseline -->
               <div class="space-y-1.5">
                 <p class="text-[11px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
                   <span>📏</span> {{ t('growthSectionHeader') }}
@@ -666,6 +701,7 @@
           </div>
         </div>
 
+        <!-- Desktop Multi-Column Session History Table (≥ 768px screens or printing) -->
         <div class="hidden md:block bg-slate-800/40 border border-slate-700/80 rounded-xl overflow-x-auto print-card">
           <table class="w-full text-left text-sm">
             <thead class="bg-slate-800/80 text-slate-300 text-xs uppercase tracking-wider">
@@ -731,6 +767,7 @@
 
     </div>
 
+    <!-- MODAL: Add Player -->
     <div v-if="showAddPlayerModal && isCoach" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 no-print">
       <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-bold">{{ t('addPlayerModalTitle') }}</h3>
@@ -799,6 +836,7 @@
       </div>
     </div>
 
+    <!-- MODAL: Edit Player Profile -->
     <div v-if="showEditPlayerModal && isCoach && editingPlayer" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 no-print">
       <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-bold">{{ t('editPlayerModalTitle') }}</h3>
@@ -818,6 +856,7 @@
             </div>
           </div>
 
+          <!-- Photo Upload & Compression Block -->
           <div class="p-3 bg-slate-900/60 border border-slate-700/80 rounded-lg space-y-2">
             <label class="block text-slate-300 text-xs font-semibold">{{ t('profilePhoto') }}</label>
             
@@ -886,6 +925,7 @@
       </div>
     </div>
 
+    <!-- MODAL: Log Station Data -->
     <div v-if="showLogModal && activePlayerForLog && isCoach" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 no-print">
       <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-bold">{{ t('logSessionTitle') }}: {{ activePlayerForLog.name }}</h3>
@@ -896,6 +936,7 @@
             <input v-model="newSession.session_date" type="date" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
           </div>
 
+          <!-- Growth & Power Section -->
           <div class="p-3 bg-slate-900/60 border border-slate-700/60 rounded-lg space-y-2">
             <p class="text-xs font-semibold text-blue-400 uppercase tracking-wider">{{ t('growthSectionHeader') }}</p>
             <div class="grid grid-cols-3 gap-2">
@@ -914,6 +955,7 @@
             </div>
           </div>
 
+          <!-- Station Metrics Section with Unit Switcher -->
           <div class="p-3 bg-slate-900/60 border border-slate-700/60 rounded-lg space-y-2">
             <div class="flex items-center justify-between">
               <p class="text-xs font-semibold text-emerald-400 uppercase tracking-wider">{{ t('stationMetricsHeader') }}</p>
@@ -988,6 +1030,7 @@
       </div>
     </div>
 
+    <!-- MODAL: Edit Session Modal -->
     <div v-if="showEditSessionModal && isCoach && editingSession" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 no-print">
       <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-bold">{{ t('editSessionModalTitle') }}</h3>
@@ -998,6 +1041,7 @@
             <input v-model="editingSession.session_date" type="date" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
           </div>
 
+          <!-- Growth & Power -->
           <div class="p-3 bg-slate-900/60 border border-slate-700/60 rounded-lg space-y-2">
             <p class="text-xs font-semibold text-blue-400 uppercase tracking-wider">{{ t('growthSectionHeader') }}</p>
             <div class="grid grid-cols-3 gap-2">
@@ -1016,6 +1060,7 @@
             </div>
           </div>
 
+          <!-- Station Metrics -->
           <div class="p-3 bg-slate-900/60 border border-slate-700/60 rounded-lg space-y-2">
             <div class="flex items-center justify-between">
               <p class="text-xs font-semibold text-emerald-400 uppercase tracking-wider">{{ t('stationMetricsHeader') }}</p>
@@ -1092,12 +1137,14 @@
   </div>
 
   <script>
+    // Supabase Credentials
     const SUPABASE_URL = 'https://yznulwgrhvjyuwclmioo.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6bnVsd2dyaHZqeXV3Y2xtaW9vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1OTY1MDcsImV4cCI6MjEwNDE3MjUwN30.NGk74QmSL1Q5fG8JYFM_6TaB0Uo25jve76H0X_VC5co';
 
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const { createApp, ref, reactive, computed, onMounted, nextTick, watch } = Vue;
 
+    // Multilingual Dictionaries (EN, ZH, JA)
     const translations = {
       en: {
         appTitle: 'SWALLOWS DATALAB',
@@ -1421,7 +1468,12 @@
 
     createApp({
       setup() {
-        // Automatic OS Language Detection with fallback to English
+        /**
+         * Resolves the initial app language:
+         * 1. Checks localStorage for a manual user choice.
+         * 2. Otherwise detects the client's OS / browser language.
+         * 3. Falls back to English ('en') if unsupported.
+         */
         const getInitialLanguage = () => {
           const saved = localStorage.getItem('swallows_lang');
           if (saved && translations[saved]) return saved;
@@ -1431,6 +1483,10 @@
         };
 
         const currentLang = ref(getInitialLanguage());
+        
+        /**
+         * Translates a given key based on currentLang with fallbacks.
+         */
         const t = (key) => translations[currentLang.value]?.[key] || translations['en'][key] || key;
 
         let chartInstance = null;
@@ -1440,6 +1496,7 @@
         const hasChartData = ref(false);
         const isUploadingPhoto = ref(false);
 
+        // Set tracking which session accordion drawers are open on mobile
         const expandedSessionIds = reactive(new Set());
         const toggleSessionExpand = (sessionId) => {
           if (expandedSessionIds.has(sessionId)) {
@@ -1450,11 +1507,15 @@
         };
         const isSessionExpanded = (sessionId) => expandedSessionIds.has(sessionId);
 
+        // Image fallback handler to prevent broken image badges
         const failedImgs = reactive({});
         const markImgFailed = (playerId) => {
           failedImgs[playerId] = true;
         };
 
+        /**
+         * Converts Google Drive and Dropbox links to direct viewable image URLs.
+         */
         const formatImgUrl = (url) => {
           if (!url) return '';
           const trimmed = String(url).trim();
@@ -1478,6 +1539,9 @@
           return trimmed;
         };
 
+        /**
+         * Compresses camera uploads client-side via HTML5 Canvas (max 500px width/height).
+         */
         const compressImage = (file, maxWidth = 500, quality = 0.8) => {
           return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -1522,6 +1586,9 @@
           });
         };
 
+        /**
+         * Uploads a compressed avatar to the public Supabase 'avatars' storage bucket.
+         */
         const handleFileUpload = async (event) => {
           const file = event.target.files[0];
           if (!file || !editingPlayer.value) return;
@@ -1559,6 +1626,9 @@
         const logSpeedUnit = ref('kmh');
         const editSpeedUnit = ref('kmh');
 
+        /**
+         * Toggles the chart display between velocity and physical growth.
+         */
         const setChartMode = (mode) => {
           chartMode.value = mode;
           nextTick(() => {
@@ -1566,11 +1636,17 @@
           });
         };
 
+        /**
+         * Saves manual language preference to localStorage.
+         */
         const saveLanguage = () => {
           localStorage.setItem('swallows_lang', currentLang.value);
           renderPlayerChart();
         };
 
+        /**
+         * Invokes system print dialog for physical or PDF reports.
+         */
         const triggerPrintReport = () => {
           window.print();
         };
@@ -1590,11 +1666,15 @@
         const selectedAddPositions = ref(['IF']);
         const selectedEditPositions = ref([]);
 
+        // Persistent Coach Mode State
         const isCoach = ref(
           localStorage.getItem('swallows_is_coach') === 'true' || 
           sessionStorage.getItem('swallows_is_coach') === 'true'
         );
 
+        /**
+         * Verifies Coach PIN against database RPC (fallback PIN '2026' supported).
+         */
         const unlockCoachMode = async () => {
           const entered = prompt(t('enterPinPrompt'));
           if (!entered) return;
@@ -1625,6 +1705,9 @@
           }
         };
 
+        /**
+         * Relocks Coach Mode back to public read-only.
+         */
         const lockCoachMode = () => {
           isCoach.value = false;
           localStorage.removeItem('swallows_is_coach');
@@ -1642,6 +1725,9 @@
           sprint_time: null, grip_dom: null, pinch: null, shoulder_check: 'Pass' 
         });
 
+        /**
+         * Converts values dynamically between km/h and mph inside modal inputs.
+         */
         const toggleSpeedUnit = (target, newUnit) => {
           const targetUnit = target === 'log' ? logSpeedUnit : editSpeedUnit;
           const targetObj = target === 'log' ? newSession.value : editingSession.value;
@@ -1663,11 +1749,17 @@
           targetUnit.value = newUnit;
         };
 
+        /**
+         * Splits comma-separated position strings into an array.
+         */
         const splitPositions = (posStr) => {
           if (!posStr) return ['IF'];
           return posStr.split(',').map(s => s.trim()).filter(Boolean);
         };
 
+        /**
+         * Toggles position tags in the Add Player modal.
+         */
         const toggleAddPosition = (pos) => {
           if (selectedAddPositions.value.includes(pos)) {
             if (selectedAddPositions.value.length > 1) {
@@ -1678,6 +1770,9 @@
           }
         };
 
+        /**
+         * Toggles position tags in the Edit Player modal.
+         */
         const toggleEditPosition = (pos) => {
           if (selectedEditPositions.value.includes(pos)) {
             if (selectedEditPositions.value.length > 1) {
@@ -1688,12 +1783,19 @@
           }
         };
 
+        /**
+         * Prepares state and opens the Add Player modal.
+         */
         const openAddPlayerModal = () => {
           selectedAddPositions.value = ['IF'];
           newPlayer.value = { name: '', jersey: null, position: 'IF', throws: 'R', bats: 'R', bat_spec: '', dob: null, photo_url: '' };
           showAddPlayerModal.value = true;
         };
 
+        /**
+         * Fetches all cloud data:
+         * Omits sensitive parent contact info from public queries for data privacy.
+         */
         const fetchAllData = async () => {
           loading.value = true;
           try {
@@ -1718,13 +1820,20 @@
           }
         };
 
+        /**
+         * Adds a single player record to the cloud database.
+         */
         const addPlayer = async () => {
           if (!isCoach.value || !newPlayer.value.name || !newPlayer.value.jersey) return;
           
           newPlayer.value.position = selectedAddPositions.value.join(', ');
           newPlayer.value.photo_url = newPlayer.value.photo_url ? newPlayer.value.photo_url.trim() : null;
           
-          const { data, error } = await supabaseClient.from('players').insert([newPlayer.value]).select('id, name, jersey, position, throws, bats, bat_spec, dob, photo_url');
+          const { data, error } = await supabaseClient
+            .from('players')
+            .insert([newPlayer.value])
+            .select('id, name, jersey, position, throws, bats, bat_spec, dob, photo_url');
+
           if (!error && data) {
             players.value.push(data[0]);
             players.value.sort((a, b) => a.jersey - b.jersey);
@@ -1735,6 +1844,9 @@
           }
         };
 
+        /**
+         * Opens the Edit Player modal and pre-fills existing values.
+         */
         const openEditPlayerModal = (player) => {
           if (!isCoach.value) return;
           editingPlayer.value = { 
@@ -1745,6 +1857,9 @@
           showEditPlayerModal.value = true;
         };
 
+        /**
+         * Updates an existing player record in Supabase.
+         */
         const updatePlayer = async () => {
           if (!isCoach.value || !editingPlayer.value) return;
           
@@ -1784,6 +1899,9 @@
           }
         };
 
+        /**
+         * Deletes a player and cascades deletion of all associated sessions.
+         */
         const removePlayer = async (id) => {
           if (!isCoach.value) return;
           if (!confirm(t('deleteConfirm'))) return;
@@ -1800,6 +1918,9 @@
           }
         };
 
+        /**
+         * Selects an individual player to view their profile, chart, and session history.
+         */
         const selectPlayer = (player) => {
           selectedPlayer.value = player;
           currentView.value = 'player';
@@ -1809,6 +1930,9 @@
           });
         };
 
+        /**
+         * Opens the Log Session modal for a designated player.
+         */
         const openLogModal = (player) => {
           if (!isCoach.value) return;
           activePlayerForLog.value = player;
@@ -1818,6 +1942,9 @@
 
         const cleanVal = (v) => (v === '' || v === undefined ? null : v);
 
+        /**
+         * Normalizes input speeds to km/h prior to cloud database storage.
+         */
         const normalizeToKmh = (val, currentUnit) => {
           const cleaned = cleanVal(val);
           if (cleaned === null) return null;
@@ -1826,6 +1953,9 @@
           return currentUnit === 'mph' ? Number((num * 1.60934).toFixed(1)) : Number(num.toFixed(1));
         };
 
+        /**
+         * Saves a new session record into the database.
+         */
         const saveSession = async () => {
           if (!isCoach.value || !activePlayerForLog.value) return;
 
@@ -1864,6 +1994,9 @@
           }
         };
 
+        /**
+         * Opens the Edit Session modal for an existing session log.
+         */
         const openEditSessionModal = (session) => {
           if (!isCoach.value) return;
           editingSession.value = { ...session };
@@ -1871,6 +2004,9 @@
           showEditSessionModal.value = true;
         };
 
+        /**
+         * Updates an existing session log in the cloud database.
+         */
         const updateSession = async () => {
           if (!isCoach.value || !editingSession.value) return;
 
@@ -1910,6 +2046,9 @@
           }
         };
 
+        /**
+         * Permanently removes a session record from the cloud database.
+         */
         const removeSession = async (sessionId) => {
           if (!isCoach.value) return;
           if (!confirm(t('deleteSessionConfirm'))) return;
@@ -1930,7 +2069,9 @@
           }
         };
 
-        // COACH-ONLY: Export Roster CSV
+        /**
+         * COACH-ONLY: Exports an administrative roster and quarterly check-in CSV template.
+         */
         const exportTeamCSV = () => {
           if (!isCoach.value) return;
           if (players.value.length === 0) {
@@ -1939,30 +2080,23 @@
           }
 
           let csvContent = 'data:text/csv;charset=utf-8,\uFEFF';
-          csvContent += 'Jersey,Name,Age,Position,Throws,Bats,Height(cm),Weight(kg),Exit Velo(kmh),Throwing Velo(kmh),Broad Jump(cm),Sprint(s)\r\n';
+          csvContent += 'Jersey,Name,DOB,Parent_Phone,Position,Throws,Bats,Bat_Spec,Current_Height_cm,Current_Weight_kg\r\n';
 
           players.value.forEach(p => {
-            const age = calculateAge(p.dob);
             const height = getLatestMetric(p.id, 'height_cm') || '';
             const weight = getLatestMetric(p.id, 'weight_kg') || '';
-            const exitVelo = getLatestMetric(p.id, 'exit_velo') || '';
-            const throwingVelo = getLatestMetric(p.id, 'throwing_velo') || '';
-            const jump = getLatestMetric(p.id, 'broad_jump') || '';
-            const sprint = getLatestMetric(p.id, 'sprint_time') || '';
 
             const row = [
               p.jersey,
-              `"${p.name}"`,
-              `"${age}"`,
-              `"${p.position || ''}"`,
-              p.throws || '',
-              p.bats || '',
+              `"${p.name || ''}"`,
+              p.dob || '',
+              `"${p.parent_phone || ''}"`,
+              `"${p.position || 'IF'}"`,
+              p.throws || 'R',
+              p.bats || 'R',
+              `"${p.bat_spec || ''}"`,
               height,
-              weight,
-              exitVelo,
-              throwingVelo,
-              jump,
-              sprint
+              weight
             ];
             csvContent += row.join(',') + '\r\n';
           });
@@ -1970,13 +2104,17 @@
           const encodedUri = encodeURI(csvContent);
           const link = document.createElement('a');
           link.setAttribute('href', encodedUri);
-          link.setAttribute('download', `Swallows_Team_Report_${new Date().toISOString().slice(0, 10)}.csv`);
+          link.setAttribute('download', `Swallows_Roster_Checkin_Template_${new Date().toISOString().slice(0, 10)}.csv`);
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
         };
 
-        // COACH-ONLY: Batch Import Roster CSV
+        /**
+         * COACH-ONLY: Batch imports parent CSV updates.
+         * Updates existing players by jersey number or inserts new players,
+         * generating unique IDs and logging quarterly growth baselines.
+         */
         const importTeamCSV = async (event) => {
           if (!isCoach.value) return;
           const file = event.target.files[0];
@@ -1986,14 +2124,15 @@
           reader.onload = async (e) => {
             const text = e.target.result;
             const lines = text.split(/\r\n|\n/);
-            
+
             if (lines.length < 2) {
               alert('The CSV file appears empty or formatted incorrectly.');
               return;
             }
 
-            let updatedCount = 0;
-            let addedCount = 0;
+            let updatedPlayers = 0;
+            let growthLogged = 0;
+            const today = new Date().toISOString().slice(0, 10);
 
             for (let i = 1; i < lines.length; i++) {
               const line = lines[i].trim();
@@ -2004,58 +2143,118 @@
 
               const jersey = Number(cols[0].replace(/['"]+/g, '').trim());
               const name = cols[1] ? cols[1].replace(/['"]+/g, '').trim() : '';
-              const position = cols[3] ? cols[3].replace(/['"]+/g, '').trim() : 'IF';
-              const throws = cols[4] ? cols[4].replace(/['"]+/g, '').trim() : 'R';
-              const bats = cols[5] ? cols[5].replace(/['"]+/g, '').trim() : 'R';
+              const dob = cols[2] ? cols[2].replace(/['"]+/g, '').trim() : null;
+              const phone = cols[3] ? cols[3].replace(/['"]+/g, '').trim() : '';
+              const position = cols[4] ? cols[4].replace(/['"]+/g, '').trim() : 'IF';
+              const throws = cols[5] ? cols[5].replace(/['"]+/g, '').trim() : 'R';
+              const bats = cols[6] ? cols[6].replace(/['"]+/g, '').trim() : 'R';
+              const batSpec = cols[7] ? cols[7].replace(/['"]+/g, '').trim() : '';
+              const height = cols[8] ? parseFloat(cols[8].replace(/['"]+/g, '').trim()) : null;
+              const weight = cols[9] ? parseFloat(cols[9].replace(/['"]+/g, '').trim()) : null;
 
               if (!jersey || !name) continue;
 
-              const existing = players.value.find(p => p.jersey === jersey);
+              let targetPlayer = players.value.find(p => p.jersey === jersey);
 
-              if (existing) {
+              if (targetPlayer) {
+                // Update demographic info for existing player
+                const payload = {
+                  name,
+                  dob: dob || targetPlayer.dob,
+                  parent_phone: phone || targetPlayer.parent_phone,
+                  position,
+                  throws,
+                  bats,
+                  bat_spec: batSpec || targetPlayer.bat_spec
+                };
+
                 const { error } = await supabaseClient
                   .from('players')
-                  .update({ name, position, throws, bats })
-                  .eq('id', existing.id);
+                  .update(payload)
+                  .eq('id', targetPlayer.id);
 
                 if (!error) {
-                  existing.name = name;
-                  existing.position = position;
-                  existing.throws = throws;
-                  existing.bats = bats;
-                  updatedCount++;
+                  Object.assign(targetPlayer, payload);
+                  updatedPlayers++;
                 }
               } else {
-                const newPlayerPayload = { jersey, name, position, throws, bats };
+                // Create new player with unique database ID
+                const newPlayer = {
+                  jersey,
+                  name,
+                  dob: dob || null,
+                  parent_phone: phone,
+                  position,
+                  throws,
+                  bats,
+                  bat_spec: batSpec
+                };
+
                 const { data, error } = await supabaseClient
                   .from('players')
-                  .insert([newPlayerPayload])
-                  .select('id, name, jersey, position, throws, bats, bat_spec, dob, photo_url');
+                  .insert([newPlayer])
+                  .select();
 
                 if (!error && data) {
-                  players.value.push(data[0]);
-                  addedCount++;
+                  targetPlayer = data[0];
+                  players.value.push(targetPlayer);
+                  updatedPlayers++;
+                }
+              }
+
+              // Automatically log quarterly baseline if height or weight is provided
+              if (targetPlayer && (height || weight)) {
+                const latestH = getLatestMetric(targetPlayer.id, 'height_cm');
+                const latestW = getLatestMetric(targetPlayer.id, 'weight_kg');
+
+                if (height !== latestH || weight !== latestW) {
+                  const sessionPayload = {
+                    player_id: targetPlayer.id,
+                    session_date: today,
+                    height_cm: height || latestH,
+                    weight_kg: weight || latestW,
+                    shoulder_check: 'Pass'
+                  };
+
+                  const { data: sData, error: sErr } = await supabaseClient
+                    .from('sessions')
+                    .insert([sessionPayload])
+                    .select();
+
+                  if (!sErr && sData) {
+                    sessions.value.unshift(sData[0]);
+                    growthLogged++;
+                  }
                 }
               }
             }
 
             players.value.sort((a, b) => a.jersey - b.jersey);
-            alert(`Import Complete!\n• Updated: ${updatedCount} players\n• Added: ${addedCount} new players`);
+            alert(`Import Complete!\n• Roster Profiles Updated: ${updatedPlayers}\n• Quarterly Growth Check-ins Logged: ${growthLogged}`);
             event.target.value = '';
           };
           reader.readAsText(file);
         };
 
+        /**
+         * Returns all session records for a given player ID.
+         */
         const getPlayerSessions = (playerId) => {
           return sessions.value.filter(s => s.player_id === playerId);
         };
 
+        /**
+         * Returns the most recent non-empty metric value for a player.
+         */
         const getLatestMetric = (playerId, key) => {
           const list = getPlayerSessions(playerId);
           const found = list.find(s => s[key] !== null && s[key] !== undefined && s[key] !== '');
           return found ? found[key] : null;
         };
 
+        /**
+         * Calculates Broad Jump Height Ratio (Broad Jump / Height) for a player.
+         */
         const calculateJumpRatio = (playerId) => {
           const jump = getLatestMetric(playerId, 'broad_jump');
           const height = getLatestMetric(playerId, 'height_cm');
@@ -2063,6 +2262,9 @@
           return (Number(jump) / Number(height)).toFixed(2);
         };
 
+        /**
+         * Calculates Broad Jump Height Ratio for an individual session row.
+         */
         const getSessionJumpRatio = (session) => {
           if (!session.broad_jump) return null;
           let h = session.height_cm;
@@ -2073,6 +2275,9 @@
           return (Number(session.broad_jump) / Number(h)).toFixed(2);
         };
 
+        /**
+         * Returns dynamic Tailwind color classes based on jump ratio thresholds.
+         */
         const getJumpRatioColor = (ratioStr) => {
           if (!ratioStr) return 'text-slate-400';
           const r = Number(ratioStr);
@@ -2082,6 +2287,9 @@
           return 'text-amber-400 font-medium';
         };
 
+        /**
+         * Computes leaderboard top performers for numeric metrics.
+         */
         const getTopMetrics = (key, count = 3, ascending = false) => {
           const results = [];
           
@@ -2101,6 +2309,9 @@
           return results.slice(0, count);
         };
 
+        /**
+         * Computes top leaderboard performers for broad jump height ratios.
+         */
         const getTopJumpRatios = (count = 3) => {
           const results = [];
 
@@ -2137,6 +2348,9 @@
           return results.slice(0, count);
         };
 
+        /**
+         * Formats latest height and weight into a compact string.
+         */
         const formatHeightWeight = (playerId) => {
           const h = getLatestMetric(playerId, 'height_cm');
           const w = getLatestMetric(playerId, 'weight_kg');
@@ -2144,6 +2358,9 @@
           return `${h ? h + 'cm' : '--'} / ${w ? w + 'kg' : '--'}`;
         };
 
+        /**
+         * Calculates developmental age in years and months (e.g., '8y 4m').
+         */
         const calculateAge = (dob) => {
           if (!dob) return '';
           const birth = new Date(dob);
@@ -2163,6 +2380,9 @@
           return `${years}y ${months}m`;
         };
 
+        /**
+         * Real-time roster search filter by name or jersey number.
+         */
         const filteredPlayers = computed(() => {
           if (!searchQuery.value.trim()) return players.value;
           const q = searchQuery.value.toLowerCase().trim();
@@ -2173,6 +2393,9 @@
           });
         });
 
+        /**
+         * Returns count of players meeting or exceeding an exit velocity threshold.
+         */
         const getClubCount = (threshold) => {
           return players.value.filter(p => {
             const velo = getLatestMetric(p.id, 'exit_velo');
@@ -2180,6 +2403,9 @@
           }).length;
         };
 
+        /**
+         * Computes active team average exit velocity.
+         */
         const avgBatSpeed = computed(() => {
           const velos = players.value
             .map(p => getLatestMetric(p.id, 'exit_velo'))
@@ -2192,10 +2418,16 @@
           return '--';
         });
 
+        /**
+         * Computes the total number of arm safety flags ('Adjust') logged across all sessions.
+         */
         const safetyAlertCount = computed(() => {
           return sessions.value.filter(s => s.shoulder_check === 'Adjust').length;
         });
 
+        /**
+         * Returns color highlights for Blast Motion attack angles (5°-15° optimal).
+         */
         const getAttackAngleColor = (angle) => {
           if (angle === null || angle === undefined || angle === '') return 'text-slate-400';
           const num = Number(angle);
@@ -2204,6 +2436,9 @@
           return 'text-amber-400';
         };
 
+        /**
+         * Renders the interactive Chart.js line graph for velocity progression or physical growth.
+         */
         const renderPlayerChart = () => {
           if (!selectedPlayer.value) return;
 
@@ -2394,6 +2629,7 @@
           });
         };
 
+        // Re-render the chart whenever the view switches to individual player
         watch([currentView, selectedPlayer], () => {
           if (currentView.value === 'player' && selectedPlayer.value) {
             nextTick(() => {
@@ -2402,6 +2638,7 @@
           }
         });
 
+        // Initialize application data on mount
         onMounted(() => {
           fetchAllData();
         });
