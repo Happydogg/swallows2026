@@ -172,7 +172,7 @@
                 <div class="w-11 h-11 rounded-full overflow-hidden flex-shrink-0 bg-slate-700 border border-slate-600 flex items-center justify-center font-bold text-sm text-blue-300">
                   <img v-if="player.photo_url && !failedImgs[player.id]" 
                        :src="formatImgUrl(player.photo_url)" 
-                       :alt="player.name" 
+                       :alt="getPlayerDisplayName(player)" 
                        class="w-full h-full object-cover" 
                        referrerpolicy="no-referrer"
                        @error="markImgFailed(player.id)">
@@ -184,8 +184,9 @@
                     <span v-if="player.dob" class="text-xs text-blue-400 font-medium">{{ calculateAge(player.dob) }}</span>
                   </div>
                   <button @click="selectPlayer(player)" class="font-bold text-white hover:underline text-base block text-left">
-                    {{ player.name }}
+                    {{ getPlayerDisplayName(player) }}
                   </button>
+                  <span v-if="player.hkll_reg_no" class="text-[10px] text-slate-400 font-mono">HKLL: {{ player.hkll_reg_no }}</span>
                 </div>
               </div>
 
@@ -262,7 +263,7 @@
                     <div class="w-9 h-9 rounded-full overflow-hidden flex-shrink-0 bg-slate-700 border border-slate-600 flex items-center justify-center font-bold text-xs text-blue-300">
                       <img v-if="player.photo_url && !failedImgs[player.id]" 
                            :src="formatImgUrl(player.photo_url)" 
-                           :alt="player.name" 
+                           :alt="getPlayerDisplayName(player)" 
                            class="w-full h-full object-cover" 
                            referrerpolicy="no-referrer"
                            @error="markImgFailed(player.id)">
@@ -270,9 +271,12 @@
                     </div>
                     <div>
                       <button @click="selectPlayer(player)" class="font-semibold text-white hover:underline text-blue-400 block text-left">
-                        {{ player.name }}
+                        {{ getPlayerDisplayName(player) }}
                       </button>
-                      <span v-if="player.dob" class="text-xs text-slate-400">{{ calculateAge(player.dob) }}</span>
+                      <div class="text-xs text-slate-400 flex items-center gap-1.5">
+                        <span v-if="player.dob">{{ calculateAge(player.dob) }}</span>
+                        <span v-if="player.hkll_reg_no" class="font-mono text-[10px] text-slate-500">• #{{ player.hkll_reg_no }}</span>
+                      </div>
                     </div>
                   </div>
                 </td>
@@ -342,7 +346,7 @@
                     {{ idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉' }}
                   </span>
                   <div>
-                    <p class="text-xs font-semibold text-white">{{ item.player.name }}</p>
+                    <p class="text-xs font-semibold text-white">{{ getPlayerDisplayName(item.player) }}</p>
                     <p class="text-[10px] text-slate-500 font-mono">#{{ item.player.jersey }}</p>
                   </div>
                 </div>
@@ -365,7 +369,7 @@
                     {{ idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉' }}
                   </span>
                   <div>
-                    <p class="text-xs font-semibold text-white">{{ item.player.name }}</p>
+                    <p class="text-xs font-semibold text-white">{{ getPlayerDisplayName(item.player) }}</p>
                     <p class="text-[10px] text-slate-500 font-mono">#{{ item.player.jersey }}</p>
                   </div>
                 </div>
@@ -388,7 +392,7 @@
                     {{ idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉' }}
                   </span>
                   <div>
-                    <p class="text-xs font-semibold text-white">{{ item.player.name }}</p>
+                    <p class="text-xs font-semibold text-white">{{ getPlayerDisplayName(item.player) }}</p>
                     <p class="text-[10px] text-slate-500 font-mono">#{{ item.player.jersey }} • {{ item.jump }}cm @ {{ item.height }}cm</p>
                   </div>
                 </div>
@@ -411,7 +415,7 @@
                     {{ idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉' }}
                   </span>
                   <div>
-                    <p class="text-xs font-semibold text-white">{{ item.player.name }}</p>
+                    <p class="text-xs font-semibold text-white">{{ getPlayerDisplayName(item.player) }}</p>
                     <p class="text-[10px] text-slate-500 font-mono">#{{ item.player.jersey }}</p>
                   </div>
                 </div>
@@ -437,6 +441,9 @@
             🖨️ {{ t('printReportBtn') }}
           </button>
           <template v-if="isCoach">
+            <button @click="openUploadVideoModal(selectedPlayer)" class="bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded-md text-sm font-medium transition flex items-center gap-1">
+              📹 {{ t('uploadVideo') }}
+            </button>
             <button @click="openEditPlayerModal(selectedPlayer)" class="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 px-3 py-1.5 rounded-md text-sm font-medium transition">
               ✏️ {{ t('editPlayer') }}
             </button>
@@ -453,7 +460,7 @@
           <div class="w-20 h-20 rounded-2xl overflow-hidden flex-shrink-0 bg-slate-700 border-2 border-slate-600 shadow-md flex items-center justify-center font-bold text-xl text-blue-300">
             <img v-if="selectedPlayer.photo_url && !failedImgs[selectedPlayer.id]" 
                  :src="formatImgUrl(selectedPlayer.photo_url)" 
-                 :alt="selectedPlayer.name" 
+                 :alt="getPlayerDisplayName(selectedPlayer)" 
                  class="w-full h-full object-cover" 
                  referrerpolicy="no-referrer"
                  @error="markImgFailed(selectedPlayer.id)">
@@ -471,8 +478,12 @@
                 🏅 60+ km/h Club
               </span>
             </div>
-            <h2 class="text-2xl font-bold">{{ selectedPlayer.name }}</h2>
-            <p class="text-sm text-slate-400">
+            <h2 class="text-2xl font-bold">{{ getPlayerDisplayName(selectedPlayer) }}</h2>
+            <p class="text-xs text-slate-400 font-mono mt-0.5">
+              {{ t('officialName') }}: <span class="text-slate-200">{{ formatLegalName(selectedPlayer) }}</span>
+              <span v-if="selectedPlayer.hkll_reg_no"> • HKLL: <span class="text-blue-300">{{ selectedPlayer.hkll_reg_no }}</span></span>
+            </p>
+            <p class="text-sm text-slate-400 mt-1">
               {{ t('throws') }}: {{ selectedPlayer.throws }} | {{ t('bats') }}: {{ selectedPlayer.bats }}
               <span v-if="selectedPlayer.dob"> | {{ t('dob') }}: {{ selectedPlayer.dob }} ({{ calculateAge(selectedPlayer.dob) }})</span>
             </p>
@@ -490,7 +501,7 @@
         </div>
       </div>
 
-      <!-- Chart.js Trend Visualizer (Hidden on Print) -->
+      <!-- Interactive Chart (Hidden on Print) -->
       <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-5 no-print">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-slate-700/60 pb-3">
           <div>
@@ -549,6 +560,62 @@
               {{ chartMode === 'velocity' ? t('needMoreDataForChart') : t('needMoreGrowthData') }}
             </p>
           </div>
+        </div>
+      </div>
+
+      <!-- STAGE 1: Video Analysis & Drill Clips Gallery -->
+      <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-5 no-print space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-700/60 pb-3">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <span>📹</span> {{ t('videoAnalysisSection') }}
+            </h3>
+            <p class="text-xs text-slate-400">{{ t('videoAnalysisSubtitle') }}</p>
+          </div>
+          <button 
+            v-if="isCoach" 
+            @click="openUploadVideoModal(selectedPlayer)" 
+            class="bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 border border-purple-500/50 px-3 py-1 rounded-md text-xs font-semibold transition">
+            + {{ t('uploadVideo') }}
+          </button>
+        </div>
+
+        <!-- Video Cards Grid -->
+        <div v-if="playerDrillVideos.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div v-for="video in playerDrillVideos" :key="video.id" class="bg-slate-900/80 border border-slate-750 rounded-xl p-3 space-y-2.5">
+            <div class="flex items-center justify-between text-xs">
+              <span class="px-2 py-0.5 rounded font-bold uppercase tracking-wider" 
+                    :class="video.category === 'batting' ? 'bg-blue-900/60 text-blue-300 border border-blue-700/50' : 'bg-emerald-900/60 text-emerald-300 border border-emerald-700/50'">
+                {{ video.category }}
+              </span>
+              <span class="text-slate-400 font-mono text-[11px]">{{ video.session_date }}</span>
+            </div>
+
+            <!-- Native HTML5 Video Element -->
+            <div class="aspect-video bg-black rounded-lg overflow-hidden border border-slate-800 relative">
+              <video :src="video.video_url" controls playsinline preload="metadata" class="w-full h-full object-contain"></video>
+            </div>
+
+            <div class="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+              <span>Angle: {{ video.camera_angle || 'Standard' }}</span>
+              <span class="text-amber-300">{{ video.fps_mode || 60 }} FPS</span>
+            </div>
+
+            <div v-if="video.coach_feedback" class="p-2 bg-slate-800/80 rounded border border-slate-700 text-xs text-slate-300">
+              <p class="font-semibold text-[10px] text-purple-300 uppercase">Coach Notes:</p>
+              <p class="mt-0.5">{{ video.coach_feedback }}</p>
+            </div>
+
+            <div v-if="isCoach" class="flex justify-end pt-1">
+              <button @click="deleteDrillVideo(video.id)" class="text-rose-400 hover:text-rose-300 text-xs">
+                🗑️ {{ t('remove') }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div v-else class="p-6 text-center bg-slate-900/40 rounded-xl border border-slate-800 text-slate-500 text-xs">
+          {{ t('noVideosLogged') }}
         </div>
       </div>
 
@@ -767,23 +834,54 @@
 
     </div>
 
-    <!-- MODAL: Add Player -->
+    <!-- MODAL: Add Player (Overhauled with Asian Naming & HKLL Reg #) -->
     <div v-if="showAddPlayerModal && isCoach" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 no-print">
       <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-bold">{{ t('addPlayerModalTitle') }}</h3>
         <div class="space-y-3 text-sm">
-          <div>
-            <label class="block text-slate-400 text-xs mb-1">{{ t('fullName') }}</label>
-            <input v-model="newPlayer.name" type="text" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none focus:border-blue-500">
+          
+          <!-- Legal / HKID Name Inputs -->
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-slate-400 text-xs mb-1 font-semibold">{{ t('lastName') }}</label>
+              <input v-model="newPlayer.last_name" @input="onNamePartInput" placeholder="e.g. Ho / Wong" type="text" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none focus:border-blue-500">
+            </div>
+            <div>
+              <label class="block text-slate-400 text-xs mb-1 font-semibold">{{ t('givenNames') }}</label>
+              <input v-model="newPlayer.given_names" @input="onNamePartInput" placeholder="e.g. Harvey Zhiping" type="text" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none focus:border-blue-500">
+            </div>
           </div>
+
+          <!-- Preferred / Dugout Display Name -->
+          <div>
+            <label class="block text-slate-400 text-xs mb-1 font-semibold">
+              {{ t('preferredName') }} <span class="text-blue-400 font-normal">({{ t('shownOnCards') }})</span>
+            </label>
+            <input v-model="newPlayer.preferred_name" @input="isPreferredCustomized = true" placeholder="e.g. Harvey Ho" type="text" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none focus:border-blue-500">
+            <p class="text-[11px] text-slate-500 mt-0.5">{{ t('preferredNameHint') }}</p>
+          </div>
+
+          <!-- Jersey & HKLL Registration Code -->
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="block text-slate-400 text-xs mb-1">{{ t('jerseyNum') }}</label>
               <input v-model.number="newPlayer.jersey" type="number" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none focus:border-blue-500">
             </div>
             <div>
+              <label class="block text-slate-400 text-xs mb-1 font-semibold">HKLL Reg #</label>
+              <input v-model="newPlayer.hkll_reg_no" placeholder="e.g. 25-0062 / New" type="text" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none focus:border-blue-500">
+            </div>
+          </div>
+
+          <!-- DOB & Contact -->
+          <div class="grid grid-cols-2 gap-2">
+            <div>
               <label class="block text-slate-400 text-xs mb-1">{{ t('dob') }}</label>
               <input v-model="newPlayer.dob" type="date" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+            </div>
+            <div>
+              <label class="block text-slate-400 text-xs mb-1">{{ t('parentPhone') }}</label>
+              <input v-model="newPlayer.parent_phone" placeholder="+852 9123 4567" type="tel" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
             </div>
           </div>
 
@@ -841,25 +939,48 @@
       <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-bold">{{ t('editPlayerModalTitle') }}</h3>
         <div class="space-y-3 text-sm">
-          <div>
-            <label class="block text-slate-400 text-xs mb-1">{{ t('fullName') }}</label>
-            <input v-model="editingPlayer.name" type="text" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none focus:border-blue-500">
+          
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-slate-400 text-xs mb-1 font-semibold">{{ t('lastName') }}</label>
+              <input v-model="editingPlayer.last_name" placeholder="e.g. Ho" type="text" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none focus:border-blue-500">
+            </div>
+            <div>
+              <label class="block text-slate-400 text-xs mb-1 font-semibold">{{ t('givenNames') }}</label>
+              <input v-model="editingPlayer.given_names" placeholder="e.g. Harvey Zhiping" type="text" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none focus:border-blue-500">
+            </div>
           </div>
+
+          <div>
+            <label class="block text-slate-400 text-xs mb-1 font-semibold">{{ t('preferredName') }}</label>
+            <input v-model="editingPlayer.preferred_name" placeholder="e.g. Harvey Ho" type="text" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none focus:border-blue-500">
+          </div>
+
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="block text-slate-400 text-xs mb-1">{{ t('jerseyNum') }}</label>
               <input v-model.number="editingPlayer.jersey" type="number" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none focus:border-blue-500">
             </div>
             <div>
-              <label class="block text-slate-400 text-xs mb-1">{{ t('dob') }}</label>
-              <input v-model="editingPlayer.dob" type="date" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+              <label class="block text-slate-400 text-xs mb-1 font-semibold">HKLL Reg #</label>
+              <input v-model="editingPlayer.hkll_reg_no" placeholder="e.g. 25-0062" type="text" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none focus:border-blue-500">
             </div>
           </div>
 
-          <!-- Photo Upload & Compression Block -->
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-slate-400 text-xs mb-1">{{ t('dob') }}</label>
+              <input v-model="editingPlayer.dob" type="date" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+            </div>
+            <div>
+              <label class="block text-slate-400 text-xs mb-1">{{ t('parentPhone') }}</label>
+              <input v-model="editingPlayer.parent_phone" placeholder="+852 9123 4567" type="tel" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+            </div>
+          </div>
+
+          <!-- Photo Upload Block -->
           <div class="p-3 bg-slate-900/60 border border-slate-700/80 rounded-lg space-y-2">
             <label class="block text-slate-300 text-xs font-semibold">{{ t('profilePhoto') }}</label>
-            
             <div class="flex items-center gap-3">
               <div class="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-slate-800 border border-slate-600 flex items-center justify-center font-bold text-sm text-blue-300">
                 <img v-if="editingPlayer.photo_url" :src="formatImgUrl(editingPlayer.photo_url)" class="w-full h-full object-cover">
@@ -925,10 +1046,73 @@
       </div>
     </div>
 
+    <!-- MODAL: Upload Drill Video (Stage 1) -->
+    <div v-if="showUploadVideoModal && isCoach && activePlayerForVideo" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 no-print">
+      <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+        <h3 class="text-lg font-bold flex items-center gap-2">
+          <span>📹</span> {{ t('uploadDrillVideoTitle') }}: {{ getPlayerDisplayName(activePlayerForVideo) }}
+        </h3>
+
+        <div class="space-y-3 text-sm">
+          <div>
+            <label class="block text-slate-400 text-xs mb-1">{{ t('sessionDate') }}</label>
+            <input v-model="newDrillVideo.session_date" type="date" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-slate-400 text-xs mb-1 font-semibold">{{ t('videoCategory') }}</label>
+              <select v-model="newDrillVideo.category" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+                <option value="batting">Batting</option>
+                <option value="pitching">Pitching</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-slate-400 text-xs mb-1 font-semibold">{{ t('cameraAngle') }}</label>
+              <select v-model="newDrillVideo.camera_angle" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+                <option value="side_open">Side View (Open)</option>
+                <option value="behind_catcher">Behind Catcher</option>
+                <option value="front">Front View</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-slate-400 text-xs mb-1">Recorded FPS</label>
+              <select v-model.number="newDrillVideo.fps_mode" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+                <option :value="30">30 FPS (Standard)</option>
+                <option :value="60">60 FPS (Smooth)</option>
+                <option :value="120">120 FPS (Slo-Mo)</option>
+                <option :value="240">240 FPS (High Speed)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-slate-400 text-xs mb-1">{{ t('selectVideoFile') }}</label>
+              <input type="file" accept="video/mp4,video/quicktime,video/webm" @change="handleVideoFilePick" class="text-xs text-slate-400 file:mr-2 file:py-1.5 file:px-2.5 file:rounded file:border-0 file:text-xs file:bg-purple-600/30 file:text-purple-300">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-slate-400 text-xs mb-1">{{ t('coachNotesOptional') }}</label>
+            <textarea v-model="newDrillVideo.coach_feedback" rows="2" placeholder="e.g. Lead leg firming up, slightly dropping rear elbow..." class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-xs outline-none focus:border-blue-500"></textarea>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button @click="showUploadVideoModal = false" :disabled="isUploadingVideo" class="px-3 py-1.5 rounded text-sm text-slate-400 hover:text-white">{{ t('cancel') }}</button>
+          <button @click="uploadDrillVideo" :disabled="isUploadingVideo || !selectedVideoFile" class="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 px-4 py-1.5 rounded text-sm font-medium text-white transition">
+            <span v-if="isUploadingVideo">⏳ {{ t('uploading') }}</span>
+            <span v-else>{{ t('saveVideo') }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- MODAL: Log Station Data -->
     <div v-if="showLogModal && activePlayerForLog && isCoach" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 no-print">
       <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-        <h3 class="text-lg font-bold">{{ t('logSessionTitle') }}: {{ activePlayerForLog.name }}</h3>
+        <h3 class="text-lg font-bold">{{ t('logSessionTitle') }}: {{ getPlayerDisplayName(activePlayerForLog) }}</h3>
         
         <div class="space-y-4 text-sm">
           <div>
@@ -1193,7 +1377,7 @@
         viewOnly: 'View only',
         noPlayers: 'No players saved in database. Tap "+ Add Player" to begin.',
         noPlayersMatch: 'No players match your search.',
-        searchPlaceholder: 'Search name or jersey #...',
+        searchPlaceholder: 'Search name, jersey, or HKLL #...',
         backToOverview: 'Back to Overview',
         logNewSession: 'Log New Session',
         throws: 'Throws',
@@ -1219,7 +1403,13 @@
         addPlayerModalTitle: 'Add Player to Cloud Database',
         editPlayerModalTitle: 'Edit Player Profile',
         editSessionModalTitle: 'Edit Session Record',
-        fullName: 'Full Name',
+        lastName: 'Last Name (Surname)',
+        givenNames: 'Given Names (Passport / HKID)',
+        preferredName: 'Preferred / Dugout Name',
+        shownOnCards: 'Shown on Cards & Charts',
+        preferredNameHint: 'Auto-generated from First Given Name + Last Name; editable anytime.',
+        parentPhone: 'Parent Emergency / WhatsApp #',
+        officialName: 'Official Full Name',
         jerseyNum: 'Jersey #',
         right: 'Right',
         left: 'Left',
@@ -1250,7 +1440,18 @@
         leaderboardTab: 'Leaderboard & PRs',
         printReportBtn: 'Print / PDF Report',
         exportCSV: 'Export Roster CSV',
-        importCSV: 'Import CSV Roster'
+        importCSV: 'Import CSV Roster',
+        uploadVideo: 'Upload Video',
+        uploadDrillVideoTitle: 'Upload Drill Video',
+        videoAnalysisSection: 'Drill Video Analysis',
+        videoAnalysisSubtitle: 'High-speed pitching and batting clips for kinematic review',
+        sessionDate: 'Recording Date',
+        videoCategory: 'Category',
+        cameraAngle: 'Camera Angle',
+        selectVideoFile: 'Select Video (.mp4 / .mov)',
+        coachNotesOptional: 'Coach Notes / Drill Cues (Optional)',
+        saveVideo: 'Upload & Save Video',
+        noVideosLogged: 'No drill videos uploaded yet for this player.'
       },
       zh: {
         appTitle: 'SWALLOWS DATALAB',
@@ -1299,7 +1500,7 @@
         viewOnly: '僅供檢視',
         noPlayers: '雲端數據庫中暫無球員資料。請點擊「新增球員」。',
         noPlayersMatch: '沒有找到符合搜尋條件的球員。',
-        searchPlaceholder: '搜尋球員姓名或球衣號碼...',
+        searchPlaceholder: '搜尋球員姓名、背號或 HKLL 編號...',
         backToOverview: '返回球隊總覽',
         logNewSession: '記錄新訓練數據',
         throws: '投球手',
@@ -1325,7 +1526,13 @@
         addPlayerModalTitle: '新增球員到雲端數據庫',
         editPlayerModalTitle: '編輯球員基本資料',
         editSessionModalTitle: '修改測試日誌數據',
-        fullName: '球員全名',
+        lastName: '姓氏 (Surname)',
+        givenNames: '名字 / 證件全名 (Given Names)',
+        preferredName: '球員暱稱 / 球衣常用名',
+        shownOnCards: '顯示於卡片與排行榜',
+        preferredNameHint: '系統自動預填「名字首單詞 + 姓氏」，可隨時自訂修改。',
+        parentPhone: '家長緊急聯絡電話 / WhatsApp',
+        officialName: '證件官方全名',
         jerseyNum: '球衣號碼 #',
         right: '右',
         left: '左',
@@ -1356,7 +1563,18 @@
         leaderboardTab: '全隊龍虎榜 (PRs)',
         printReportBtn: '列印 / 匯出 PDF 成績單',
         exportCSV: '匯出球隊名冊 CSV',
-        importCSV: '批次匯入名冊 CSV'
+        importCSV: '批次匯入名冊 CSV',
+        uploadVideo: '上傳訓練影片',
+        uploadDrillVideoTitle: '上傳訓練影片',
+        videoAnalysisSection: '動作影片與機制分析',
+        videoAnalysisSubtitle: '高速慢動作打擊與投球影片庫',
+        sessionDate: '拍攝日期',
+        videoCategory: '測試類別',
+        cameraAngle: '鏡頭角度',
+        selectVideoFile: '選擇影片檔 (.mp4 / .mov)',
+        coachNotesOptional: '教練評語 / 訓練指引 (選填)',
+        saveVideo: '儲存並上傳影片',
+        noVideosLogged: '該球員暫無影片記錄。'
       },
       ja: {
         appTitle: 'SWALLOWS DATALAB',
@@ -1405,7 +1623,7 @@
         viewOnly: '閲覧のみ',
         noPlayers: '登録選手がいません。「選手追加」から登録してください。',
         noPlayersMatch: '一致する選手がいません。',
-        searchPlaceholder: '名前または背番号で検索...',
+        searchPlaceholder: '名前、背番号、またはHKLL番号で検索...',
         backToOverview: 'チーム概要へ戻る',
         logNewSession: '新規セッション記録',
         throws: '投',
@@ -1431,7 +1649,13 @@
         addPlayerModalTitle: '選手新規登録',
         editPlayerModalTitle: '選手プロファイル編集',
         editSessionModalTitle: 'セッションデータ編集',
-        fullName: '選手氏名',
+        lastName: '姓 (Surname)',
+        givenNames: '名 / パスポート名 (Given Names)',
+        preferredName: '登録名 / 呼出名 (Preferred)',
+        shownOnCards: 'カード・一覧表示用',
+        preferredNameHint: '名＋姓から自動生成されます。変更も可能です。',
+        parentPhone: '保護者連絡先 / WhatsApp',
+        officialName: '公的身元氏名',
         jerseyNum: '背番号 #',
         right: '右',
         left: '左',
@@ -1462,7 +1686,18 @@
         leaderboardTab: 'チームランキング (PRs)',
         printReportBtn: '印刷 / PDF 出力',
         exportCSV: '名簿をCSV出力',
-        importCSV: 'CSVから一括登録'
+        importCSV: 'CSVから一括登録',
+        uploadVideo: '動画アップロード',
+        uploadDrillVideoTitle: '動画アップロード',
+        videoAnalysisSection: '動作解析・ドリル動画',
+        videoAnalysisSubtitle: '投球・打撃スローモーション動画',
+        sessionDate: '撮影日',
+        videoCategory: '種別',
+        cameraAngle: 'アングル',
+        selectVideoFile: '動画ファイル選択 (.mp4 / .mov)',
+        coachNotesOptional: 'コーチメモ (任意)',
+        saveVideo: '動画を保存',
+        noVideosLogged: '登録された動画はありません。'
       }
     };
 
@@ -1470,9 +1705,8 @@
       setup() {
         /**
          * Resolves the initial app language:
-         * 1. Checks localStorage for a manual user choice.
-         * 2. Otherwise detects the client's OS / browser language.
-         * 3. Falls back to English ('en') if unsupported.
+         * 1. Checks localStorage for an explicit user choice.
+         * 2. Falls back to detecting OS/browser language (en, zh, ja).
          */
         const getInitialLanguage = () => {
           const saved = localStorage.getItem('swallows_lang');
@@ -1483,10 +1717,6 @@
         };
 
         const currentLang = ref(getInitialLanguage());
-        
-        /**
-         * Translates a given key based on currentLang with fallbacks.
-         */
         const t = (key) => translations[currentLang.value]?.[key] || translations['en'][key] || key;
 
         let chartInstance = null;
@@ -1495,8 +1725,12 @@
         const searchQuery = ref('');
         const hasChartData = ref(false);
         const isUploadingPhoto = ref(false);
+        const isUploadingVideo = ref(false);
 
-        // Set tracking which session accordion drawers are open on mobile
+        // Track user override on preferred name auto-fill
+        const isPreferredCustomized = ref(false);
+
+        // Track session accordion expansions on mobile
         const expandedSessionIds = reactive(new Set());
         const toggleSessionExpand = (sessionId) => {
           if (expandedSessionIds.has(sessionId)) {
@@ -1507,14 +1741,14 @@
         };
         const isSessionExpanded = (sessionId) => expandedSessionIds.has(sessionId);
 
-        // Image fallback handler to prevent broken image badges
+        // Track broken images to prevent ugly visual errors
         const failedImgs = reactive({});
         const markImgFailed = (playerId) => {
           failedImgs[playerId] = true;
         };
 
         /**
-         * Converts Google Drive and Dropbox links to direct viewable image URLs.
+         * Formats image URLs, converting Google Drive & Dropbox links into direct thumbnails.
          */
         const formatImgUrl = (url) => {
           if (!url) return '';
@@ -1540,7 +1774,7 @@
         };
 
         /**
-         * Compresses camera uploads client-side via HTML5 Canvas (max 500px width/height).
+         * Compresses image uploads client-side to maximum 500px avatars (~50KB).
          */
         const compressImage = (file, maxWidth = 500, quality = 0.8) => {
           return new Promise((resolve, reject) => {
@@ -1587,7 +1821,7 @@
         };
 
         /**
-         * Uploads a compressed avatar to the public Supabase 'avatars' storage bucket.
+         * Uploads a compressed player avatar directly to the 'avatars' Supabase bucket.
          */
         const handleFileUpload = async (event) => {
           const file = event.target.files[0];
@@ -1616,7 +1850,7 @@
             editingPlayer.value.photo_url = finalUrl;
             failedImgs[playerId] = false;
           } catch (err) {
-            alert('Upload error: ' + (err.message || 'Make sure the "avatars" bucket is created as Public.'));
+            alert('Upload error: ' + (err.message || 'Ensure the "avatars" bucket is set to Public.'));
             console.error('Upload failed:', err);
           } finally {
             isUploadingPhoto.value = false;
@@ -1627,7 +1861,7 @@
         const editSpeedUnit = ref('kmh');
 
         /**
-         * Toggles the chart display between velocity and physical growth.
+         * Toggles chart visualizer between velocity mode and growth mode.
          */
         const setChartMode = (mode) => {
           chartMode.value = mode;
@@ -1637,7 +1871,7 @@
         };
 
         /**
-         * Saves manual language preference to localStorage.
+         * Persists language selection in browser storage.
          */
         const saveLanguage = () => {
           localStorage.setItem('swallows_lang', currentLang.value);
@@ -1645,7 +1879,7 @@
         };
 
         /**
-         * Invokes system print dialog for physical or PDF reports.
+         * Triggers system print or PDF generation dialog.
          */
         const triggerPrintReport = () => {
           window.print();
@@ -1657,23 +1891,26 @@
         const showEditPlayerModal = ref(false);
         const showLogModal = ref(false);
         const showEditSessionModal = ref(false);
+        const showUploadVideoModal = ref(false);
         
         const selectedPlayer = ref(null);
         const editingPlayer = ref(null);
         const activePlayerForLog = ref(null);
         const editingSession = ref(null);
+        const activePlayerForVideo = ref(null);
+        const selectedVideoFile = ref(null);
 
         const selectedAddPositions = ref(['IF']);
         const selectedEditPositions = ref([]);
 
-        // Persistent Coach Mode State
+        // Coach Authorization Mode
         const isCoach = ref(
           localStorage.getItem('swallows_is_coach') === 'true' || 
           sessionStorage.getItem('swallows_is_coach') === 'true'
         );
 
         /**
-         * Verifies Coach PIN against database RPC (fallback PIN '2026' supported).
+         * Unlocks Coach Mode with PIN verification.
          */
         const unlockCoachMode = async () => {
           const entered = prompt(t('enterPinPrompt'));
@@ -1706,7 +1943,7 @@
         };
 
         /**
-         * Relocks Coach Mode back to public read-only.
+         * Locks Coach Mode back to public read-only state.
          */
         const lockCoachMode = () => {
           isCoach.value = false;
@@ -1716,8 +1953,25 @@
 
         const players = ref([]);
         const sessions = ref([]);
+        const drillVideos = ref([]);
 
-        const newPlayer = ref({ name: '', jersey: null, position: 'IF', throws: 'R', bats: 'R', bat_spec: '', dob: null, photo_url: '' });
+        // New Player Reactive Form State (Asian Naming Architecture)
+        const newPlayer = ref({
+          last_name: '',
+          given_names: '',
+          preferred_name: '',
+          jersey: null,
+          hkll_reg_no: '',
+          parent_phone: '',
+          position: 'IF',
+          throws: 'R',
+          bats: 'R',
+          bat_spec: '',
+          dob: null,
+          photo_url: ''
+        });
+
+        // New Session Reactive Form State
         const newSession = ref({ 
           session_date: new Date().toISOString().slice(0, 10), 
           height_cm: null, weight_kg: null, broad_jump: null,
@@ -1725,8 +1979,55 @@
           sprint_time: null, grip_dom: null, pinch: null, shoulder_check: 'Pass' 
         });
 
+        // New Drill Video Reactive Form State (Stage 1)
+        const newDrillVideo = ref({
+          session_date: new Date().toISOString().slice(0, 10),
+          category: 'batting',
+          camera_angle: 'side_open',
+          fps_mode: 60,
+          coach_feedback: ''
+        });
+
         /**
-         * Converts values dynamically between km/h and mph inside modal inputs.
+         * Auto-populates Preferred Name as coach types Last Name and Given Names,
+         * unless the coach has explicitly overridden the field.
+         */
+        const onNamePartInput = () => {
+          if (isPreferredCustomized.value) return;
+          const given = (newPlayer.value.given_names || '').trim();
+          const last = (newPlayer.value.last_name || '').trim();
+
+          if (!given && !last) {
+            newPlayer.value.preferred_name = '';
+            return;
+          }
+
+          // Takes first English word from given names + Last Name (e.g. "Harvey" + "Ho")
+          const firstGivenWord = given.split(' ')[0] || '';
+          newPlayer.value.preferred_name = `${firstGivenWord} ${last}`.trim();
+        };
+
+        /**
+         * Returns display name for a player, preferring preferred_name with fallback to legacy 'name'.
+         */
+        const getPlayerDisplayName = (player) => {
+          if (!player) return '';
+          return player.preferred_name || player.name || `${player.last_name || ''} ${player.given_names || ''}`.trim() || 'Player';
+        };
+
+        /**
+         * Formats official passport/HKLL legal full name (e.g., "Ho, Harvey Zhiping").
+         */
+        const formatLegalName = (player) => {
+          if (!player) return '--';
+          if (player.last_name && player.given_names) {
+            return `${player.last_name}, ${player.given_names}`;
+          }
+          return player.official_name || player.preferred_name || player.name || '--';
+        };
+
+        /**
+         * Converts modal input numbers dynamically between km/h and mph.
          */
         const toggleSpeedUnit = (target, newUnit) => {
           const targetUnit = target === 'log' ? logSpeedUnit : editSpeedUnit;
@@ -1757,9 +2058,6 @@
           return posStr.split(',').map(s => s.trim()).filter(Boolean);
         };
 
-        /**
-         * Toggles position tags in the Add Player modal.
-         */
         const toggleAddPosition = (pos) => {
           if (selectedAddPositions.value.includes(pos)) {
             if (selectedAddPositions.value.length > 1) {
@@ -1770,9 +2068,6 @@
           }
         };
 
-        /**
-         * Toggles position tags in the Edit Player modal.
-         */
         const toggleEditPosition = (pos) => {
           if (selectedEditPositions.value.includes(pos)) {
             if (selectedEditPositions.value.length > 1) {
@@ -1784,35 +2079,60 @@
         };
 
         /**
-         * Prepares state and opens the Add Player modal.
+         * Opens the Add Player modal and resets state.
          */
         const openAddPlayerModal = () => {
+          isPreferredCustomized.value = false;
           selectedAddPositions.value = ['IF'];
-          newPlayer.value = { name: '', jersey: null, position: 'IF', throws: 'R', bats: 'R', bat_spec: '', dob: null, photo_url: '' };
+          newPlayer.value = {
+            last_name: '',
+            given_names: '',
+            preferred_name: '',
+            jersey: null,
+            hkll_reg_no: '',
+            parent_phone: '',
+            position: 'IF',
+            throws: 'R',
+            bats: 'R',
+            bat_spec: '',
+            dob: null,
+            photo_url: ''
+          };
           showAddPlayerModal.value = true;
         };
 
         /**
-         * Fetches all cloud data:
-         * Omits sensitive parent contact info from public queries for data privacy.
+         * Fetches all cloud records from Supabase:
+         * Synchronizes players, performance sessions, and drill videos.
          */
         const fetchAllData = async () => {
           loading.value = true;
           try {
+            // Load players
             const { data: pData, error: pError } = await supabaseClient
               .from('players')
-              .select('id, name, jersey, position, throws, bats, bat_spec, dob, photo_url')
+              .select('*')
               .order('jersey', { ascending: true });
             
+            // Load station metrics
             const { data: sData, error: sError } = await supabaseClient
               .from('sessions')
               .select('*')
               .order('session_date', { ascending: false });
 
+            // Load Stage 1 drill videos
+            const { data: vData, error: vError } = await supabaseClient
+              .from('drill_videos')
+              .select('*')
+              .order('session_date', { ascending: false });
+
             if (pError) console.error('Players Error:', pError);
             if (sError) console.error('Sessions Error:', sError);
+            if (vError) console.error('Videos Error:', vError);
+
             if (pData) players.value = pData;
             if (sData) sessions.value = sData;
+            if (vData) drillVideos.value = vData;
           } catch (err) {
             console.error('Fetch error:', err);
           } finally {
@@ -1821,23 +2141,28 @@
         };
 
         /**
-         * Adds a single player record to the cloud database.
+         * Inserts a new player into the Supabase 'players' table.
          */
         const addPlayer = async () => {
-          if (!isCoach.value || !newPlayer.value.name || !newPlayer.value.jersey) return;
+          if (!isCoach.value || !newPlayer.value.preferred_name || !newPlayer.value.jersey) return;
           
           newPlayer.value.position = selectedAddPositions.value.join(', ');
           newPlayer.value.photo_url = newPlayer.value.photo_url ? newPlayer.value.photo_url.trim() : null;
+
+          // Backwards compatibility with legacy 'name' column if present
+          const payload = {
+            ...newPlayer.value,
+            name: newPlayer.value.preferred_name
+          };
           
           const { data, error } = await supabaseClient
             .from('players')
-            .insert([newPlayer.value])
-            .select('id, name, jersey, position, throws, bats, bat_spec, dob, photo_url');
+            .insert([payload])
+            .select();
 
           if (!error && data) {
             players.value.push(data[0]);
             players.value.sort((a, b) => a.jersey - b.jersey);
-            newPlayer.value = { name: '', jersey: null, position: 'IF', throws: 'R', bats: 'R', bat_spec: '', dob: null, photo_url: '' };
             showAddPlayerModal.value = false;
           } else if (error) {
             alert('Failed to save player: ' + error.message);
@@ -1845,12 +2170,17 @@
         };
 
         /**
-         * Opens the Edit Player modal and pre-fills existing values.
+         * Opens the Edit Player modal and binds existing records.
          */
         const openEditPlayerModal = (player) => {
           if (!isCoach.value) return;
           editingPlayer.value = { 
-            ...player, 
+            ...player,
+            preferred_name: getPlayerDisplayName(player),
+            last_name: player.last_name || '',
+            given_names: player.given_names || '',
+            hkll_reg_no: player.hkll_reg_no || '',
+            parent_phone: player.parent_phone || '',
             photo_url: player.photo_url ? String(player.photo_url) : '' 
           };
           selectedEditPositions.value = splitPositions(player.position);
@@ -1858,18 +2188,23 @@
         };
 
         /**
-         * Updates an existing player record in Supabase.
+         * Commits updated player fields to Supabase.
          */
         const updatePlayer = async () => {
           if (!isCoach.value || !editingPlayer.value) return;
           
-          const { id, name, jersey, throws, bats, bat_spec, dob, photo_url } = editingPlayer.value;
+          const { id, last_name, given_names, preferred_name, jersey, hkll_reg_no, parent_phone, throws, bats, bat_spec, dob, photo_url } = editingPlayer.value;
           const posString = selectedEditPositions.value.join(', ');
           const cleanPhoto = photo_url && photo_url.trim() !== '' ? photo_url.trim() : null;
 
           const payload = {
-            name,
+            last_name: last_name ? last_name.trim() : null,
+            given_names: given_names ? given_names.trim() : null,
+            preferred_name: preferred_name ? preferred_name.trim() : '',
+            name: preferred_name ? preferred_name.trim() : '',
             jersey: Number(jersey),
+            hkll_reg_no: hkll_reg_no ? hkll_reg_no.trim() : null,
+            parent_phone: parent_phone ? parent_phone.trim() : null,
             position: posString,
             throws,
             bats,
@@ -1900,7 +2235,7 @@
         };
 
         /**
-         * Deletes a player and cascades deletion of all associated sessions.
+         * Deletes a player and cascades deletion to sessions and drill videos.
          */
         const removePlayer = async (id) => {
           if (!isCoach.value) return;
@@ -1909,6 +2244,7 @@
           if (!error) {
             players.value = players.value.filter(p => p.id !== id);
             sessions.value = sessions.value.filter(s => s.player_id !== id);
+            drillVideos.value = drillVideos.value.filter(v => v.player_id !== id);
             if (selectedPlayer.value && selectedPlayer.value.id === id) {
               currentView.value = 'overview';
               selectedPlayer.value = null;
@@ -1919,7 +2255,7 @@
         };
 
         /**
-         * Selects an individual player to view their profile, chart, and session history.
+         * Switches UI to individual player view and renders chart.
          */
         const selectPlayer = (player) => {
           selectedPlayer.value = player;
@@ -1931,7 +2267,7 @@
         };
 
         /**
-         * Opens the Log Session modal for a designated player.
+         * Opens the Log Session modal for an active player.
          */
         const openLogModal = (player) => {
           if (!isCoach.value) return;
@@ -1943,7 +2279,7 @@
         const cleanVal = (v) => (v === '' || v === undefined ? null : v);
 
         /**
-         * Normalizes input speeds to km/h prior to cloud database storage.
+         * Normalizes modal input speeds to km/h prior to database storage.
          */
         const normalizeToKmh = (val, currentUnit) => {
           const cleaned = cleanVal(val);
@@ -1954,7 +2290,7 @@
         };
 
         /**
-         * Saves a new session record into the database.
+         * Saves a new session entry for an athlete.
          */
         const saveSession = async () => {
           if (!isCoach.value || !activePlayerForLog.value) return;
@@ -1995,7 +2331,7 @@
         };
 
         /**
-         * Opens the Edit Session modal for an existing session log.
+         * Opens the Edit Session modal for an existing record.
          */
         const openEditSessionModal = (session) => {
           if (!isCoach.value) return;
@@ -2005,7 +2341,7 @@
         };
 
         /**
-         * Updates an existing session log in the cloud database.
+         * Commits session modifications to the database.
          */
         const updateSession = async () => {
           if (!isCoach.value || !editingSession.value) return;
@@ -2047,7 +2383,7 @@
         };
 
         /**
-         * Permanently removes a session record from the cloud database.
+         * Deletes a session record permanently.
          */
         const removeSession = async (sessionId) => {
           if (!isCoach.value) return;
@@ -2069,8 +2405,111 @@
           }
         };
 
+        // STAGE 1: Drill Videos Management Functions
+        const playerDrillVideos = computed(() => {
+          if (!selectedPlayer.value) return [];
+          return drillVideos.value.filter(v => v.player_id === selectedPlayer.value.id);
+        });
+
+        const openUploadVideoModal = (player) => {
+          if (!isCoach.value) return;
+          activePlayerForVideo.value = player;
+          selectedVideoFile.value = null;
+          newDrillVideo.value = {
+            session_date: new Date().toISOString().slice(0, 10),
+            category: 'batting',
+            camera_angle: 'side_open',
+            fps_mode: 60,
+            coach_feedback: ''
+          };
+          showUploadVideoModal.value = true;
+        };
+
+        const handleVideoFilePick = (event) => {
+          selectedVideoFile.value = event.target.files[0] || null;
+        };
+
         /**
-         * COACH-ONLY: Exports an administrative roster and quarterly check-in CSV template.
+         * Uploads video to the 'drills-video' Supabase bucket and logs metadata in 'drill_videos'.
+         */
+        const uploadDrillVideo = async () => {
+          if (!isCoach.value || !activePlayerForVideo.value || !selectedVideoFile.value) return;
+
+          isUploadingVideo.value = true;
+          try {
+            const player = activePlayerForVideo.value;
+            const fileExt = selectedVideoFile.value.name.split('.').pop() || 'mp4';
+            const fileName = `${player.id}_${Date.now()}.${fileExt}`;
+            const filePath = `${player.id}/${fileName}`;
+
+            // Upload directly to drills-video bucket
+            const { error: uploadError } = await supabaseClient.storage
+              .from('drills-video')
+              .upload(filePath, selectedVideoFile.value, {
+                contentType: selectedVideoFile.value.type || 'video/mp4',
+                upsert: true
+              });
+
+            if (uploadError) throw uploadError;
+
+            // Retrieve public URL
+            const { data: publicUrlData } = supabaseClient.storage
+              .from('drills-video')
+              .getPublicUrl(filePath);
+
+            const videoPayload = {
+              player_id: player.id,
+              session_date: newDrillVideo.value.session_date,
+              category: newDrillVideo.value.category,
+              camera_angle: newDrillVideo.value.camera_angle,
+              video_url: publicUrlData.publicUrl,
+              fps_mode: newDrillVideo.value.fps_mode,
+              coach_feedback: newDrillVideo.value.coach_feedback || null
+            };
+
+            // Insert metadata record
+            const { data: insertData, error: insertError } = await supabaseClient
+              .from('drill_videos')
+              .insert([videoPayload])
+              .select();
+
+            if (insertError) throw insertError;
+
+            if (insertData) {
+              drillVideos.value.unshift(insertData[0]);
+              showUploadVideoModal.value = false;
+              alert('Video clip uploaded and registered successfully!');
+            }
+          } catch (err) {
+            alert('Video upload error: ' + (err.message || 'Check storage bucket permissions.'));
+            console.error(err);
+          } finally {
+            isUploadingVideo.value = false;
+          }
+        };
+
+        /**
+         * Removes a drill video record and associated cloud storage asset.
+         */
+        const deleteDrillVideo = async (videoId) => {
+          if (!isCoach.value) return;
+          if (!confirm('Are you sure you want to permanently delete this drill video?')) return;
+
+          const { error } = await supabaseClient
+            .from('drill_videos')
+            .delete()
+            .eq('id', videoId);
+
+          if (!error) {
+            drillVideos.value = drillVideos.value.filter(v => v.id !== videoId);
+          } else {
+            alert('Failed to delete video: ' + error.message);
+          }
+        };
+
+        /**
+         * COACH-ONLY: Exports administrative & quarterly check-in CSV template
+         * structured under Asian naming standards and HKLL registration numbers.
          */
         const exportTeamCSV = () => {
           if (!isCoach.value) return;
@@ -2080,15 +2519,18 @@
           }
 
           let csvContent = 'data:text/csv;charset=utf-8,\uFEFF';
-          csvContent += 'Jersey,Name,DOB,Parent_Phone,Position,Throws,Bats,Bat_Spec,Current_Height_cm,Current_Weight_kg\r\n';
+          csvContent += 'HKLL_Reg_No,Jersey,Last_Name,Given_Names,Preferred_Name,DOB,Parent_Phone,Position,Throws,Bats,Bat_Spec,Current_Height_cm,Current_Weight_kg\r\n';
 
           players.value.forEach(p => {
             const height = getLatestMetric(p.id, 'height_cm') || '';
             const weight = getLatestMetric(p.id, 'weight_kg') || '';
 
             const row = [
+              `"${p.hkll_reg_no || ''}"`,
               p.jersey,
-              `"${p.name || ''}"`,
+              `"${p.last_name || ''}"`,
+              `"${p.given_names || ''}"`,
+              `"${getPlayerDisplayName(p)}"`,
               p.dob || '',
               `"${p.parent_phone || ''}"`,
               `"${p.position || 'IF'}"`,
@@ -2104,16 +2546,15 @@
           const encodedUri = encodeURI(csvContent);
           const link = document.createElement('a');
           link.setAttribute('href', encodedUri);
-          link.setAttribute('download', `Swallows_Roster_Checkin_Template_${new Date().toISOString().slice(0, 10)}.csv`);
+          link.setAttribute('download', `Swallows_Roster_Template_${new Date().toISOString().slice(0, 10)}.csv`);
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
         };
 
         /**
-         * COACH-ONLY: Batch imports parent CSV updates.
-         * Updates existing players by jersey number or inserts new players,
-         * generating unique IDs and logging quarterly growth baselines.
+         * COACH-ONLY: Batch imports parent CSV updates with multi-season identity matching.
+         * Match priority: 1. HKLL Reg # -> 2. DOB + Last Name -> 3. Jersey fallback.
          */
         const importTeamCSV = async (event) => {
           if (!isCoach.value) return;
@@ -2133,35 +2574,61 @@
             let updatedPlayers = 0;
             let growthLogged = 0;
             const today = new Date().toISOString().slice(0, 10);
+            const cleanStr = (s) => (s || '').replace(/['"]+/g, '').trim();
 
             for (let i = 1; i < lines.length; i++) {
               const line = lines[i].trim();
               if (!line) continue;
 
               const cols = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || line.split(',');
-              if (cols.length < 2) continue;
+              if (cols.length < 5) continue;
 
-              const jersey = Number(cols[0].replace(/['"]+/g, '').trim());
-              const name = cols[1] ? cols[1].replace(/['"]+/g, '').trim() : '';
-              const dob = cols[2] ? cols[2].replace(/['"]+/g, '').trim() : null;
-              const phone = cols[3] ? cols[3].replace(/['"]+/g, '').trim() : '';
-              const position = cols[4] ? cols[4].replace(/['"]+/g, '').trim() : 'IF';
-              const throws = cols[5] ? cols[5].replace(/['"]+/g, '').trim() : 'R';
-              const bats = cols[6] ? cols[6].replace(/['"]+/g, '').trim() : 'R';
-              const batSpec = cols[7] ? cols[7].replace(/['"]+/g, '').trim() : '';
-              const height = cols[8] ? parseFloat(cols[8].replace(/['"]+/g, '').trim()) : null;
-              const weight = cols[9] ? parseFloat(cols[9].replace(/['"]+/g, '').trim()) : null;
+              const hkllReg = cleanStr(cols[0]);
+              const jersey = Number(cleanStr(cols[1]));
+              const lastName = cleanStr(cols[2]);
+              const givenNames = cleanStr(cols[3]);
+              const preferredName = cleanStr(cols[4]);
+              const dob = cols[5] ? cleanStr(cols[5]) : null;
+              const phone = cols[6] ? cleanStr(cols[6]) : '';
+              const position = cols[7] ? cleanStr(cols[7]) : 'IF';
+              const throws = cols[8] ? cleanStr(cols[8]) : 'R';
+              const bats = cols[9] ? cleanStr(cols[9]) : 'R';
+              const batSpec = cols[10] ? cleanStr(cols[10]) : '';
+              const height = cols[11] ? parseFloat(cleanStr(cols[11])) : null;
+              const weight = cols[12] ? parseFloat(cleanStr(cols[12])) : null;
 
-              if (!jersey || !name) continue;
+              if (!preferredName && !lastName) continue;
 
-              let targetPlayer = players.value.find(p => p.jersey === jersey);
+              // Step 1: Match by HKLL Reg No (if not empty and not 'New')
+              let targetPlayer = null;
+              if (hkllReg && hkllReg.toLowerCase() !== 'new') {
+                targetPlayer = players.value.find(p => p.hkll_reg_no && p.hkll_reg_no.trim() === hkllReg);
+              }
+
+              // Step 2: Match by DOB + Last Name
+              if (!targetPlayer && dob && lastName) {
+                targetPlayer = players.value.find(p => 
+                  p.dob === dob && 
+                  (p.last_name || '').toLowerCase() === lastName.toLowerCase()
+                );
+              }
+
+              // Step 3: Match fallback by Jersey number
+              if (!targetPlayer && jersey) {
+                targetPlayer = players.value.find(p => p.jersey === jersey);
+              }
 
               if (targetPlayer) {
-                // Update demographic info for existing player
+                // Update profile (accommodates jersey number changes across seasons)
                 const payload = {
-                  name,
-                  dob: dob || targetPlayer.dob,
+                  jersey: jersey || targetPlayer.jersey,
+                  last_name: lastName || targetPlayer.last_name,
+                  given_names: givenNames || targetPlayer.given_names,
+                  preferred_name: preferredName || targetPlayer.preferred_name || targetPlayer.name,
+                  name: preferredName || targetPlayer.preferred_name || targetPlayer.name,
+                  hkll_reg_no: hkllReg || targetPlayer.hkll_reg_no,
                   parent_phone: phone || targetPlayer.parent_phone,
+                  dob: dob || targetPlayer.dob,
                   position,
                   throws,
                   bats,
@@ -2178,12 +2645,16 @@
                   updatedPlayers++;
                 }
               } else {
-                // Create new player with unique database ID
-                const newPlayer = {
-                  jersey,
-                  name,
-                  dob: dob || null,
+                // Insert brand new player -> Supabase creates a new UUID
+                const newPlayerPayload = {
+                  jersey: jersey || 99,
+                  last_name: lastName || null,
+                  given_names: givenNames || null,
+                  preferred_name: preferredName || `${givenNames} ${lastName}`.trim(),
+                  name: preferredName || `${givenNames} ${lastName}`.trim(),
+                  hkll_reg_no: hkllReg || null,
                   parent_phone: phone,
+                  dob: dob || null,
                   position,
                   throws,
                   bats,
@@ -2192,7 +2663,7 @@
 
                 const { data, error } = await supabaseClient
                   .from('players')
-                  .insert([newPlayer])
+                  .insert([newPlayerPayload])
                   .select();
 
                 if (!error && data) {
@@ -2202,7 +2673,7 @@
                 }
               }
 
-              // Automatically log quarterly baseline if height or weight is provided
+              // Log quarterly growth check-in if height or weight is provided
               if (targetPlayer && (height || weight)) {
                 const latestH = getLatestMetric(targetPlayer.id, 'height_cm');
                 const latestW = getLatestMetric(targetPlayer.id, 'weight_kg');
@@ -2230,21 +2701,21 @@
             }
 
             players.value.sort((a, b) => a.jersey - b.jersey);
-            alert(`Import Complete!\n• Roster Profiles Updated: ${updatedPlayers}\n• Quarterly Growth Check-ins Logged: ${growthLogged}`);
+            alert(`Import Complete!\n• Roster Profiles Updated: ${updatedPlayers}\n• Growth Baselines Logged: ${growthLogged}`);
             event.target.value = '';
           };
           reader.readAsText(file);
         };
 
         /**
-         * Returns all session records for a given player ID.
+         * Retrieves performance sessions for a specific athlete.
          */
         const getPlayerSessions = (playerId) => {
           return sessions.value.filter(s => s.player_id === playerId);
         };
 
         /**
-         * Returns the most recent non-empty metric value for a player.
+         * Returns most recent metric entry for an athlete.
          */
         const getLatestMetric = (playerId, key) => {
           const list = getPlayerSessions(playerId);
@@ -2253,7 +2724,7 @@
         };
 
         /**
-         * Calculates Broad Jump Height Ratio (Broad Jump / Height) for a player.
+         * Calculates Broad Jump Height Ratio (Jump / Height) for fair youth comparison.
          */
         const calculateJumpRatio = (playerId) => {
           const jump = getLatestMetric(playerId, 'broad_jump');
@@ -2263,7 +2734,7 @@
         };
 
         /**
-         * Calculates Broad Jump Height Ratio for an individual session row.
+         * Calculates Broad Jump Height Ratio for an individual historical session row.
          */
         const getSessionJumpRatio = (session) => {
           if (!session.broad_jump) return null;
@@ -2276,7 +2747,7 @@
         };
 
         /**
-         * Returns dynamic Tailwind color classes based on jump ratio thresholds.
+         * Dynamic Tailwind colors based on broad jump height ratio standards.
          */
         const getJumpRatioColor = (ratioStr) => {
           if (!ratioStr) return 'text-slate-400';
@@ -2310,7 +2781,7 @@
         };
 
         /**
-         * Computes top leaderboard performers for broad jump height ratios.
+         * Computes leaderboard top performers for broad jump height ratios.
          */
         const getTopJumpRatios = (count = 3) => {
           const results = [];
@@ -2348,9 +2819,6 @@
           return results.slice(0, count);
         };
 
-        /**
-         * Formats latest height and weight into a compact string.
-         */
         const formatHeightWeight = (playerId) => {
           const h = getLatestMetric(playerId, 'height_cm');
           const w = getLatestMetric(playerId, 'weight_kg');
@@ -2358,9 +2826,6 @@
           return `${h ? h + 'cm' : '--'} / ${w ? w + 'kg' : '--'}`;
         };
 
-        /**
-         * Calculates developmental age in years and months (e.g., '8y 4m').
-         */
         const calculateAge = (dob) => {
           if (!dob) return '';
           const birth = new Date(dob);
@@ -2381,21 +2846,20 @@
         };
 
         /**
-         * Real-time roster search filter by name or jersey number.
+         * Real-time roster search filter: checks Preferred Name, Legal Names, Jersey, or HKLL Reg #.
          */
         const filteredPlayers = computed(() => {
           if (!searchQuery.value.trim()) return players.value;
           const q = searchQuery.value.toLowerCase().trim();
           return players.value.filter(p => {
-            const nameMatch = p.name && p.name.toLowerCase().includes(q);
+            const nameMatch = getPlayerDisplayName(p).toLowerCase().includes(q);
+            const legalMatch = formatLegalName(p).toLowerCase().includes(q);
             const jerseyMatch = p.jersey && String(p.jersey).includes(q);
-            return nameMatch || jerseyMatch;
+            const regMatch = p.hkll_reg_no && p.hkll_reg_no.toLowerCase().includes(q);
+            return nameMatch || legalMatch || jerseyMatch || regMatch;
           });
         });
 
-        /**
-         * Returns count of players meeting or exceeding an exit velocity threshold.
-         */
         const getClubCount = (threshold) => {
           return players.value.filter(p => {
             const velo = getLatestMetric(p.id, 'exit_velo');
@@ -2403,9 +2867,6 @@
           }).length;
         };
 
-        /**
-         * Computes active team average exit velocity.
-         */
         const avgBatSpeed = computed(() => {
           const velos = players.value
             .map(p => getLatestMetric(p.id, 'exit_velo'))
@@ -2418,16 +2879,10 @@
           return '--';
         });
 
-        /**
-         * Computes the total number of arm safety flags ('Adjust') logged across all sessions.
-         */
         const safetyAlertCount = computed(() => {
           return sessions.value.filter(s => s.shoulder_check === 'Adjust').length;
         });
 
-        /**
-         * Returns color highlights for Blast Motion attack angles (5°-15° optimal).
-         */
         const getAttackAngleColor = (angle) => {
           if (angle === null || angle === undefined || angle === '') return 'text-slate-400';
           const num = Number(angle);
@@ -2437,7 +2892,7 @@
         };
 
         /**
-         * Renders the interactive Chart.js line graph for velocity progression or physical growth.
+         * Renders velocity progression or physical growth lines via Chart.js.
          */
         const renderPlayerChart = () => {
           if (!selectedPlayer.value) return;
@@ -2629,7 +3084,6 @@
           });
         };
 
-        // Re-render the chart whenever the view switches to individual player
         watch([currentView, selectedPlayer], () => {
           if (currentView.value === 'player' && selectedPlayer.value) {
             nextTick(() => {
@@ -2638,7 +3092,6 @@
           }
         });
 
-        // Initialize application data on mount
         onMounted(() => {
           fetchAllData();
         });
@@ -2646,16 +3099,18 @@
         return {
           currentLang, t, saveLanguage,
           loading, currentView, overviewTab, searchQuery, filteredPlayers,
-          showAddPlayerModal, showEditPlayerModal, showLogModal, showEditSessionModal,
-          selectedPlayer, editingPlayer, activePlayerForLog, editingSession,
+          showAddPlayerModal, showEditPlayerModal, showLogModal, showEditSessionModal, showUploadVideoModal,
+          selectedPlayer, editingPlayer, activePlayerForLog, editingSession, activePlayerForVideo, selectedVideoFile,
           selectedAddPositions, selectedEditPositions,
           toggleAddPosition, toggleEditPosition, openAddPlayerModal, splitPositions,
-          players, sessions, newPlayer, newSession, 
+          players, sessions, drillVideos, playerDrillVideos, newPlayer, newSession, newDrillVideo,
           chartMode, setChartMode, hasChartData,
           expandedSessionIds, toggleSessionExpand, isSessionExpanded,
-          failedImgs, markImgFailed, formatImgUrl, handleFileUpload, isUploadingPhoto,
+          failedImgs, markImgFailed, formatImgUrl, handleFileUpload, isUploadingPhoto, isUploadingVideo,
           logSpeedUnit, editSpeedUnit, toggleSpeedUnit, triggerPrintReport, 
           exportTeamCSV, importTeamCSV,
+          openUploadVideoModal, handleVideoFilePick, uploadDrillVideo, deleteDrillVideo,
+          onNamePartInput, isPreferredCustomized, getPlayerDisplayName, formatLegalName,
           getTopMetrics, getTopJumpRatios, calculateJumpRatio, getSessionJumpRatio, getJumpRatioColor,
           isCoach, unlockCoachMode, lockCoachMode,
           addPlayer, openEditPlayerModal, updatePlayer, removePlayer, selectPlayer, 
