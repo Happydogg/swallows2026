@@ -7,9 +7,7 @@
   <link rel="icon" type="image/png" href="./logo.png">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-  <!-- Supabase Official Client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- Chart.js Official Client -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     [v-cloak] { display: none !important; }
@@ -20,7 +18,7 @@
         color: #0f172a !important;
         padding: 0 !important;
       }
-      header, .no-print, nav, button, select {
+      header, .no-print, nav, button, select, label {
         display: none !important;
       }
       .print-card {
@@ -46,7 +44,6 @@
 <body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8 font-sans">
   <div id="app" v-cloak class="max-w-6xl mx-auto">
     
-    <!-- Header (Hidden on Print) -->
     <header class="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-800 pb-4 mb-6 gap-4 no-print">
       <div>
         <h1 class="text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
@@ -72,6 +69,15 @@
         </button>
         
         <template v-if="isCoach">
+          <button @click="exportTeamCSV" class="bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 rounded-md text-sm font-medium text-white transition flex items-center gap-1">
+            📊 {{ t('exportCSV') }}
+          </button>
+          
+          <label class="bg-purple-600 hover:bg-purple-500 px-3 py-1.5 rounded-md text-sm font-medium text-white transition cursor-pointer flex items-center gap-1">
+            📂 {{ t('importCSV') }}
+            <input type="file" accept=".csv" class="hidden" @change="importTeamCSV">
+          </label>
+
           <button @click="openAddPlayerModal" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-md text-sm font-medium text-white transition">
             + {{ t('addPlayer') }}
           </button>
@@ -79,6 +85,7 @@
             {{ t('lock') }}
           </button>
         </template>
+        
         <template v-else>
           <button @click="unlockCoachMode" class="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-md text-sm font-medium transition">
             🔒 {{ t('coachUnlock') }}
@@ -87,15 +94,12 @@
       </div>
     </header>
 
-    <!-- Loading State -->
     <div v-if="loading" class="p-8 text-center text-slate-400 font-mono text-sm no-print">
       {{ t('syncingData') }}
     </div>
 
-    <!-- VIEW 1: Team Overview -->
     <div v-else-if="currentView === 'overview'" class="space-y-6">
       
-      <!-- Top Overview Stat Cards -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div class="bg-slate-800/60 border border-slate-700 p-4 rounded-xl">
           <p class="text-xs text-slate-400">{{ t('activeRoster') }}</p>
@@ -115,8 +119,7 @@
         </div>
       </div>
 
-      <!-- Overview Sub-Tab Switcher: Roster vs Leaderboard -->
-      <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-3 gap-3">
         <div class="flex gap-2">
           <button 
             @click="overviewTab = 'roster'" 
@@ -132,99 +135,178 @@
             <span class="bg-amber-500/20 text-amber-300 text-[10px] px-1.5 py-0.2 rounded-full font-bold">Top 3</span>
           </button>
         </div>
+
+        <div v-if="overviewTab === 'roster'" class="w-full sm:w-64">
+          <input 
+            v-model="searchQuery" 
+            type="text" 
+            :placeholder="t('searchPlaceholder')" 
+            class="w-full bg-slate-800/80 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white outline-none focus:border-blue-500">
+        </div>
       </div>
 
-      <!-- TAB A: Roster Table -->
-      <div v-if="overviewTab === 'roster'" class="bg-slate-800/40 border border-slate-700/80 rounded-xl overflow-x-auto">
-        <table class="w-full text-left text-sm">
-          <thead class="bg-slate-800/80 text-slate-300 text-xs uppercase tracking-wider">
-            <tr>
-              <th class="p-3">#</th>
-              <th class="p-3">{{ t('player') }}</th>
-              <th class="p-3">{{ t('pos') }}</th>
-              <th class="p-3">{{ t('throwsBats') }}</th>
-              <th class="p-3">{{ t('heightWeight') }}</th>
-              <th class="p-3">{{ t('topExitVelo') }}</th>
-              <th class="p-3">{{ t('throwingVelo') }}</th>
-              <th class="p-3">{{ t('attackAngle') }}</th>
-              <th class="p-3">{{ t('broadJumpRatioHeader') }}</th>
-              <th class="p-3 text-right">{{ t('actions') }}</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-800">
-            <tr v-for="player in players" :key="player.id" class="hover:bg-slate-800/40 transition">
-              <td class="p-3 font-mono text-slate-400">{{ player.jersey }}</td>
-              <td class="p-3">
-                <div class="flex items-center gap-3">
-                  <div class="w-9 h-9 rounded-full overflow-hidden flex-shrink-0 bg-slate-700 border border-slate-600 flex items-center justify-center font-bold text-xs text-blue-300">
-                    <img v-if="player.photo_url && !failedImgs[player.id]" 
-                         :src="formatImgUrl(player.photo_url)" 
-                         :alt="player.name" 
-                         class="w-full h-full object-cover" 
-                         referrerpolicy="no-referrer"
-                         @error="markImgFailed(player.id)">
-                    <span v-else>#{{ player.jersey }}</span>
-                  </div>
-                  <div>
-                    <button @click="selectPlayer(player)" class="font-semibold text-white hover:underline text-blue-400 block text-left">
-                      {{ player.name }}
-                    </button>
-                    <span v-if="player.dob" class="text-xs text-slate-400">{{ calculateAge(player.dob) }}</span>
-                  </div>
+      <div v-if="overviewTab === 'roster'">
+        
+        <div class="block md:hidden space-y-3">
+          <div v-for="player in filteredPlayers" :key="'m-rost-' + player.id" class="bg-slate-800/60 border border-slate-700/80 rounded-xl p-4 space-y-3 shadow-sm">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-full overflow-hidden flex-shrink-0 bg-slate-700 border border-slate-600 flex items-center justify-center font-bold text-sm text-blue-300">
+                  <img v-if="player.photo_url && !failedImgs[player.id]" 
+                       :src="formatImgUrl(player.photo_url)" 
+                       :alt="player.name" 
+                       class="w-full h-full object-cover" 
+                       referrerpolicy="no-referrer"
+                       @error="markImgFailed(player.id)">
+                  <span v-else>#{{ player.jersey }}</span>
                 </div>
-              </td>
-              <td class="p-3">
-                <div class="flex flex-wrap gap-1">
-                  <span v-for="pos in splitPositions(player.position)" :key="pos" class="px-2 py-0.5 rounded bg-slate-700 text-xs font-medium">
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs font-mono text-slate-400">#{{ player.jersey }}</span>
+                    <span v-if="player.dob" class="text-xs text-blue-400 font-medium">{{ calculateAge(player.dob) }}</span>
+                  </div>
+                  <button @click="selectPlayer(player)" class="font-bold text-white hover:underline text-base block text-left">
+                    {{ player.name }}
+                  </button>
+                </div>
+              </div>
+
+              <div class="flex flex-col items-end gap-1">
+                <div class="flex gap-1">
+                  <span v-for="pos in splitPositions(player.position)" :key="pos" class="px-2 py-0.5 rounded bg-slate-700 text-[10px] font-semibold text-slate-200">
                     {{ pos }}
                   </span>
                 </div>
-              </td>
-              <td class="p-3 text-slate-300">{{ player.throws }} / {{ player.bats }}</td>
-              <td class="p-3 font-mono text-slate-300">
-                {{ formatHeightWeight(player.id) }}
-              </td>
-              <td class="p-3 font-mono">
-                <span :class="Number(getLatestMetric(player.id, 'exit_velo')) >= 60 ? 'text-amber-400 font-bold' : ''">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 bg-slate-900/60 p-2.5 rounded-lg border border-slate-800 text-xs font-mono">
+              <div>
+                <span class="text-slate-400 text-[10px] block">{{ t('throwsBats') }}:</span>
+                <span class="text-slate-200 font-bold">{{ player.throws }} / {{ player.bats }}</span>
+              </div>
+              <div>
+                <span class="text-slate-400 text-[10px] block">{{ t('sprint18m') }}:</span>
+                <span class="text-amber-300 font-bold">{{ getLatestMetric(player.id, 'sprint_time') ? getLatestMetric(player.id, 'sprint_time') + 's' : '--' }}</span>
+              </div>
+              <div>
+                <span class="text-slate-400 text-[10px] block">{{ t('topExitVelo') }}:</span>
+                <span :class="Number(getLatestMetric(player.id, 'exit_velo')) >= 60 ? 'text-amber-400 font-bold' : 'text-blue-400 font-semibold'">
                   {{ getLatestMetric(player.id, 'exit_velo') || '--' }} km/h
                 </span>
-              </td>
-              <td class="p-3 font-mono text-emerald-400 font-semibold">{{ getLatestMetric(player.id, 'throwing_velo') ? getLatestMetric(player.id, 'throwing_velo') + ' km/h' : '--' }}</td>
-              <td class="p-3 font-mono">
-                <span :class="getAttackAngleColor(getLatestMetric(player.id, 'attack_angle'))">
-                  {{ getLatestMetric(player.id, 'attack_angle') ? getLatestMetric(player.id, 'attack_angle') + '°' : '--' }}
-                </span>
-              </td>
-              <td class="p-3 font-mono">
-                <div v-if="getLatestMetric(player.id, 'broad_jump')">
-                  <span>{{ getLatestMetric(player.id, 'broad_jump') }} cm</span>
-                  <span v-if="calculateJumpRatio(player.id)" class="text-xs ml-1 font-bold" :class="getJumpRatioColor(calculateJumpRatio(player.id))">
-                    ({{ calculateJumpRatio(player.id) }}x)
+              </div>
+              <div>
+                <span class="text-slate-400 text-[10px] block">{{ t('throwingVelo') }}:</span>
+                <span class="text-emerald-400 font-semibold">{{ getLatestMetric(player.id, 'throwing_velo') ? getLatestMetric(player.id, 'throwing_velo') + ' km/h' : '--' }}</span>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-1 border-t border-slate-700/60">
+              <button @click="selectPlayer(player)" class="text-xs text-blue-400 font-semibold hover:underline">
+                View Profile &amp; History →
+              </button>
+              <div class="space-x-2" v-if="isCoach">
+                <button @click="openLogModal(player)" class="bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 px-2.5 py-1 rounded text-xs">+ {{ t('log') }}</button>
+                <button @click="openEditPlayerModal(player)" class="bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 px-2.5 py-1 rounded text-xs">{{ t('edit') }}</button>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="filteredPlayers.length === 0" class="p-8 text-center bg-slate-800/40 rounded-xl border border-slate-750 text-slate-500 text-sm">
+            {{ t('noPlayersMatch') }}
+          </div>
+        </div>
+
+        <div class="hidden md:block bg-slate-800/40 border border-slate-700/80 rounded-xl overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-slate-800/80 text-slate-300 text-xs uppercase tracking-wider">
+              <tr>
+                <th class="p-3">#</th>
+                <th class="p-3">{{ t('player') }}</th>
+                <th class="p-3">{{ t('pos') }}</th>
+                <th class="p-3">{{ t('throwsBats') }}</th>
+                <th class="p-3">{{ t('sprint18m') }}</th>
+                <th class="p-3">{{ t('topExitVelo') }}</th>
+                <th class="p-3">{{ t('throwingVelo') }}</th>
+                <th class="p-3">{{ t('attackAngle') }}</th>
+                <th class="p-3">{{ t('broadJumpRatioHeader') }}</th>
+                <th class="p-3 text-right">{{ t('actions') }}</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800">
+              <tr v-for="player in filteredPlayers" :key="player.id" class="hover:bg-slate-800/40 transition">
+                <td class="p-3 font-mono text-slate-400">{{ player.jersey }}</td>
+                <td class="p-3">
+                  <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-full overflow-hidden flex-shrink-0 bg-slate-700 border border-slate-600 flex items-center justify-center font-bold text-xs text-blue-300">
+                      <img v-if="player.photo_url && !failedImgs[player.id]" 
+                           :src="formatImgUrl(player.photo_url)" 
+                           :alt="player.name" 
+                           class="w-full h-full object-cover" 
+                           referrerpolicy="no-referrer"
+                           @error="markImgFailed(player.id)">
+                      <span v-else>#{{ player.jersey }}</span>
+                    </div>
+                    <div>
+                      <button @click="selectPlayer(player)" class="font-semibold text-white hover:underline text-blue-400 block text-left">
+                        {{ player.name }}
+                      </button>
+                      <span v-if="player.dob" class="text-xs text-slate-400">{{ calculateAge(player.dob) }}</span>
+                    </div>
+                  </div>
+                </td>
+                <td class="p-3">
+                  <div class="flex flex-wrap gap-1">
+                    <span v-for="pos in splitPositions(player.position)" :key="pos" class="px-2 py-0.5 rounded bg-slate-700 text-xs font-medium">
+                      {{ pos }}
+                    </span>
+                  </div>
+                </td>
+                <td class="p-3 font-mono text-slate-300">{{ player.throws }} / {{ player.bats }}</td>
+                <td class="p-3 font-mono text-amber-300 font-semibold">
+                  {{ getLatestMetric(player.id, 'sprint_time') ? getLatestMetric(player.id, 'sprint_time') + 's' : '--' }}
+                </td>
+                <td class="p-3 font-mono">
+                  <span :class="Number(getLatestMetric(player.id, 'exit_velo')) >= 60 ? 'text-amber-400 font-bold' : ''">
+                    {{ getLatestMetric(player.id, 'exit_velo') || '--' }} km/h
                   </span>
-                </div>
-                <span v-else class="text-slate-600">--</span>
-              </td>
-              <td class="p-3 text-right space-x-2 whitespace-nowrap">
-                <template v-if="isCoach">
-                  <button @click="openLogModal(player)" class="bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 px-2.5 py-1 rounded text-xs">+ {{ t('log') }}</button>
-                  <button @click="openEditPlayerModal(player)" class="bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 px-2.5 py-1 rounded text-xs">{{ t('edit') }}</button>
-                  <button @click="removePlayer(player.id)" class="text-rose-400 hover:text-rose-300 text-xs">{{ t('remove') }}</button>
-                </template>
-                <span v-else class="text-xs text-slate-500 italic">{{ t('viewOnly') }}</span>
-              </td>
-            </tr>
-            <tr v-if="players.length === 0">
-              <td colspan="10" class="p-6 text-center text-slate-500">{{ t('noPlayers') }}</td>
-            </tr>
-          </tbody>
-        </table>
+                </td>
+                <td class="p-3 font-mono text-emerald-400 font-semibold">{{ getLatestMetric(player.id, 'throwing_velo') ? getLatestMetric(player.id, 'throwing_velo') + ' km/h' : '--' }}</td>
+                <td class="p-3 font-mono">
+                  <span :class="getAttackAngleColor(getLatestMetric(player.id, 'attack_angle'))">
+                    {{ getLatestMetric(player.id, 'attack_angle') ? getLatestMetric(player.id, 'attack_angle') + '°' : '--' }}
+                  </span>
+                </td>
+                <td class="p-3 font-mono">
+                  <div v-if="getLatestMetric(player.id, 'broad_jump')">
+                    <span>{{ getLatestMetric(player.id, 'broad_jump') }} cm</span>
+                    <span v-if="calculateJumpRatio(player.id)" class="text-xs ml-1 font-bold" :class="getJumpRatioColor(calculateJumpRatio(player.id))">
+                      ({{ calculateJumpRatio(player.id) }}x)
+                    </span>
+                  </div>
+                  <span v-else class="text-slate-600">--</span>
+                </td>
+                <td class="p-3 text-right space-x-2 whitespace-nowrap">
+                  <template v-if="isCoach">
+                    <button @click="openLogModal(player)" class="bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 px-2.5 py-1 rounded text-xs">+ {{ t('log') }}</button>
+                    <button @click="openEditPlayerModal(player)" class="bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 px-2.5 py-1 rounded text-xs">{{ t('edit') }}</button>
+                    <button @click="removePlayer(player.id)" class="text-rose-400 hover:text-rose-300 text-xs">{{ t('remove') }}</button>
+                  </template>
+                  <span v-else class="text-xs text-slate-500 italic">{{ t('viewOnly') }}</span>
+                </td>
+              </tr>
+              <tr v-if="filteredPlayers.length === 0">
+                <td colspan="10" class="p-6 text-center text-slate-500">{{ t('noPlayersMatch') }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
       </div>
 
-      <!-- TAB B: Team Leaderboards & PR Badges -->
       <div v-else-if="overviewTab === 'leaderboard'" class="space-y-6">
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           
-          <!-- Leaderboard Card 1: Exit Velocity -->
           <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
             <h4 class="text-sm font-bold text-blue-400 flex items-center justify-between mb-3">
               <span>⚡ {{ t('topExitVelo') }}</span>
@@ -247,7 +329,6 @@
             </div>
           </div>
 
-          <!-- Leaderboard Card 2: Throwing Velocity -->
           <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
             <h4 class="text-sm font-bold text-emerald-400 flex items-center justify-between mb-3">
               <span>🎯 {{ t('throwingVelo') }}</span>
@@ -270,7 +351,6 @@
             </div>
           </div>
 
-          <!-- Leaderboard Card 3: Broad Jump (Normalized Height Ratio) -->
           <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
             <h4 class="text-sm font-bold text-purple-400 flex items-center justify-between mb-3">
               <span>🚀 {{ t('broadJumpRatioTitle') }}</span>
@@ -293,7 +373,6 @@
             </div>
           </div>
 
-          <!-- Leaderboard Card 4: Home-to-1st Sprint -->
           <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
             <h4 class="text-sm font-bold text-amber-400 flex items-center justify-between mb-3">
               <span>⏱️ {{ t('sprint18m') }}</span>
@@ -321,10 +400,8 @@
 
     </div>
 
-    <!-- VIEW 2: Individual Player View & Report Card -->
     <div v-if="currentView === 'player' && selectedPlayer" class="space-y-6">
       
-      <!-- Top Action Bar (Hidden on Print) -->
       <div class="flex items-center justify-between no-print">
         <button @click="currentView = 'overview'" class="text-sm text-slate-400 hover:text-white">← {{ t('backToOverview') }}</button>
         <div class="flex items-center gap-2">
@@ -342,7 +419,6 @@
         </div>
       </div>
 
-      <!-- Printable Player Report Header Card (Phone Row Completely Removed) -->
       <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 print-card">
         <div class="flex items-center gap-4">
           <div class="w-20 h-20 rounded-2xl overflow-hidden flex-shrink-0 bg-slate-700 border-2 border-slate-600 shadow-md flex items-center justify-center font-bold text-xl text-blue-300">
@@ -385,7 +461,6 @@
         </div>
       </div>
 
-      <!-- Interactive Chart (Hidden on Print) -->
       <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-5 no-print">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-slate-700/60 pb-3">
           <div>
@@ -447,7 +522,6 @@
         </div>
       </div>
 
-      <!-- DATED SESSION HISTORY (COMPACT ACCORDION CARDS ON MOBILE) -->
       <div class="space-y-3">
         <div class="flex items-center justify-between">
           <h3 class="text-lg font-semibold flex items-center gap-2">
@@ -459,14 +533,12 @@
           <span class="text-xs text-slate-500 font-normal no-print hidden sm:inline">All metrics synced to cloud</span>
         </div>
 
-        <!-- 1. MOBILE SMART ACCORDION CARDS (Visible on < 768px screens) -->
         <div class="block md:hidden space-y-2.5">
           <div 
             v-for="session in getPlayerSessions(selectedPlayer.id)" 
             :key="'mob-' + session.id"
             class="bg-slate-850 border border-slate-700/80 rounded-xl overflow-hidden shadow-sm transition">
             
-            <!-- Tier 1: Collapsed Row -->
             <div 
               @click="toggleSessionExpand(session.id)" 
               class="p-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-800/60 transition active:bg-slate-800">
@@ -500,12 +572,10 @@
               </div>
             </div>
 
-            <!-- Tier 2: Expanded Drawer Details -->
             <div 
               v-if="isSessionExpanded(session.id)" 
               class="border-t border-slate-800 bg-slate-900/90 p-4 space-y-3.5 text-xs">
               
-              <!-- Hitting & Exit Speeds -->
               <div class="space-y-1.5">
                 <p class="text-[11px] font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
                   <span>⚡</span> {{ t('stationMetricsHeader') }}
@@ -528,7 +598,6 @@
                 </div>
               </div>
 
-              <!-- Athletic Power & Speed -->
               <div class="space-y-1.5">
                 <p class="text-[11px] font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
                   <span>🚀</span> {{ t('broadJumpRatioTitle') }} &amp; Speed
@@ -560,7 +629,6 @@
                 </div>
               </div>
 
-              <!-- Growth & Physical Baseline -->
               <div class="space-y-1.5">
                 <p class="text-[11px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
                   <span>📏</span> {{ t('growthSectionHeader') }}
@@ -577,7 +645,6 @@
                 </div>
               </div>
 
-              <!-- Actions (Coach Only) -->
               <div v-if="isCoach" class="flex justify-end gap-2 pt-2 border-t border-slate-800">
                 <button 
                   @click="openEditSessionModal(session)" 
@@ -599,7 +666,6 @@
           </div>
         </div>
 
-        <!-- 2. DESKTOP & PRINT MULTI-COLUMN TABLE (Visible on ≥ 768px screens or printing) -->
         <div class="hidden md:block bg-slate-800/40 border border-slate-700/80 rounded-xl overflow-x-auto print-card">
           <table class="w-full text-left text-sm">
             <thead class="bg-slate-800/80 text-slate-300 text-xs uppercase tracking-wider">
@@ -665,7 +731,6 @@
 
     </div>
 
-    <!-- MODAL: Add Player -->
     <div v-if="showAddPlayerModal && isCoach" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 no-print">
       <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-bold">{{ t('addPlayerModalTitle') }}</h3>
@@ -734,7 +799,6 @@
       </div>
     </div>
 
-    <!-- MODAL: Edit Player Profile -->
     <div v-if="showEditPlayerModal && isCoach && editingPlayer" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 no-print">
       <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-bold">{{ t('editPlayerModalTitle') }}</h3>
@@ -754,7 +818,6 @@
             </div>
           </div>
 
-          <!-- Photo Upload & Compression Block -->
           <div class="p-3 bg-slate-900/60 border border-slate-700/80 rounded-lg space-y-2">
             <label class="block text-slate-300 text-xs font-semibold">{{ t('profilePhoto') }}</label>
             
@@ -823,7 +886,6 @@
       </div>
     </div>
 
-    <!-- MODAL: Log Station Data -->
     <div v-if="showLogModal && activePlayerForLog && isCoach" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 no-print">
       <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-bold">{{ t('logSessionTitle') }}: {{ activePlayerForLog.name }}</h3>
@@ -834,7 +896,6 @@
             <input v-model="newSession.session_date" type="date" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
           </div>
 
-          <!-- Growth & Power Section -->
           <div class="p-3 bg-slate-900/60 border border-slate-700/60 rounded-lg space-y-2">
             <p class="text-xs font-semibold text-blue-400 uppercase tracking-wider">{{ t('growthSectionHeader') }}</p>
             <div class="grid grid-cols-3 gap-2">
@@ -853,7 +914,6 @@
             </div>
           </div>
 
-          <!-- Station Metrics Section with Unit Switcher -->
           <div class="p-3 bg-slate-900/60 border border-slate-700/60 rounded-lg space-y-2">
             <div class="flex items-center justify-between">
               <p class="text-xs font-semibold text-emerald-400 uppercase tracking-wider">{{ t('stationMetricsHeader') }}</p>
@@ -928,7 +988,6 @@
       </div>
     </div>
 
-    <!-- MODAL: Edit Session Modal -->
     <div v-if="showEditSessionModal && isCoach && editingSession" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 no-print">
       <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-bold">{{ t('editSessionModalTitle') }}</h3>
@@ -939,7 +998,6 @@
             <input v-model="editingSession.session_date" type="date" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
           </div>
 
-          <!-- Growth & Power -->
           <div class="p-3 bg-slate-900/60 border border-slate-700/60 rounded-lg space-y-2">
             <p class="text-xs font-semibold text-blue-400 uppercase tracking-wider">{{ t('growthSectionHeader') }}</p>
             <div class="grid grid-cols-3 gap-2">
@@ -958,7 +1016,6 @@
             </div>
           </div>
 
-          <!-- Station Metrics -->
           <div class="p-3 bg-slate-900/60 border border-slate-700/60 rounded-lg space-y-2">
             <div class="flex items-center justify-between">
               <p class="text-xs font-semibold text-emerald-400 uppercase tracking-wider">{{ t('stationMetricsHeader') }}</p>
@@ -1088,6 +1145,8 @@
         remove: 'Remove',
         viewOnly: 'View only',
         noPlayers: 'No players saved in database. Tap "+ Add Player" to begin.',
+        noPlayersMatch: 'No players match your search.',
+        searchPlaceholder: 'Search name or jersey #...',
         backToOverview: 'Back to Overview',
         logNewSession: 'Log New Session',
         throws: 'Throws',
@@ -1142,7 +1201,9 @@
         deleteSessionConfirm: 'Are you sure you want to delete this session record permanently?',
         rosterList: 'Roster Table',
         leaderboardTab: 'Leaderboard & PRs',
-        printReportBtn: 'Print / PDF Report'
+        printReportBtn: 'Print / PDF Report',
+        exportCSV: 'Export Roster CSV',
+        importCSV: 'Import CSV Roster'
       },
       zh: {
         appTitle: 'SWALLOWS DATALAB',
@@ -1190,6 +1251,8 @@
         remove: '刪除',
         viewOnly: '僅供檢視',
         noPlayers: '雲端數據庫中暫無球員資料。請點擊「新增球員」。',
+        noPlayersMatch: '沒有找到符合搜尋條件的球員。',
+        searchPlaceholder: '搜尋球員姓名或球衣號碼...',
         backToOverview: '返回球隊總覽',
         logNewSession: '記錄新訓練數據',
         throws: '投球手',
@@ -1244,7 +1307,9 @@
         deleteSessionConfirm: '確認要永久刪除這條測試記錄嗎？',
         rosterList: '球員名冊總覽',
         leaderboardTab: '全隊龍虎榜 (PRs)',
-        printReportBtn: '列印 / 匯出 PDF 成績單'
+        printReportBtn: '列印 / 匯出 PDF 成績單',
+        exportCSV: '匯出球隊名冊 CSV',
+        importCSV: '批次匯入名冊 CSV'
       },
       ja: {
         appTitle: 'SWALLOWS DATALAB',
@@ -1292,6 +1357,8 @@
         remove: '削除',
         viewOnly: '閲覧のみ',
         noPlayers: '登録選手がいません。「選手追加」から登録してください。',
+        noPlayersMatch: '一致する選手がいません。',
+        searchPlaceholder: '名前または背番号で検索...',
         backToOverview: 'チーム概要へ戻る',
         logNewSession: '新規セッション記録',
         throws: '投',
@@ -1346,18 +1413,30 @@
         deleteSessionConfirm: 'このセッションデータを完全に削除してもよろしいですか？',
         rosterList: '選手名簿',
         leaderboardTab: 'チームランキング (PRs)',
-        printReportBtn: '印刷 / PDF 出力'
+        printReportBtn: '印刷 / PDF 出力',
+        exportCSV: '名簿をCSV出力',
+        importCSV: 'CSVから一括登録'
       }
     };
 
     createApp({
       setup() {
-        const currentLang = ref(localStorage.getItem('swallows_lang') || 'en');
+        // Automatic OS Language Detection with fallback to English
+        const getInitialLanguage = () => {
+          const saved = localStorage.getItem('swallows_lang');
+          if (saved && translations[saved]) return saved;
+          const navLang = navigator.language || navigator.userLanguage || 'en';
+          const shortLang = navLang.substring(0, 2).toLowerCase();
+          return translations[shortLang] ? shortLang : 'en';
+        };
+
+        const currentLang = ref(getInitialLanguage());
         const t = (key) => translations[currentLang.value]?.[key] || translations['en'][key] || key;
 
         let chartInstance = null;
         const chartMode = ref('velocity');
         const overviewTab = ref('roster');
+        const searchQuery = ref('');
         const hasChartData = ref(false);
         const isUploadingPhoto = ref(false);
 
@@ -1615,7 +1694,6 @@
           showAddPlayerModal.value = true;
         };
 
-        // Stripped parent_phone from query to protect privacy
         const fetchAllData = async () => {
           loading.value = true;
           try {
@@ -1852,6 +1930,122 @@
           }
         };
 
+        // COACH-ONLY: Export Roster CSV
+        const exportTeamCSV = () => {
+          if (!isCoach.value) return;
+          if (players.value.length === 0) {
+            alert('No players to export.');
+            return;
+          }
+
+          let csvContent = 'data:text/csv;charset=utf-8,\uFEFF';
+          csvContent += 'Jersey,Name,Age,Position,Throws,Bats,Height(cm),Weight(kg),Exit Velo(kmh),Throwing Velo(kmh),Broad Jump(cm),Sprint(s)\r\n';
+
+          players.value.forEach(p => {
+            const age = calculateAge(p.dob);
+            const height = getLatestMetric(p.id, 'height_cm') || '';
+            const weight = getLatestMetric(p.id, 'weight_kg') || '';
+            const exitVelo = getLatestMetric(p.id, 'exit_velo') || '';
+            const throwingVelo = getLatestMetric(p.id, 'throwing_velo') || '';
+            const jump = getLatestMetric(p.id, 'broad_jump') || '';
+            const sprint = getLatestMetric(p.id, 'sprint_time') || '';
+
+            const row = [
+              p.jersey,
+              `"${p.name}"`,
+              `"${age}"`,
+              `"${p.position || ''}"`,
+              p.throws || '',
+              p.bats || '',
+              height,
+              weight,
+              exitVelo,
+              throwingVelo,
+              jump,
+              sprint
+            ];
+            csvContent += row.join(',') + '\r\n';
+          });
+
+          const encodedUri = encodeURI(csvContent);
+          const link = document.createElement('a');
+          link.setAttribute('href', encodedUri);
+          link.setAttribute('download', `Swallows_Team_Report_${new Date().toISOString().slice(0, 10)}.csv`);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        };
+
+        // COACH-ONLY: Batch Import Roster CSV
+        const importTeamCSV = async (event) => {
+          if (!isCoach.value) return;
+          const file = event.target.files[0];
+          if (!file) return;
+
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            const text = e.target.result;
+            const lines = text.split(/\r\n|\n/);
+            
+            if (lines.length < 2) {
+              alert('The CSV file appears empty or formatted incorrectly.');
+              return;
+            }
+
+            let updatedCount = 0;
+            let addedCount = 0;
+
+            for (let i = 1; i < lines.length; i++) {
+              const line = lines[i].trim();
+              if (!line) continue;
+
+              const cols = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || line.split(',');
+              if (cols.length < 2) continue;
+
+              const jersey = Number(cols[0].replace(/['"]+/g, '').trim());
+              const name = cols[1] ? cols[1].replace(/['"]+/g, '').trim() : '';
+              const position = cols[3] ? cols[3].replace(/['"]+/g, '').trim() : 'IF';
+              const throws = cols[4] ? cols[4].replace(/['"]+/g, '').trim() : 'R';
+              const bats = cols[5] ? cols[5].replace(/['"]+/g, '').trim() : 'R';
+
+              if (!jersey || !name) continue;
+
+              const existing = players.value.find(p => p.jersey === jersey);
+
+              if (existing) {
+                const { error } = await supabaseClient
+                  .from('players')
+                  .update({ name, position, throws, bats })
+                  .eq('id', existing.id);
+
+                if (!error) {
+                  existing.name = name;
+                  existing.position = position;
+                  existing.throws = throws;
+                  existing.bats = bats;
+                  updatedCount++;
+                }
+              } else {
+                const newPlayerPayload = { jersey, name, position, throws, bats };
+                const { data, error } = await supabaseClient
+                  .from('players')
+                  .insert([newPlayerPayload])
+                  .select('id, name, jersey, position, throws, bats, bat_spec, dob, photo_url');
+
+                if (!error && data) {
+                  players.value.push(data[0]);
+                  addedCount++;
+                }
+              }
+            }
+
+            players.value.sort((a, b) => a.jersey - b.jersey);
+            alert(`Import Complete!\n• Updated: ${updatedCount} players\n• Added: ${addedCount} new players`);
+            event.target.value = '';
+          };
+          reader.readAsText(file);
+        };
+
         const getPlayerSessions = (playerId) => {
           return sessions.value.filter(s => s.player_id === playerId);
         };
@@ -1950,24 +2144,34 @@
           return `${h ? h + 'cm' : '--'} / ${w ? w + 'kg' : '--'}`;
         };
 
-   const calculateAge = (dob) => {
-  if (!dob) return '';
-  const birth = new Date(dob);
-  const now = new Date();
+        const calculateAge = (dob) => {
+          if (!dob) return '';
+          const birth = new Date(dob);
+          const now = new Date();
 
-  let years = now.getFullYear() - birth.getFullYear();
-  let months = now.getMonth() - birth.getMonth();
+          let years = now.getFullYear() - birth.getFullYear();
+          let months = now.getMonth() - birth.getMonth();
 
-  if (months < 0 || (months === 0 && now.getDate() < birth.getDate())) {
-    years--;
-    months += 12;
-  }
-  if (now.getDate() < birth.getDate()) {
-    months = Math.max(0, months - 1);
-  }
+          if (months < 0 || (months === 0 && now.getDate() < birth.getDate())) {
+            years--;
+            months += 12;
+          }
+          if (now.getDate() < birth.getDate()) {
+            months = Math.max(0, months - 1);
+          }
 
-  return `${years}y ${months}m`;
-};
+          return `${years}y ${months}m`;
+        };
+
+        const filteredPlayers = computed(() => {
+          if (!searchQuery.value.trim()) return players.value;
+          const q = searchQuery.value.toLowerCase().trim();
+          return players.value.filter(p => {
+            const nameMatch = p.name && p.name.toLowerCase().includes(q);
+            const jerseyMatch = p.jersey && String(p.jersey).includes(q);
+            return nameMatch || jerseyMatch;
+          });
+        });
 
         const getClubCount = (threshold) => {
           return players.value.filter(p => {
@@ -2204,7 +2408,8 @@
 
         return {
           currentLang, t, saveLanguage,
-          loading, currentView, overviewTab, showAddPlayerModal, showEditPlayerModal, showLogModal, showEditSessionModal,
+          loading, currentView, overviewTab, searchQuery, filteredPlayers,
+          showAddPlayerModal, showEditPlayerModal, showLogModal, showEditSessionModal,
           selectedPlayer, editingPlayer, activePlayerForLog, editingSession,
           selectedAddPositions, selectedEditPositions,
           toggleAddPosition, toggleEditPosition, openAddPlayerModal, splitPositions,
@@ -2213,6 +2418,7 @@
           expandedSessionIds, toggleSessionExpand, isSessionExpanded,
           failedImgs, markImgFailed, formatImgUrl, handleFileUpload, isUploadingPhoto,
           logSpeedUnit, editSpeedUnit, toggleSpeedUnit, triggerPrintReport, 
+          exportTeamCSV, importTeamCSV,
           getTopMetrics, getTopJumpRatios, calculateJumpRatio, getSessionJumpRatio, getJumpRatioColor,
           isCoach, unlockCoachMode, lockCoachMode,
           addPlayer, openEditPlayerModal, updatePlayer, removePlayer, selectPlayer, 
