@@ -1381,16 +1381,17 @@
       <!-- Stage & HUD (Adaptive for 9:16 Vertical and 16:9 Landscape) -->
       <div class="relative w-full max-w-5xl h-[65vh] sm:h-[72vh] bg-neutral-950 rounded-2xl overflow-hidden shadow-2xl flex items-center justify-center border border-white/10">
         <div class="relative max-w-full max-h-full flex items-center justify-center">
-          <video 
-            ref="analyzerVideoRef" 
-            :src="activeAnalyzerVideo.video_url" 
-            class="max-w-full max-h-[65vh] sm:max-h-[72vh] object-contain pointer-events-none rounded-lg block"
-            crossorigin="anonymous"
-            playsinline 
-            webkit-playsinline
-            @loadedmetadata="onAnalyzerVideoLoaded"
-            @timeupdate="onAnalyzerTimeUpdate">
-          </video>
+         <video 
+  ref="analyzerVideoRef" 
+  :src="activeAnalyzerVideo.video_url" 
+  class="max-w-full max-h-[65vh] sm:max-h-[72vh] object-contain pointer-events-none rounded-lg block"
+  crossorigin="anonymous"
+  playsinline 
+  webkit-playsinline
+  muted
+  @loadedmetadata="onAnalyzerVideoLoaded"
+  @timeupdate="onAnalyzerTimeUpdate">
+</video>
           <canvas ref="analyzerCanvasRef" class="absolute inset-0 w-full h-full pointer-events-none z-10"></canvas>
         </div>
 
