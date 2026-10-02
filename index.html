@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>SWALLOWS DATALAB</title>
   <link rel="icon" type="image/png" href="./logo.png">
   <script src="https://cdn.tailwindcss.com"></script>
@@ -41,6 +41,13 @@
   </script>
   <style>
     [v-cloak] { display: none !important; }
+    /* Eliminates double-tap zoom & text selection on transport buttons */
+    button, input, select, [role="button"], .touch-manipulation {
+      touch-action: manipulation;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
     input[type=range]::-webkit-slider-thumb {
       -webkit-appearance: none;
       height: 16px;
@@ -1404,80 +1411,64 @@
           <canvas ref="analyzerCanvasRef" class="absolute inset-0 w-full h-full pointer-events-none z-10"></canvas>
         </div>
 
-        <!-- Left HUD Cards -->
-        <div class="absolute left-3 top-3 bottom-3 flex flex-col justify-start gap-2.5 z-20 pointer-events-none">
-          <!-- Card 1: Velocity -->
-          <div class="bg-white/85 dark:bg-slate-900/80 backdrop-blur-md border border-white/50 dark:border-slate-700/60 rounded-xl p-3 w-36 sm:w-44 shadow-lg text-slate-900 dark:text-white">
-            <div class="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">
-              {{ activeAnalyzerVideo.category === 'pitching' ? t('hudSpeedPitching') : t('hudSpeedBatting') }}
+        <!-- MINIMALIST FLOATING HUD (UNBLOCKS MOBILE CANVAS) -->
+        <div class="absolute left-2 sm:left-4 top-2 sm:top-4 z-30 flex flex-col items-start gap-2 select-none pointer-events-auto">
+          <!-- Main Floating Pill -->
+          <div @click="isHudExpanded = !isHudExpanded"
+               class="bg-slate-950/85 hover:bg-slate-900/90 active:scale-95 backdrop-blur-md border border-white/20 hover:border-amber-400/60 shadow-xl rounded-full px-3 py-1.5 flex items-center gap-2.5 cursor-pointer transition-all touch-manipulation">
+            <!-- Velocity -->
+            <div class="flex items-center gap-1 font-mono">
+              <span class="text-xs text-amber-400">⚡</span>
+              <span class="text-xs sm:text-sm font-black text-white">{{ currentCalculatedSpeed }}</span>
+              <span class="text-[9px] sm:text-[10px] text-slate-400">km/h</span>
             </div>
-            <div class="text-2xl sm:text-3xl font-black mt-0.5 tracking-tight font-mono text-emerald-500 dark:text-emerald-400">
-              {{ currentCalculatedSpeed }} <span class="text-xs font-normal text-slate-500">km/h</span>
+            <span class="text-slate-600 text-xs">|</span>
+            <!-- Arm Slot / Attack Angle -->
+            <div class="flex items-center gap-1 font-mono">
+              <span class="text-xs text-cyan-400">🎯</span>
+              <span class="text-xs sm:text-sm font-bold text-cyan-300">{{ currentTrajectoryAngle }}°</span>
             </div>
-          </div>
-
-          <!-- Card 2: Arm Slot / Attack Angle -->
-          <div class="bg-white/85 dark:bg-slate-900/80 backdrop-blur-md border border-white/50 dark:border-slate-700/60 rounded-xl p-3 w-36 sm:w-44 shadow-lg text-slate-900 dark:text-white">
-            <div class="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">
-              {{ activeAnalyzerVideo.category === 'pitching' ? t('hudAnglePitching') : t('hudAngleBatting') }}
-            </div>
-            <div class="text-2xl sm:text-3xl font-black mt-0.5 tracking-tight font-mono text-cyan-500 dark:text-cyan-400">
-              {{ currentTrajectoryAngle }}<span class="text-sm font-semibold">°</span>
-            </div>
-          </div>
-
-          <!-- Card 3: Lead Leg Block -->
-          <div class="bg-white/85 dark:bg-slate-900/80 backdrop-blur-md border border-white/50 dark:border-slate-700/60 rounded-xl p-3 w-36 sm:w-44 shadow-lg text-slate-900 dark:text-white">
-            <div class="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">
-              {{ activeAnalyzerVideo.category === 'pitching' ? t('hudKneePitching') : t('hudKneeBatting') }}
-            </div>
-            <div class="text-xl sm:text-2xl font-black mt-0.5 font-mono" :class="leadKneeAngle >= 140 ? 'text-emerald-500' : 'text-amber-400'">
-              {{ leadKneeAngle }}° 
-              <span class="text-[10px] font-semibold block sm:inline px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                {{ leadKneeAngle >= 140 ? t('hudSolid') : t('hudSoft') }}
+            <span class="text-slate-600 text-xs">|</span>
+            <!-- Knee Block -->
+            <div class="flex items-center gap-1 font-mono">
+              <span class="text-xs">🦵</span>
+              <span class="text-xs sm:text-sm font-bold" :class="leadKneeAngle >= 140 ? 'text-emerald-400' : 'text-amber-400'">
+                {{ leadKneeAngle }}°
               </span>
             </div>
+            <span class="text-[10px] text-slate-400 pl-0.5">
+              {{ isHudExpanded ? '▲' : '▼' }}
+            </span>
           </div>
 
-          <!-- Card 4: Postural Stability & Cocking Angle -->
-          <div class="bg-black/60 backdrop-blur-sm border border-white/10 rounded-lg p-2.5 w-36 sm:w-44 text-[10px] font-mono text-slate-300 leading-tight space-y-1">
-            <div class="flex items-center justify-between">
-              <span>{{ t('hudHeadDrift') }}:</span>
-              <span :class="Math.abs(headDriftPx) > 35 ? 'text-rose-400 font-bold' : 'text-emerald-400 font-semibold'">{{ headDriftPx }}px</span>
+          <!-- Expandable Secondary Card (Only opens on tap) -->
+          <div v-if="isHudExpanded" 
+               class="bg-slate-950/95 backdrop-blur-xl border border-white/20 rounded-2xl p-3 shadow-2xl w-60 sm:w-64 text-xs font-mono space-y-2 animate-in fade-in zoom-in-95 duration-150">
+            <div class="flex items-center justify-between pb-1.5 border-b border-slate-800 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+              <span>Diagnostics</span>
+              <span class="text-amber-400">Frame {{ currentFrameIndex }}</span>
             </div>
-            <div v-if="activeAnalyzerVideo.category === 'pitching'" class="flex items-center justify-between pt-0.5 border-t border-white/10">
-              <span>{{ t('hudElbowFlexion') }}:</span>
-              <span class="text-cyan-400 font-bold">{{ elbowFlexionAngle }}°</span>
-            </div>
-          </div>
-        </div>
 
-        <!-- Right HUD Cards -->
-        <div class="absolute right-3 top-3 bottom-3 flex flex-col justify-between items-end z-20 pointer-events-none">
-          <!-- Card 5: Angular Orientation (Tilt) -->
-          <div class="bg-white/85 dark:bg-slate-900/80 backdrop-blur-md border border-white/50 dark:border-slate-700/60 rounded-xl p-3 w-36 sm:w-44 shadow-lg text-slate-900 dark:text-white flex flex-col items-center">
-            <div class="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider self-start">
-              {{ activeAnalyzerVideo.category === 'pitching' ? t('hudTiltPitching') : t('hudTiltBatting') }}
+            <div class="grid grid-cols-2 gap-1.5 text-[11px]">
+              <div class="bg-slate-900/80 p-2 rounded-lg border border-slate-800">
+                <span class="text-[10px] text-slate-400 block">{{ t('hudHeadDrift') }}</span>
+                <span class="font-bold text-sm" :class="Math.abs(headDriftPx) > 35 ? 'text-rose-400' : 'text-emerald-400'">
+                  {{ headDriftPx > 0 ? '+' : '' }}{{ headDriftPx }}px
+                </span>
+              </div>
+              <div class="bg-slate-900/80 p-2 rounded-lg border border-slate-800">
+                <span class="text-[10px] text-slate-400 block">{{ t('hudTiltPitching') }}</span>
+                <span class="font-bold text-sm text-cyan-300">{{ trunkTiltAngle }}°</span>
+              </div>
+              <div v-if="activeAnalyzerVideo.category === 'pitching'" class="col-span-2 bg-slate-900/80 p-2 rounded-lg border border-slate-800 flex items-center justify-between">
+                <span class="text-[10px] text-slate-400">{{ t('hudElbowFlexion') }}:</span>
+                <span class="font-bold text-sm text-cyan-400">{{ elbowFlexionAngle }}°</span>
+              </div>
+              <div class="col-span-2 flex items-center justify-between px-1 text-[10px] text-slate-400">
+                <span>Time:</span>
+                <span class="text-slate-200 font-semibold">{{ currentPlaybackTime.toFixed(2) }}s / {{ videoDuration.toFixed(2) }}s</span>
+              </div>
             </div>
-            <div class="relative w-24 h-12 mt-2 flex items-end justify-center">
-              <svg class="w-full h-full overflow-visible" viewBox="0 0 100 50">
-                <line x1="10" y1="45" x2="90" y2="45" stroke="#64748b" stroke-width="2" stroke-dasharray="3,3" />
-                <line x1="50" y1="45" 
-                      :x2="50 + 40 * Math.sin((trunkTiltAngle || 0) * Math.PI / 180)" 
-                      :y2="45 - 40 * Math.cos((trunkTiltAngle || 0) * Math.PI / 180)" 
-                      stroke="#0284c7" stroke-width="3.5" stroke-linecap="round" />
-              </svg>
-            </div>
-            <span class="text-xs font-mono text-cyan-500 font-bold mt-1">{{ trunkTiltAngle }}°</span>
-          </div>
-
-          <!-- Card 6: Playback Time / Frame Counter -->
-          <div class="bg-white/85 dark:bg-slate-900/80 backdrop-blur-md border border-white/50 dark:border-slate-700/60 rounded-xl p-3 w-36 sm:w-44 shadow-lg text-slate-900 dark:text-white">
-            <div class="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">{{ t('hudTimeFrame') }}</div>
-            <div class="text-2xl sm:text-3xl font-black mt-0.5 font-mono text-slate-800 dark:text-slate-100">
-              {{ currentPlaybackTime.toFixed(2) }}<span class="text-xs font-normal text-slate-400">s</span>
-            </div>
-            <div class="text-[10px] text-slate-500 font-mono mt-0.5">Frame {{ currentFrameIndex }} / {{ totalFramesEstimate }}</div>
           </div>
         </div>
       </div>
@@ -1502,34 +1493,53 @@
         </div>
       </div>
 
-      <!-- Scrubber & Controls -->
-      <div class="w-full max-w-5xl bg-slate-900/90 border border-slate-800 rounded-xl p-3 mt-2 flex flex-col gap-2 z-20">
-        <div class="flex items-center gap-3">
+      <!-- Scrubber & Controls (44px Mobile Touch Targets) -->
+      <div class="w-full max-w-5xl bg-slate-900/95 border border-slate-800 rounded-2xl p-2.5 sm:p-3 mt-1.5 flex flex-col gap-2 z-20 shadow-2xl">
+        <div class="flex items-center gap-2 sm:gap-3 px-1">
           <input type="range" min="0" :max="videoDuration" step="0.00416"
                  v-model.number="currentPlaybackTime" @input="onSeekSlider"
-                 class="w-full accent-amber-500 h-2 bg-slate-700 rounded-lg cursor-pointer">
+                 class="flex-1 accent-amber-500 h-2.5 sm:h-2 bg-slate-700 rounded-lg cursor-pointer touch-manipulation">
+          <span class="text-[11px] sm:text-xs font-mono text-slate-400 whitespace-nowrap min-w-[70px] text-right">
+            {{ currentPlaybackTime.toFixed(2) }}s <span class="text-slate-500">|</span> f{{ currentFrameIndex }}
+          </span>
         </div>
-        <div class="flex flex-wrap items-center justify-between gap-2 text-white">
-          <div class="flex items-center gap-1.5">
-            <button @click="stepFrames(-5)" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded text-xs font-mono">-5f</button>
-            <button @click="stepFrames(-1)" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded text-xs font-mono font-bold">❮ Frame</button>
-            <button @click="togglePlayPause" class="px-4 py-1 bg-amber-500 hover:bg-amber-600 text-black font-bold rounded text-xs">
-              {{ isPlaying ? 'PAUSE' : 'PLAY' }}
-            </button>
-            <button @click="stepFrames(1)" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded text-xs font-mono font-bold">Frame ❯</button>
-            <button @click="stepFrames(5)" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded text-xs font-mono">+5f</button>
-          </div>
+
+        <div class="flex items-center justify-between gap-1 sm:gap-2">
+          <button @click="stepFrames(-5)" 
+                  class="h-11 sm:h-9 px-2.5 sm:px-3 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 active:scale-95 text-slate-300 rounded-xl text-xs font-mono font-semibold transition touch-manipulation flex items-center justify-center border border-slate-700/60">
+            -5f
+          </button>
+          <button @click="stepFrames(-1)" 
+                  class="h-11 sm:h-9 flex-1 max-w-[120px] px-3 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 active:scale-95 text-white rounded-xl text-xs font-mono font-bold transition touch-manipulation flex items-center justify-center gap-1 border border-slate-700/80 shadow">
+            <span class="text-sm">❮</span> <span>Frame</span>
+          </button>
+          <button @click="togglePlayPause" 
+                  class="h-11 sm:h-9 flex-1 max-w-[140px] px-4 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 active:scale-95 text-black font-black rounded-xl text-xs sm:text-sm tracking-wide transition touch-manipulation flex items-center justify-center gap-1.5 shadow-lg shadow-amber-500/20">
+            <span>{{ isPlaying ? '❚❚' : '▶' }}</span>
+            <span>{{ isPlaying ? 'PAUSE' : 'PLAY' }}</span>
+          </button>
+          <button @click="stepFrames(1)" 
+                  class="h-11 sm:h-9 flex-1 max-w-[120px] px-3 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 active:scale-95 text-white rounded-xl text-xs font-mono font-bold transition touch-manipulation flex items-center justify-center gap-1 border border-slate-700/80 shadow">
+            <span>Frame</span> <span class="text-sm">❯</span>
+          </button>
+          <button @click="stepFrames(5)" 
+                  class="h-11 sm:h-9 px-2.5 sm:px-3 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 active:scale-95 text-slate-300 rounded-xl text-xs font-mono font-semibold transition touch-manipulation flex items-center justify-center border border-slate-700/60">
+            +5f
+          </button>
+        </div>
+
+        <div class="flex items-center justify-between gap-1 pt-1 border-t border-slate-800/80 text-white">
           <div class="flex items-center gap-1">
             <button v-for="rate in [0.1, 0.25, 0.5, 1.0]" :key="rate" @click="setPlaybackRate(rate)"
-                    :class="playbackRate === rate ? 'bg-amber-500 text-black font-bold' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'"
-                    class="px-2.5 py-1 rounded text-xs font-mono">
+                    :class="playbackRate === rate ? 'bg-amber-500 text-black font-bold' : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700'"
+                    class="h-8 px-2 sm:px-2.5 rounded-lg text-xs font-mono transition touch-manipulation active:scale-95">
               {{ rate }}x
             </button>
           </div>
           <button @click="toggleOverlay" 
-                  :class="showOverlay ? 'bg-cyan-600 text-white font-semibold' : 'bg-slate-800 text-slate-400'"
-                  class="px-3 py-1 rounded text-xs transition-colors">
-            {{ showOverlay ? '✓ AR HUD ON' : '○ AR HUD OFF' }}
+                  :class="showOverlay ? 'bg-cyan-600 hover:bg-cyan-500 text-white font-semibold' : 'bg-slate-800 text-slate-400'"
+                  class="h-8 px-3 rounded-lg text-xs transition touch-manipulation active:scale-95 flex items-center gap-1">
+            <span>{{ showOverlay ? '✓ AR HUD' : '○ AR HUD' }}</span>
           </button>
         </div>
       </div>
@@ -2883,6 +2893,7 @@
         const playbackRate = ref(0.25);
         const showOverlay = ref(true);
         const isTrackerLocked = ref(false);
+        const isHudExpanded = ref(false);
 
         const currentCalculatedSpeed = ref(19.9);
         const currentTrajectoryAngle = ref(16.1);
@@ -4026,7 +4037,7 @@
           getClubCount, avgBatSpeed, safetyAlertCount, getAttackAngleColor,
           // Stage 2 Exports
           activeAnalyzerVideo, analyzerVideoRef, analyzerCanvasRef,
-          isPlaying, playbackRate, showOverlay, isTrackerLocked,
+          isPlaying, playbackRate, showOverlay, isTrackerLocked, isHudExpanded,
           currentCalculatedSpeed, currentTrajectoryAngle, leadKneeAngle, headDriftPx,
           videoDuration, currentPlaybackTime, currentFrameIndex, totalFramesEstimate,
           openAnalyzer, closeAnalyzer, onAnalyzerVideoLoaded, togglePlayPause,

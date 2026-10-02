@@ -1,11 +1,12 @@
 /**
  * pitchAnchorDetector.js
- * Identifies the 4 primary kinematic anchor frames across MediaPipe landmark history.
+ * Automatically detects the 4 primary kinematic anchor frames across the full pitch.
  */
 
 export function detectPitchAnchors(framesData, armSide = 'RHP') {
-  if (!framesData || framesData.length < 15) return null;
+  if (!framesData || framesData.length < 20) return null;
 
+  const totalFrames = framesData.length;
   const leadKneeIdx = armSide === 'RHP' ? 25 : 26;
   const leadAnkleIdx = armSide === 'RHP' ? 27 : 28;
   const leadHeelIdx = armSide === 'RHP' ? 29 : 30;
@@ -13,12 +14,12 @@ export function detectPitchAnchors(framesData, armSide = 'RHP') {
   const throwElbowIdx = armSide === 'RHP' ? 14 : 13;
   const throwShoulderIdx = armSide === 'RHP' ? 12 : 11;
 
-  // 1. Peak Leg Lift: Highest point (lowest Y) of lead knee
+  // 1. Peak Leg Lift: Highest elevation (minimum Y value) of lead knee across the first 75% of the clip
   let peakLiftFrame = 0;
   let minY = 999;
-  const searchLiftWindow = Math.min(framesData.length, 60);
+  const maxLiftSearch = Math.floor(totalFrames * 0.75);
 
-  for (let f = 0; f < searchLiftWindow; f++) {
+  for (let f = 0; f < maxLiftSearch; f++) {
     const knee = framesData[f]?.landmarks?.[leadKneeIdx];
     if (knee && knee.y < minY) {
       minY = knee.y;
@@ -26,58 +27,51 @@ export function detectPitchAnchors(framesData, armSide = 'RHP') {
     }
   }
 
-  // 2. Foot Contact (FC): Instant lead heel/ankle decelerates to near-zero downward velocity
-  let footContactFrame = peakLiftFrame + 10;
-  let maxFootDecel = 0;
-
-  for (let f = peakLiftFrame + 5; f < framesData.length - 10; f++) {
-    const cur = framesData[f]?.landmarks?.[leadHeelIdx] || framesData[f]?.landmarks?.[leadAnkleIdx];
-    const nxt = framesData[f + 1]?.landmarks?.[leadHeelIdx] || framesData[f + 1]?.landmarks?.[leadAnkleIdx];
-    const prv = framesData[f - 1]?.landmarks?.[leadHeelIdx] || framesData[f - 1]?.landmarks?.[leadAnkleIdx];
-
-    if (cur && nxt && prv) {
-      const vPrev = Math.abs(cur.y - prv.y);
-      const vNext = Math.abs(nxt.y - cur.y);
-      const decel = vPrev - vNext; // sharp deceleration at impact
-      if (decel > maxFootDecel && cur.y > 0.6) { // ground half of screen
-        maxFootDecel = decel;
-        footContactFrame = f;
-      }
-    }
-  }
-
-  // 3. Ball Release (BR): Peak linear wrist velocity in the throwing direction ahead of shoulder
-  let releaseFrame = footContactFrame + 8;
+  // 2. Ball Release (BR): Locate the global maximum wrist linear velocity AFTER peak lift
+  // (Ball release is the most distinct kinematic event in the entire clip)
+  let releaseFrame = peakLiftFrame + 10;
   let maxWristVelocity = -1;
 
-  for (let f = footContactFrame; f < Math.min(framesData.length - 1, footContactFrame + 45); f++) {
+  for (let f = peakLiftFrame; f < totalFrames - 1; f++) {
     const w1 = framesData[f]?.landmarks?.[throwWristIdx];
     const w2 = framesData[f + 1]?.landmarks?.[throwWristIdx];
     const s = framesData[f]?.landmarks?.[throwShoulderIdx];
 
     if (w1 && w2 && s) {
       const v = Math.hypot(w2.x - w1.x, w2.y - w1.y);
-      // Gated: hand must be past the shoulder line toward the target
-      const isPastShoulder = armSide === 'RHP' ? (w1.x > s.x) : (w1.x < s.x);
-      if (v > maxWristVelocity && isPastShoulder) {
+      // Hand must be past or level with shoulder towards the plate
+      const isForward = armSide === 'RHP' ? (w1.x > s.x - 0.05) : (w1.x < s.x + 0.05);
+      if (v > maxWristVelocity && isForward) {
         maxWristVelocity = v;
         releaseFrame = f;
       }
     }
   }
 
-  // 4. Max External Rotation (MER): Peak forearm layback between FC and Release
+  // 3. Foot Contact (FC): Occurs BETWEEN Peak Lift and Ball Release
+  // Lead heel / ankle reaches lowest point and decelerates to stationary ground impact
+  let footContactFrame = Math.floor((peakLiftFrame + releaseFrame) / 2);
+  let maxFootY = -1;
+
+  for (let f = peakLiftFrame; f < releaseFrame; f++) {
+    const heel = framesData[f]?.landmarks?.[leadHeelIdx] || framesData[f]?.landmarks?.[leadAnkleIdx];
+    if (heel && heel.y > maxFootY) {
+      maxFootY = heel.y;
+      footContactFrame = f;
+    }
+  }
+
+  // 4. Max External Rotation (MER): Peak layback (wrist lowest/deepest behind elbow) between FC and Release
   let merFrame = Math.max(footContactFrame + 1, releaseFrame - 4);
-  let maxLaybackOffset = -999;
+  let maxLayback = -999;
 
   for (let f = footContactFrame; f <= releaseFrame; f++) {
     const w = framesData[f]?.landmarks?.[throwWristIdx];
     const e = framesData[f]?.landmarks?.[throwElbowIdx];
     if (w && e) {
-      // Layback in side open-view drops wrist down/back relative to elbow
-      const laybackMetric = (w.y - e.y);
-      if (laybackMetric > maxLaybackOffset) {
-        maxLaybackOffset = laybackMetric;
+      const layback = w.y - e.y;
+      if (layback > maxLayback) {
+        maxLayback = layback;
         merFrame = f;
       }
     }
