@@ -4,6 +4,7 @@
  */
 
 import { supabaseClient } from './config.js';
+import { isValidJersey, sameJersey } from '../utils/jerseyUtils.js';
 
 export function exportTeamRosterCSV(players, getLatestMetric, getPlayerDisplayName) {
   if (!players || players.length === 0) {
@@ -79,7 +80,7 @@ export function importTeamRosterCSV(file, { players, sessions, getLatestMetric }
           const hkllReg = cleanStr(cols[0]);
           const jersey = cleanStr(cols[1]);
           // Keep leading zeros. Reject malformed jersey identifiers before cloud writes.
-          if (jersey && !/^\d{1,2}$/.test(jersey)) {
+          if (jersey && !isValidJersey(jersey)) {
             throw new Error(`Invalid jersey number on CSV line ${i + 1}`);
           }
           const lastName = cleanStr(cols[2]);
@@ -113,8 +114,7 @@ export function importTeamRosterCSV(file, { players, sessions, getLatestMetric }
           // For updates, require HKLL registration or DOB + last name.
           if (!jersey) throw new Error(`Jersey is required on CSV line ${i + 1}`);
           const jerseyConflict = players.find((p) =>
-            p.id !== targetPlayer?.id && /^\d{1,2}$/.test(String(p.jersey ?? '')) &&
-            Number(p.jersey) === Number(jersey)
+            p.id !== targetPlayer?.id && isValidJersey(p.jersey) && sameJersey(p.jersey, jersey)
           );
           if (jerseyConflict) {
             throw new Error(`Jersey ${jersey} conflicts with an existing player on CSV line ${i + 1}`);
