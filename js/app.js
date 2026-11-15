@@ -36,11 +36,12 @@ import {
 } from './supabaseService.js';
 import { createArAnalyzerController } from './arAnalyzer.js';
 import { TeamOverview } from '../components/TeamOverview.js';
+import { PlayerFormModal } from '../components/PlayerFormModal.js';
 
 const { createApp, ref, reactive, computed, onMounted, nextTick, watch } = Vue;
 
 createApp({
-  components: { TeamOverview },
+  components: { TeamOverview, PlayerFormModal },
   setup() {
     const getInitialLanguage = () => {
       const saved = localStorage.getItem('swallows_lang');
@@ -179,7 +180,7 @@ createApp({
       last_name: '',
       given_names: '',
       preferred_name: '',
-      jersey: null,
+      jersey: '',
       hkll_reg_no: '',
       parent_phone: '',
       position: 'IF',
@@ -289,7 +290,7 @@ createApp({
         last_name: '',
         given_names: '',
         preferred_name: '',
-        jersey: null,
+        jersey: '',
         hkll_reg_no: '',
         parent_phone: '',
         position: 'IF',
@@ -309,7 +310,7 @@ createApp({
       loading.value = true;
       try {
         const data = await fetchAllCloudData();
-        players.value = data.players;
+        players.value = data.players.sort(compareJerseys);
         sessions.value = data.sessions;
         drillVideos.value = data.drillVideos;
       } catch (err) {
@@ -319,8 +320,32 @@ createApp({
       }
     };
 
+    // SDL-002-A: Preserve display formatting, reserve numeric jersey identity.
+    // Requires the coordinated production migration to players.jersey TEXT.
+    const validJersey = (value) => /^\d{1,2}$/.test(String(value ?? '').trim());
+    const jerseyTaken = (value, excludePlayerId = null) => players.value.some(
+      p => p.id !== excludePlayerId && validJersey(p.jersey) && Number(p.jersey) === Number(value)
+    );
+    const compareJerseys = (a, b) => {
+      const x = String(a.jersey ?? '');
+      const y = String(b.jersey ?? '');
+      if (!x) return y ? 1 : 0;
+      if (!y) return -1;
+      const numericOrder = x.localeCompare(y, undefined, { numeric: true });
+      return numericOrder || x.localeCompare(y);
+    };
+
     const addPlayer = async () => {
-      if (isSaving.value || !isCoach.value || !newPlayer.value.preferred_name || !newPlayer.value.jersey) return;
+      if (isSaving.value || !isCoach.value) return;
+      if (!String(newPlayer.value.preferred_name ?? '').trim() || !validJersey(newPlayer.value.jersey)) {
+        alert('Enter a preferred name and a jersey number of 1–2 digits (0–99).');
+        return;
+      }
+      newPlayer.value.jersey = String(newPlayer.value.jersey).trim();
+      if (jerseyTaken(newPlayer.value.jersey)) {
+        alert('This jersey number is already assigned (leading zeros do not make it a different number).');
+        return;
+      }
       isSaving.value = true;
       newPlayer.value.position = selectedAddPositions.value.join(', ');
       newPlayer.value.photo_url = newPlayer.value.photo_url ? newPlayer.value.photo_url.trim() : null;
@@ -330,7 +355,7 @@ createApp({
           name: newPlayer.value.preferred_name
         });
         players.value.push(created);
-        players.value.sort((a, b) => a.jersey - b.jersey);
+        players.value.sort(compareJerseys);
         showAddPlayerModal.value = false;
       } catch (error) {
         alert('Failed to save player: ' + error.message);
@@ -356,6 +381,15 @@ createApp({
 
     const updatePlayer = async () => {
       if (isSaving.value || !isCoach.value || !editingPlayer.value) return;
+      if (!String(editingPlayer.value.preferred_name ?? '').trim() || !validJersey(editingPlayer.value.jersey)) {
+        alert('Enter a preferred name and a jersey number of 1–2 digits (0–99).');
+        return;
+      }
+      const proposedJersey = String(editingPlayer.value.jersey).trim();
+      if (jerseyTaken(proposedJersey, editingPlayer.value.id)) {
+        alert('This jersey number is already assigned (leading zeros do not make it a different number).');
+        return;
+      }
       isSaving.value = true;
       const { id, last_name, given_names, preferred_name, jersey, hkll_reg_no, parent_phone, throws, bats, bat_spec, dob, photo_url } = editingPlayer.value;
       const payload = {
@@ -363,7 +397,7 @@ createApp({
         given_names: given_names ? given_names.trim() : null,
         preferred_name: preferred_name ? preferred_name.trim() : '',
         name: preferred_name ? preferred_name.trim() : '',
-        jersey: Number(jersey),
+        jersey: String(jersey).trim(),
         hkll_reg_no: hkll_reg_no ? hkll_reg_no.trim() : null,
         parent_phone: parent_phone ? parent_phone.trim() : null,
         position: selectedEditPositions.value.join(', '),
@@ -378,7 +412,7 @@ createApp({
         const index = players.value.findIndex((p) => p.id === id);
         if (index !== -1) {
           players.value[index] = { ...players.value[index], ...payload };
-          players.value.sort((a, b) => a.jersey - b.jersey);
+          players.value.sort(compareJerseys);
         }
         if (selectedPlayer.value?.id === id) {
           selectedPlayer.value = { ...selectedPlayer.value, ...payload };
@@ -653,7 +687,7 @@ createApp({
       return players.value.filter((p) => {
         const nameMatch = getPlayerDisplayName(p).toLowerCase().includes(q);
         const legalMatch = formatLegalName(p).toLowerCase().includes(q);
-        const jerseyMatch = p.jersey && String(p.jersey).includes(q);
+        const jerseyMatch = p.jersey != null && String(p.jersey).includes(q);
         const regMatch = p.hkll_reg_no && p.hkll_reg_no.toLowerCase().includes(q);
         return nameMatch || legalMatch || jerseyMatch || regMatch;
       });
