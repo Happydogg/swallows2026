@@ -20,7 +20,7 @@ export function exportTeamRosterCSV(players, getLatestMetric, getPlayerDisplayNa
 
     const row = [
       `"${p.hkll_reg_no || ''}"`,
-      p.jersey,
+      `"${String(p.jersey ?? '').replace(/"/g, '""')}"`,
       `"${p.last_name || ''}"`,
       `"${p.given_names || ''}"`,
       `"${getPlayerDisplayName(p)}"`,
@@ -60,6 +60,10 @@ export function importTeamRosterCSV(file, { players, sessions, getLatestMetric }
           return;
         }
 
+        if (!/^\uFEFF?HKLL_Reg_No,Jersey,Last_Name,Given_Names,Preferred_Name,/.test(lines[0])) {
+          throw new Error('CSV header mismatch; expected Swallows roster template.');
+        }
+
         let updatedPlayers = 0;
         let growthLogged = 0;
         const today = new Date().toISOString().slice(0, 10);
@@ -73,7 +77,11 @@ export function importTeamRosterCSV(file, { players, sessions, getLatestMetric }
           if (cols.length < 5) continue;
 
           const hkllReg = cleanStr(cols[0]);
-          const jersey = Number(cleanStr(cols[1]));
+          const jersey = cleanStr(cols[1]);
+          // Keep leading zeros. Reject malformed jersey identifiers before cloud writes.
+          if (jersey && !/^\d{1,2}$/.test(jersey)) {
+            throw new Error(`Invalid jersey number on CSV line ${i + 1}`);
+          }
           const lastName = cleanStr(cols[2]);
           const givenNames = cleanStr(cols[3]);
           const preferredName = cleanStr(cols[4]);
@@ -101,14 +109,20 @@ export function importTeamRosterCSV(file, { players, sessions, getLatestMetric }
             );
           }
 
-          // 3. Fallback match by Jersey #
-          if (!targetPlayer && jersey) {
-            targetPlayer = players.find((p) => p.jersey === jersey);
+          // Do NOT identify a person solely by jersey number: numbers can be reassigned.
+          // For updates, require HKLL registration or DOB + last name.
+          if (!jersey) throw new Error(`Jersey is required on CSV line ${i + 1}`);
+          const jerseyConflict = players.find((p) =>
+            p.id !== targetPlayer?.id && /^\d{1,2}$/.test(String(p.jersey ?? '')) &&
+            Number(p.jersey) === Number(jersey)
+          );
+          if (jerseyConflict) {
+            throw new Error(`Jersey ${jersey} conflicts with an existing player on CSV line ${i + 1}`);
           }
 
           if (targetPlayer) {
             const payload = {
-              jersey: jersey || targetPlayer.jersey,
+              jersey: jersey,
               last_name: lastName || targetPlayer.last_name,
               given_names: givenNames || targetPlayer.given_names,
               preferred_name: preferredName || targetPlayer.preferred_name || targetPlayer.name,
@@ -127,13 +141,12 @@ export function importTeamRosterCSV(file, { players, sessions, getLatestMetric }
               .update(payload)
               .eq('id', targetPlayer.id);
 
-            if (!error) {
-              Object.assign(targetPlayer, payload);
-              updatedPlayers++;
-            }
+            if (error) throw error;
+            Object.assign(targetPlayer, payload);
+            updatedPlayers++;
           } else {
             const newPlayerPayload = {
-              jersey: jersey || 99,
+              jersey: jersey,
               last_name: lastName || null,
               given_names: givenNames || null,
               preferred_name: preferredName || `${givenNames} ${lastName}`.trim(),
@@ -152,7 +165,8 @@ export function importTeamRosterCSV(file, { players, sessions, getLatestMetric }
               .insert([newPlayerPayload])
               .select();
 
-            if (!error && data) {
+            if (error) throw error;
+            if (data?.length) {
               targetPlayer = data[0];
               players.push(targetPlayer);
               updatedPlayers++;
@@ -186,7 +200,12 @@ export function importTeamRosterCSV(file, { players, sessions, getLatestMetric }
           }
         }
 
-        players.sort((a, b) => a.jersey - b.jersey);
+        players.sort((a, b) => {
+          const x = String(a.jersey ?? '');
+          const y = String(b.jersey ?? '');
+          const numericOrder = x.localeCompare(y, undefined, { numeric: true });
+          return numericOrder || x.localeCompare(y);
+        });
         resolve({ updatedPlayers, growthLogged });
       } catch (err) {
         reject(err);
