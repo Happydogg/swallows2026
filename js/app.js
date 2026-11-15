@@ -35,10 +35,12 @@ import {
   deleteDrillVideoRecord
 } from './supabaseService.js';
 import { createArAnalyzerController } from './arAnalyzer.js';
+import { TeamOverview } from '../components/TeamOverview.js';
 
 const { createApp, ref, reactive, computed, onMounted, nextTick, watch } = Vue;
 
 createApp({
+  components: { TeamOverview },
   setup() {
     const getInitialLanguage = () => {
       const saved = localStorage.getItem('swallows_lang');
@@ -121,33 +123,6 @@ createApp({
 
     const selectedPlayer = ref(null);
     const arAnalyzer = createArAnalyzerController({ selectedPlayer });
-    const localVideoCategory = ref('batting');
-    const localCameraAngle = ref('side_open');
-    const localPlaybackMode = ref('realtime120');
-    const localVideoError = ref('');
-    const handleLocalVideoPick = (event) => {
-      const file = event.target.files?.[0];
-      if (!file) return;
-      localVideoError.value = '';
-      const modes = {
-        realtime120: { playbackFps: 120, motionFactor: 1 },
-        slow30: { playbackFps: 30, motionFactor: 4 },
-        realtime60: { playbackFps: 60, motionFactor: 1 },
-        realtime30: { playbackFps: 30, motionFactor: 1 }
-      };
-      try {
-        arAnalyzer.openLocalAnalyzer(file, {
-          category: localVideoCategory.value,
-          cameraAngle: localCameraAngle.value,
-          ...modes[localPlaybackMode.value]
-        });
-      } catch (err) {
-        localVideoError.value = err.message || 'Could not open local video.';
-      } finally {
-        // Allow picking the same file again after closing.
-        event.target.value = '';
-      }
-    };
 
     const editingPlayer = ref(null);
     const activePlayerForLog = ref(null);
@@ -712,7 +687,6 @@ createApp({
 
     return {
       currentLang, t, saveLanguage,
-      localVideoCategory, localCameraAngle, localPlaybackMode, localVideoError, handleLocalVideoPick,
       loading, isSaving, currentView, overviewTab, searchQuery, filteredPlayers,
       showAddPlayerModal, showEditPlayerModal, showLogModal, showEditSessionModal, showUploadVideoModal,
       selectedPlayer, editingPlayer, activePlayerForLog, editingSession, activePlayerForVideo, selectedVideoFile,

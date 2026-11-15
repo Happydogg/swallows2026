@@ -157,324 +157,36 @@
       {{ t('syncingData') }}
     </div>
 
-    <!-- VIEW 1: Team Overview Dashboard -->
-    <div v-else-if="currentView === 'overview'" class="space-y-6">
-      
-      <!-- Top Overview Stat Summary Cards -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="bg-slate-800/60 border border-slate-700 p-4 rounded-xl">
-          <p class="text-xs text-slate-400">{{ t('activeRoster') }}</p>
-          <p class="text-2xl font-bold">{{ players.length }} {{ t('playersUnit') }}</p>
-        </div>
-        <div class="bg-slate-800/60 border border-slate-700 p-4 rounded-xl">
-          <p class="text-xs text-slate-400">{{ t('club60') }}</p>
-          <p class="text-2xl font-bold text-amber-400">{{ getClubCount(60) }}</p>
-        </div>
-        <div class="bg-slate-800/60 border border-slate-700 p-4 rounded-xl">
-          <p class="text-xs text-slate-400">{{ t('avgExitVelo') }}</p>
-          <p class="text-2xl font-bold text-blue-400">{{ avgBatSpeed }} km/h</p>
-        </div>
-        <div class="bg-slate-800/60 border border-slate-700 p-4 rounded-xl">
-          <p class="text-xs text-slate-400">{{ t('armSafetyFlags') }}</p>
-          <p class="text-2xl font-bold" :class="safetyAlertCount > 0 ? 'text-rose-400' : 'text-emerald-400'">{{ safetyAlertCount }}</p>
-        </div>
-      </div>
-
-      <!-- Tab Switcher & Quick Roster Search -->
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-3 gap-3">
-        <div class="flex gap-2">
-          <button 
-            @click="overviewTab = 'roster'" 
-            :class="overviewTab === 'roster' ? 'border-b-2 border-blue-500 text-white font-bold' : 'text-slate-400 hover:text-slate-200'"
-            class="pb-2 px-3 text-sm transition">
-            📋 {{ t('rosterList') }}
-          </button>
-          <button 
-            @click="overviewTab = 'leaderboard'" 
-            :class="overviewTab === 'leaderboard' ? 'border-b-2 border-amber-500 text-white font-bold' : 'text-slate-400 hover:text-slate-200'"
-            class="pb-2 px-3 text-sm transition flex items-center gap-1.5">
-            🏆 {{ t('leaderboardTab') }}
-            <span class="bg-amber-500/20 text-amber-300 text-[10px] px-1.5 py-0.2 rounded-full font-bold">Top 3</span>
-          </button>
-        </div>
-
-        <div v-if="overviewTab === 'roster'" class="w-full sm:w-64">
-          <input 
-            v-model="searchQuery" 
-            type="text" 
-            :placeholder="t('searchPlaceholder')" 
-            class="w-full bg-slate-800/80 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white outline-none focus:border-blue-500">
-        </div>
-      </div>
-
-      <!-- TAB A: Roster (Responsive Layout) -->
-      <div v-if="overviewTab === 'roster'">
-        
-        <!-- Mobile Player Cards (< 768px): Prioritizes Throws/Bats and Sprint -->
-        <div class="block md:hidden space-y-3">
-          <div v-for="player in filteredPlayers" :key="'m-rost-' + player.id" class="bg-slate-800/60 border border-slate-700/80 rounded-xl p-4 space-y-3 shadow-sm">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-3">
-                <div @click="selectPlayer(player)" class="w-11 h-11 rounded-full overflow-hidden flex-shrink-0 bg-slate-700 border border-slate-600 flex items-center justify-center font-bold text-sm text-blue-300 cursor-pointer hover:opacity-80 transition" title="View Profile">
-                  <img v-if="player.photo_url && !failedImgs[player.id]" 
-                       :src="formatImgUrl(player.photo_url)" 
-                       :alt="getPlayerDisplayName(player)" 
-                       class="w-full h-full object-cover" 
-                       referrerpolicy="no-referrer"
-                       @error="markImgFailed(player.id)">
-                  <span v-else>#{{ player.jersey }}</span>
-                </div>
-                <div>
-                  <div class="flex items-center gap-2">
-                    <span class="text-xs font-mono text-slate-400">#{{ player.jersey }}</span>
-                    <span v-if="player.dob" class="text-xs text-blue-400 font-medium">{{ calculateAge(player.dob) }}</span>
-                  </div>
-                  <button @click="selectPlayer(player)" class="font-bold text-white hover:underline text-base block text-left">
-                    {{ getPlayerDisplayName(player) }}
-                  </button>
-                  <span v-if="player.hkll_reg_no" class="text-[10px] text-slate-400 font-mono">HKLL: {{ player.hkll_reg_no }}</span>
-                </div>
-              </div>
-
-              <div class="flex flex-col items-end gap-1">
-                <div class="flex gap-1">
-                  <span v-for="pos in splitPositions(player.position)" :key="pos" class="px-2 py-0.5 rounded bg-slate-700 text-[10px] font-semibold text-slate-200">
-                    {{ pos }}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Core High-Signal Stats Grid -->
-            <div class="grid grid-cols-2 gap-2 bg-slate-900/60 p-2.5 rounded-lg border border-slate-800 text-xs font-mono">
-              <div>
-                <span class="text-slate-400 text-[10px] block">{{ t('throwsBats') }}:</span>
-                <span class="text-slate-200 font-bold">{{ player.throws }} / {{ player.bats }}</span>
-              </div>
-              <div>
-                <span class="text-slate-400 text-[10px] block">{{ t('sprint18m') }}:</span>
-                <span class="text-amber-300 font-bold">{{ getLatestMetric(player.id, 'sprint_time') ? getLatestMetric(player.id, 'sprint_time') + 's' : '--' }}</span>
-              </div>
-              <div>
-                <span class="text-slate-400 text-[10px] block">{{ t('topExitVelo') }}:</span>
-                <span :class="Number(getLatestMetric(player.id, 'exit_velo')) >= 60 ? 'text-amber-400 font-bold' : 'text-blue-400 font-semibold'">
-                  {{ getLatestMetric(player.id, 'exit_velo') || '--' }} km/h
-                </span>
-              </div>
-              <div>
-                <span class="text-slate-400 text-[10px] block">{{ t('throwingVelo') }}:</span>
-                <span class="text-emerald-400 font-semibold">{{ getLatestMetric(player.id, 'throwing_velo') ? getLatestMetric(player.id, 'throwing_velo') + ' km/h' : '--' }}</span>
-              </div>
-            </div>
-
-            <!-- Mobile Card Actions Footer -->
-            <div class="flex items-center justify-between pt-1 border-t border-slate-700/60">
-              <button @click="selectPlayer(player)" class="text-xs text-blue-400 font-semibold hover:underline">
-                View Profile &amp; History →
-              </button>
-              <div class="space-x-2" v-if="isCoach">
-                <button @click="openLogModal(player)" class="bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 px-2.5 py-1 rounded text-xs">+ {{ t('log') }}</button>
-                <button @click="openEditPlayerModal(player)" class="bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 px-2.5 py-1 rounded text-xs">{{ t('edit') }}</button>
-              </div>
-            </div>
-          </div>
-
-          <div v-if="filteredPlayers.length === 0" class="p-8 text-center bg-slate-800/40 rounded-xl border border-slate-750 text-slate-500 text-sm">
-            {{ t('noPlayersMatch') }}
-          </div>
-        </div>
-
-        <!-- Desktop Multi-Column Roster Table (≥ 768px) -->
-        <div class="hidden md:block bg-slate-800/40 border border-slate-700/80 rounded-xl overflow-x-auto">
-          <table class="w-full text-left text-sm">
-            <thead class="bg-slate-800/80 text-slate-300 text-xs uppercase tracking-wider">
-              <tr>
-                <th class="p-3">#</th>
-                <th class="p-3">{{ t('player') }}</th>
-                <th class="p-3">{{ t('pos') }}</th>
-                <th class="p-3">{{ t('throwsBats') }}</th>
-                <th class="p-3">{{ t('sprint18m') }}</th>
-                <th class="p-3">{{ t('topExitVelo') }}</th>
-                <th class="p-3">{{ t('throwingVelo') }}</th>
-                <th class="p-3">{{ t('attackAngle') }}</th>
-                <th class="p-3">{{ t('broadJumpRatioHeader') }}</th>
-                <th class="p-3 text-right">{{ t('actions') }}</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-800">
-              <tr v-for="player in filteredPlayers" :key="player.id" class="hover:bg-slate-800/40 transition">
-                <td class="p-3 font-mono text-slate-400">{{ player.jersey }}</td>
-                <td class="p-3">
-                  <div class="flex items-center gap-3">
-                    <div @click="selectPlayer(player)" class="w-9 h-9 rounded-full overflow-hidden flex-shrink-0 bg-slate-700 border border-slate-600 flex items-center justify-center font-bold text-xs text-blue-300 cursor-pointer hover:opacity-80 transition" title="View Profile">
-                      <img v-if="player.photo_url && !failedImgs[player.id]" 
-                           :src="formatImgUrl(player.photo_url)" 
-                           :alt="getPlayerDisplayName(player)" 
-                           class="w-full h-full object-cover" 
-                           referrerpolicy="no-referrer"
-                           @error="markImgFailed(player.id)">
-                      <span v-else>#{{ player.jersey }}</span>
-                    </div>
-                    <div>
-                      <button @click="selectPlayer(player)" class="font-semibold text-white hover:underline text-blue-400 block text-left">
-                        {{ getPlayerDisplayName(player) }}
-                      </button>
-                      <div class="text-xs text-slate-400 flex items-center gap-1.5">
-                        <span v-if="player.dob">{{ calculateAge(player.dob) }}</span>
-                        <span v-if="player.hkll_reg_no" class="font-mono text-[10px] text-slate-500">• #{{ player.hkll_reg_no }}</span>
-                      </div>
-                    </div>
-                  </div>
-                </td>
-                <td class="p-3">
-                  <div class="flex flex-wrap gap-1">
-                    <span v-for="pos in splitPositions(player.position)" :key="pos" class="px-2 py-0.5 rounded bg-slate-700 text-xs font-medium">
-                      {{ pos }}
-                    </span>
-                  </div>
-                </td>
-                <td class="p-3 font-mono text-slate-300">{{ player.throws }} / {{ player.bats }}</td>
-                <td class="p-3 font-mono text-amber-300 font-semibold">
-                  {{ getLatestMetric(player.id, 'sprint_time') ? getLatestMetric(player.id, 'sprint_time') + 's' : '--' }}
-                </td>
-                <td class="p-3 font-mono">
-                  <span :class="Number(getLatestMetric(player.id, 'exit_velo')) >= 60 ? 'text-amber-400 font-bold' : ''">
-                    {{ getLatestMetric(player.id, 'exit_velo') || '--' }} km/h
-                  </span>
-                </td>
-                <td class="p-3 font-mono text-emerald-400 font-semibold">{{ getLatestMetric(player.id, 'throwing_velo') ? getLatestMetric(player.id, 'throwing_velo') + ' km/h' : '--' }}</td>
-                <td class="p-3 font-mono">
-                  <span :class="getAttackAngleColor(getLatestMetric(player.id, 'attack_angle'))">
-                    {{ getLatestMetric(player.id, 'attack_angle') ? getLatestMetric(player.id, 'attack_angle') + '°' : '--' }}
-                  </span>
-                </td>
-                <td class="p-3 font-mono">
-                  <div v-if="getLatestMetric(player.id, 'broad_jump')">
-                    <span>{{ getLatestMetric(player.id, 'broad_jump') }} cm</span>
-                    <span v-if="calculateJumpRatio(player.id)" class="text-xs ml-1 font-bold" :class="getJumpRatioColor(calculateJumpRatio(player.id))">
-                      ({{ calculateJumpRatio(player.id) }}x)
-                    </span>
-                  </div>
-                  <span v-else class="text-slate-600">--</span>
-                </td>
-                <td class="p-3 text-right space-x-2 whitespace-nowrap">
-                  <template v-if="isCoach">
-                    <button @click="openLogModal(player)" class="bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 px-2.5 py-1 rounded text-xs">+ {{ t('log') }}</button>
-                    <button @click="openEditPlayerModal(player)" class="bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 px-2.5 py-1 rounded text-xs">{{ t('edit') }}</button>
-                    <button @click="removePlayer(player.id)" class="text-rose-400 hover:text-rose-300 text-xs">{{ t('remove') }}</button>
-                  </template>
-                  <span v-else class="text-xs text-slate-500 italic">{{ t('viewOnly') }}</span>
-                </td>
-              </tr>
-              <tr v-if="filteredPlayers.length === 0">
-                <td colspan="10" class="p-6 text-center text-slate-500">{{ t('noPlayersMatch') }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-      </div>
-
-      <!-- TAB B: Team Leaderboards & PR Badges -->
-      <div v-else-if="overviewTab === 'leaderboard'" class="space-y-6">
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          
-          <!-- Exit Velocity Leaderboard -->
-          <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
-            <h4 class="text-sm font-bold text-blue-400 flex items-center justify-between mb-3">
-              <span>⚡ {{ t('topExitVelo') }}</span>
-              <span class="text-xs text-slate-500">km/h</span>
-            </h4>
-            <div class="space-y-2">
-              <div v-for="(item, idx) in getTopMetrics('exit_velo', 3)" :key="item.player.id" class="flex items-center justify-between p-2 rounded-lg bg-slate-900/60 border border-slate-800">
-                <div class="flex items-center gap-2">
-                  <span class="text-sm font-bold" :class="idx === 0 ? 'text-amber-400' : idx === 1 ? 'text-slate-300' : 'text-amber-600'">
-                    {{ idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉' }}
-                  </span>
-                  <div>
-                    <p class="text-xs font-semibold text-white">{{ getPlayerDisplayName(item.player) }}</p>
-                    <p class="text-[10px] text-slate-500 font-mono">#{{ item.player.jersey }}</p>
-                  </div>
-                </div>
-                <span class="text-sm font-mono font-bold text-blue-400">{{ item.value }} km/h</span>
-              </div>
-              <p v-if="getTopMetrics('exit_velo', 3).length === 0" class="text-xs text-slate-500 text-center py-2">--</p>
-            </div>
-          </div>
-
-          <!-- Throwing Velocity Leaderboard -->
-          <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
-            <h4 class="text-sm font-bold text-emerald-400 flex items-center justify-between mb-3">
-              <span>🎯 {{ t('throwingVelo') }}</span>
-              <span class="text-xs text-slate-500">km/h</span>
-            </h4>
-            <div class="space-y-2">
-              <div v-for="(item, idx) in getTopMetrics('throwing_velo', 3)" :key="item.player.id" class="flex items-center justify-between p-2 rounded-lg bg-slate-900/60 border border-slate-800">
-                <div class="flex items-center gap-2">
-                  <span class="text-sm font-bold" :class="idx === 0 ? 'text-amber-400' : idx === 1 ? 'text-slate-300' : 'text-amber-600'">
-                    {{ idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉' }}
-                  </span>
-                  <div>
-                    <p class="text-xs font-semibold text-white">{{ getPlayerDisplayName(item.player) }}</p>
-                    <p class="text-[10px] text-slate-500 font-mono">#{{ item.player.jersey }}</p>
-                  </div>
-                </div>
-                <span class="text-sm font-mono font-bold text-emerald-400">{{ item.value }} km/h</span>
-              </div>
-              <p v-if="getTopMetrics('throwing_velo', 3).length === 0" class="text-xs text-slate-500 text-center py-2">--</p>
-            </div>
-          </div>
-
-          <!-- Broad Jump Height Ratio Leaderboard -->
-          <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
-            <h4 class="text-sm font-bold text-purple-400 flex items-center justify-between mb-3">
-              <span>🚀 {{ t('broadJumpRatioTitle') }}</span>
-              <span class="text-xs text-slate-500">{{ t('ratioLabel') }}</span>
-            </h4>
-            <div class="space-y-2">
-              <div v-for="(item, idx) in getTopJumpRatios(3)" :key="item.player.id" class="flex items-center justify-between p-2 rounded-lg bg-slate-900/60 border border-slate-800">
-                <div class="flex items-center gap-2">
-                  <span class="text-sm font-bold" :class="idx === 0 ? 'text-amber-400' : idx === 1 ? 'text-slate-300' : 'text-amber-600'">
-                    {{ idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉' }}
-                  </span>
-                  <div>
-                    <p class="text-xs font-semibold text-white">{{ getPlayerDisplayName(item.player) }}</p>
-                    <p class="text-[10px] text-slate-500 font-mono">#{{ item.player.jersey }} • {{ item.jump }}cm @ {{ item.height }}cm</p>
-                  </div>
-                </div>
-                <span class="text-sm font-mono font-bold text-purple-400">{{ item.ratio }}x</span>
-              </div>
-              <p v-if="getTopJumpRatios(3).length === 0" class="text-xs text-slate-500 text-center py-2">--</p>
-            </div>
-          </div>
-
-          <!-- Home-to-1st Sprint Leaderboard -->
-          <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
-            <h4 class="text-sm font-bold text-amber-400 flex items-center justify-between mb-3">
-              <span>⏱️ {{ t('sprint18m') }}</span>
-              <span class="text-xs text-slate-500">sec (Lowest)</span>
-            </h4>
-            <div class="space-y-2">
-              <div v-for="(item, idx) in getTopMetrics('sprint_time', 3, true)" :key="item.player.id" class="flex items-center justify-between p-2 rounded-lg bg-slate-900/60 border border-slate-800">
-                <div class="flex items-center gap-2">
-                  <span class="text-sm font-bold" :class="idx === 0 ? 'text-amber-400' : idx === 1 ? 'text-slate-300' : 'text-amber-600'">
-                    {{ idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉' }}
-                  </span>
-                  <div>
-                    <p class="text-xs font-semibold text-white">{{ getPlayerDisplayName(item.player) }}</p>
-                    <p class="text-[10px] text-slate-500 font-mono">#{{ item.player.jersey }}</p>
-                  </div>
-                </div>
-                <span class="text-sm font-mono font-bold text-amber-300">{{ item.value }}s</span>
-              </div>
-              <p v-if="getTopMetrics('sprint_time', 3, true).length === 0" class="text-xs text-slate-500 text-center py-2">--</p>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-    </div>
+    <!-- SDL-001: TeamOverview extracted without changing root view routing -->
+    <team-overview v-else-if="currentView === 'overview'"
+      :t="t"
+      :players="players"
+      :get-club-count="getClubCount"
+      :avg-bat-speed="avgBatSpeed"
+      :safety-alert-count="safetyAlertCount"
+      :overview-tab="overviewTab"
+      :search-query="searchQuery"
+      @update:overview-tab="overviewTab = $event"
+      @update:search-query="searchQuery = $event"
+      :filtered-players="filteredPlayers"
+      :failed-imgs="failedImgs"
+      :format-img-url="formatImgUrl"
+      :get-player-display-name="getPlayerDisplayName"
+      :mark-img-failed="markImgFailed"
+      :select-player="selectPlayer"
+      :calculate-age="calculateAge"
+      :split-positions="splitPositions"
+      :get-latest-metric="getLatestMetric"
+      :get-attack-angle-color="getAttackAngleColor"
+      :calculate-jump-ratio="calculateJumpRatio"
+      :get-jump-ratio-color="getJumpRatioColor"
+      :is-coach="isCoach"
+      :open-log-modal="openLogModal"
+      :open-edit-player-modal="openEditPlayerModal"
+      :remove-player="removePlayer"
+      :get-top-metrics="getTopMetrics"
+      :get-top-jump-ratios="getTopJumpRatios"
+    ></team-overview>
 
     <!-- VIEW 2: Individual Player Profile & Dated Session History -->
     <div v-if="currentView === 'player' && selectedPlayer" class="space-y-6">
@@ -624,39 +336,6 @@
             class="bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 border border-purple-500/50 px-3 py-1 rounded-md text-xs font-semibold transition">
             + {{ t('uploadVideo') }}
           </button>
-        </div>
-
-        <!-- LOCAL ANALYSIS: uses object URL, no cloud upload or database writes -->
-        <div v-if="isCoach" class="rounded-xl border border-cyan-700/50 bg-slate-900/70 p-4 space-y-3">
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h4 class="font-bold text-cyan-300 text-sm">💻 Local Video Analysis (No Cloud Upload)</h4>
-              <p class="text-xs text-slate-400">Open a video on this PC and test MediaPipe before saving any clips to R2.</p>
-            </div>
-            <span class="text-[10px] px-2 py-1 rounded border border-cyan-700 text-cyan-300">LOCAL ONLY</span>
-          </div>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-            <label class="space-y-1"><span class="text-slate-300">Activity</span>
-              <select v-model="localVideoCategory" class="block w-full bg-slate-800 border border-slate-600 rounded p-2"><option value="batting">Batting</option><option value="pitching">Throwing / Pitching</option></select>
-            </label>
-            <label class="space-y-1"><span class="text-slate-300">Camera angle</span>
-              <select v-model="localCameraAngle" class="block w-full bg-slate-800 border border-slate-600 rounded p-2"><option value="side_open">Side view</option><option value="behind_catcher">Rear view</option><option value="front">Front view</option></select>
-            </label>
-            <label class="space-y-1"><span class="text-slate-300">File playback timing</span>
-              <select v-model="localPlaybackMode" class="block w-full bg-slate-800 border border-slate-600 rounded p-2">
-                <option value="realtime120">120fps real time (converted Trevor clip)</option>
-                <option value="slow30">30fps at 4× slow motion (original export)</option>
-                <option value="realtime60">60fps real time</option>
-                <option value="realtime30">30fps real time</option>
-              </select>
-            </label>
-          </div>
-          <label class="inline-flex items-center gap-2 cursor-pointer rounded-lg bg-cyan-700 hover:bg-cyan-600 text-white font-semibold text-sm px-4 py-2">
-            📂 Open Local Video
-            <input type="file" accept="video/mp4,video/quicktime,video/*" class="hidden" @change="handleLocalVideoPick">
-          </label>
-          <p v-if="localVideoError" class="text-rose-400 text-xs">{{ localVideoError }}</p>
-          <p class="text-[11px] text-amber-300">Choose the video's encoded playback timing, not just the camera capture rate. Browser pose tracking may skip frames; displayed speeds and phase labels are experimental estimates.</p>
         </div>
 
         <!-- Video Cards Grid -->
@@ -1426,12 +1105,10 @@
                 :class="isTrackerLocked ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-amber-500/20 text-amber-400 border border-amber-500/40'">
             {{ isTrackerLocked ? '● POSE LOCKED' : '○ TRACKING...' }}
           </span>
-          <span v-if="activeAnalyzerVideo.is_local" class="text-xs text-cyan-300 font-mono">LOCAL · {{ activeAnalyzerVideo.filename }}</span>
-          <span class="text-xs text-slate-400 font-mono">{{ activeAnalyzerVideo.fps_mode || 240 }} playback FPS</span>
+          <span class="text-xs text-slate-400 font-mono">{{ activeAnalyzerVideo.fps_mode || 240 }} FPS</span>
         </div>
       </div>
 
-      <div v-if="activeAnalyzerVideo.is_local" class="text-xs text-amber-300 px-2">Local preview only · No cloud upload · {{ activeAnalyzerVideo.motion_factor }}× slow-motion factor · Motion speeds and auto-phase results are not validated.</div>
       <!-- Stage & HUD (Adaptive for 9:16 Vertical and 16:9 Landscape) -->
       <div class="relative w-full max-w-5xl h-[65vh] sm:h-[72vh] bg-neutral-950 rounded-2xl overflow-hidden shadow-2xl flex items-center justify-center border border-white/10">
         <div class="relative max-w-full max-h-full flex items-center justify-center">
