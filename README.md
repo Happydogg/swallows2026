@@ -1,26 +1,30 @@
-# SDL-002-A fast-track release CANDIDATE (not approved to execute)
+# SDL-004-006 | Staging-only safe coach roster and direct security testing
 
-Source: uploaded SDL-002 working snapshot and last frontend-only patch, NOT the current live GitHub develop/main or local feature branch. Review diffs before using. Nothing has been deployed, and production Supabase remains unchanged.
+This package was prepared from the verified SDL-004-005 staging auth patch and SDL-004-002/003/004 migrations present in this conversation. It **has not** been executed on the Supabase server or exercised in a live browser.
 
-## Contents
-- `components/PlayerFormModal.js`: text input, one/two digits, leading zeros
-- `js/app.js`: Add/Edit string jersey, normalized duplicate warning, removes pre-migration padded-number save block; **do not deploy before coordinated DB conversion**
-- `js/csvManager.js`: string jerseys, 1-2-digit validation, normalized collision checks, refuses jersey-only player matching. CSV import is not transactionally atomic and needs a targeted CSV test before production enablement.
-- `sql/00_PRE_FLIGHT_READ_ONLY.sql`: production read-only check
-- `sql/01_PRODUCTION_MIGRATION_REVIEW_AND_APPROVAL_REQUIRED.sql`: proposed transaction, **not authorized to run**
-- `sql/02_POST_RELEASE_READ_ONLY.sql`: production verification
+## What changes
 
-## Release gate
-1. Confirm feature branch and inspect diff against EXACT current files. Do not blindly drag-drop old snapshot files.
-2. Review CSV import: existing importer is sequential, could partially import if a later row fails; for lowest risk, temporarily refrain from using CSV import during release until tested. Excel can strip leading zeros despite CSV quoting; import jersey column explicitly as text.
-3. Verify fresh backup and recovery procedure (CSV is not complete DB rollback), production dependency review and production RLS/security posture.
-4. Freeze Add/Edit/import writes for deployment window; production and dev share DB.
-5. Review SQL and explicitly approve migration and release; do NOT run the included candidate SQL until then.
-6. Coordinate database migration with compatible frontend: release only after acceptance on exact code, then smoke test 19 existing players and a new unused padded jersey, conflict rejection and reload. Do not create duplicate `00` with test player `0` assigned.
-7. Roll forward to fix if postmigration issue. Reverting TEXT -> INTEGER would destroy leading zero display and can be unsafe after new writes; use DB restore only with assessed data loss and full recovery procedure.
+- `sql/01_STAGE_TEAM_A_PLAYER_A.sql` (write): sets only Test Player A's `organization_id` to Pilot Organization A and inserts one `player_team_memberships` row. Does not modify player/athlete IDs.
+- `sql/02_COACH_SAFE_ROSTER_RPC.sql` (write): creates authenticated-only `public.sdl_004_coach_roster()` security-definer function. It verifies `auth.uid()`, active **coach** team membership, active **staff/admin** organization membership, active assigned player membership, and cross-org consistency. Returns only minimal baseball fields.
+- `sql/03_VERIFY_STAGING_READ_ONLY.sql`: six post-setup checks. Neither SQL script weakens existing table RLS policies or enables writes to official stats.
+- `frontend/index.html`, `frontend/js/app.js`: branch coach team overview to separate read-only component, preserving existing root Vue bindings and parent UI.
+- `frontend/js/coachRosterService.js` (new): calls authenticated RPC.
+- `frontend/components/CoachTeamRoster.js` (new): responsive coach-safe roster that doesn't link into private player profile.
 
-## Security
-Production RLS policies remain unverified. Avoid exposing real children's information or changing production privileges. Staging has no access policies, so browser tests require a separate secure test setup. No R2 changes are included.
+## Install order
 
-## Branch
-Only apply reviewed changes on `feature/SDL-002-player-form`, not main. This is a code candidate, not an automatic production release.
+1. **Do not run in production.** Confirm project ref `wvurolqbjhuckkkjiiiv` and backup.
+2. Execute `sql/01_STAGE_TEAM_A_PLAYER_A.sql` fully in staging SQL Editor.
+3. Execute `sql/02_COACH_SAFE_ROSTER_RPC.sql` fully.
+4. Execute `sql/03_VERIFY_STAGING_READ_ONLY.sql`, report six PASS.
+5. Make a backup of the *working SDL-004-005 local staging folder*. Compare and merge files against local changes. Copy the four `frontend/` files into the corresponding paths of the staging folder.
+6. Do **not** copy a `config.js` from an archive; preserve your currently working staging URL and publishable key.
+7. Hard reload and run tests in `docs/SECURITY_TESTS.md` with Coach A, Parent A, unrelated user, and signed out.
+
+## Risks and boundaries
+
+- `01` changes a synthetic pilot player club assignment. It is deliberate, guarded, and **not** an inference about real players.
+- This implementation is a **coach-only pilot roster**, not a Clubhouse roster. No parent-to-teammate sharing until approval/consent is implemented.
+- `SECURITY DEFINER` is a privileged boundary; the only permitted output is an explicit allowlist, callable by authenticated users and filtered by current user's verified memberships. Review function ownership and exposed API execution privileges on deployment.
+- Existing guardian query can still retrieve their child's private fields. Existing player-profile UI must not be reused for teammates. No official sessions, videos, statistics write policies, or R2 authorizations are implemented.
+- The code is based on the previously generated SDL-004-005 frontend, rather than your possibly newer local staging changes. Merge, don't overwrite blindly.

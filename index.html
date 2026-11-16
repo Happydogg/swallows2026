@@ -92,6 +92,32 @@
 <body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8 font-sans">
   <div id="app" v-cloak class="max-w-6xl mx-auto">
     
+    <!-- SDL-004-005: Authentication gate. No private app UI before verified session. -->
+    <div v-if="!authReady" class="p-10 text-center text-slate-300" role="status">Checking secure session…</div>
+    <section v-else-if="!authUser" class="max-w-md mx-auto mt-12 bg-slate-800 border border-slate-700 p-6 rounded-xl no-print">
+      <h1 class="text-2xl font-bold mb-2">Swallows DataLab</h1>
+      <p class="text-slate-400 text-sm mb-6">Staging security test. Sign in with one of your three test accounts.</p>
+      <form @submit.prevent="signInAndLoad" class="space-y-4">
+        <label class="block text-sm">Email
+          <input v-model="loginEmail" type="email" autocomplete="username" required class="mt-1 w-full rounded bg-slate-900 border border-slate-600 p-3" />
+        </label>
+        <label class="block text-sm">Password
+          <input v-model="loginPassword" type="password" autocomplete="current-password" required class="mt-1 w-full rounded bg-slate-900 border border-slate-600 p-3" />
+        </label>
+        <button type="submit" :disabled="authBusy" class="w-full bg-emerald-600 disabled:opacity-50 p-3 rounded font-semibold">{{ authBusy ? 'Signing in…' : 'Sign in' }}</button>
+      </form>
+      <p v-if="authError" role="alert" class="mt-4 text-rose-300 text-sm">{{ authError }}</p>
+    </section>
+    <template v-else>
+      <section class="mb-4 flex flex-wrap items-center justify-between gap-3 bg-slate-800 border border-slate-700 p-3 rounded-lg no-print">
+        <div class="text-sm">
+          <div class="font-semibold">{{ authUser.email }}</div>
+          <div class="text-slate-400">{{ isTeamCoach ? 'Team coach (read-only pilot)' : isVerifiedGuardian ? 'My Players (guardian)' : 'No team or family access' }}</div>
+          <div class="text-xs text-slate-500">Organizations: {{ orgMemberships.length }} · Teams: {{ teamMemberships.length }} · Guardian links: {{ guardianLinks.length }}</div>
+        </div>
+        <button @click="signOutAndClear" :disabled="authBusy" class="bg-slate-700 px-4 py-2 rounded text-sm">Sign out</button>
+      </section>
+      <p v-if="authError" role="alert" class="mb-3 text-rose-300 text-sm no-print">{{ authError }}</p>
     <!-- Top Header Bar (Hidden during printing) -->
     <app-header :t="t" :current-lang="currentLang" :current-view="currentView" :is-coach="isCoach"
       @change-language="currentLang = $event; saveLanguage()"
@@ -106,6 +132,8 @@
     </div>
 
     <!-- SDL-001: TeamOverview extracted without changing root view routing -->
+    <coach-team-roster v-else-if="currentView === 'overview' && isTeamCoach"
+      :roster="coachRoster" :loading="coachRosterLoading" :error="coachRosterError"></coach-team-roster>
     <team-overview v-else-if="currentView === 'overview'"
       :t="t"
       :players="players"
@@ -196,6 +224,7 @@
     <ar-analyzer-modal v-if="activeAnalyzerVideo" :t="t"
       :controller="analyzerController"></ar-analyzer-modal>
 
+    </template>
   </div>
 
   <!-- Root Application Entry Module -->

@@ -82,6 +82,7 @@ export function compressImage(file, maxWidth = 500, quality = 0.8) {
  * Compresses and uploads a player avatar to the Supabase 'avatars' bucket, returning its cache-busted public URL.
  */
 export async function uploadAvatarToSupabase(playerId, file) {
+  throw new Error('SDL staging safety lock: avatar uploads are disabled until storage is isolated.');
   const compressedBlob = await compressImage(file, 500, 0.8);
   const filePath = `${playerId}.jpg`;
 
@@ -105,6 +106,7 @@ export async function uploadAvatarToSupabase(playerId, file) {
  * Uploads a video or snapshot blob directly to Cloudflare R2 via the Worker signer.
  */
 export async function uploadFileToR2(key, fileOrBlob, contentType) {
+  throw new Error('SDL staging safety lock: R2 uploads are disabled.');
   const uploadUrl = `${R2_WORKER_SIGNER_URL}?key=${encodeURIComponent(key)}`;
   const res = await fetch(uploadUrl, {
     method: 'PUT',
@@ -120,6 +122,7 @@ export async function uploadFileToR2(key, fileOrBlob, contentType) {
  * Deletes an object from Cloudflare R2 by key.
  */
 export async function deleteFileFromR2(key) {
+  throw new Error('SDL staging safety lock: R2 deletion is disabled.');
   if (!key) return;
   try {
     await fetch(`${R2_WORKER_SIGNER_URL}?key=${encodeURIComponent(key)}`, {
