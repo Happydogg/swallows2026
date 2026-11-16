@@ -11,3 +11,8 @@ for(const key of ['SUPABASE_PUBLISHABLE_KEY','SUPABASE_SECRET_KEY']) {
 }
 assert.ok(fs.existsSync(new URL('./.cloudflare/output/v1/workers/default/bundle/index.js',import.meta.url)));
 console.log('Staging package verified; v2 remains disabled; no embedded secret values.');
+
+import {readBaseline,verifyPreservation} from './deploymentPreservation.mjs';
+const baseline=readBaseline();
+if(process.argv.includes('--release')||baseline)verifyPreservation(config,baseline);
+else console.log('RELEASE BLOCKED: current staging bindings/observability baseline has not been reviewed. Local build only.');

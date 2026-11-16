@@ -37,9 +37,15 @@ export const SubmissionWorkspace={
       <label class="block">Category<select v-model="category" :disabled="busy" class="w-full block p-3 mt-1 bg-slate-900 rounded"><option value="pitching">Pitching</option><option value="batting">Batting</option><option value="throwing">Throwing</option></select></label>
       <label class="block">MP4 video (up to 20 MiB)<input type="file" accept="video/mp4,.mp4" @change="pickFile" :disabled="busy" class="block w-full py-3 text-sm" /></label>
       <video v-if="previewUrl" :key="previewUrl" :src="previewUrl" @error="previewError" controls playsinline class="w-full max-h-80 rounded bg-black"></video>
-      <label class="flex gap-3 items-start text-sm"><input v-model="share" type="checkbox" :disabled="busy||!enabled||!ready||!consentTeams.length" class="mt-1" />I am a verified guardian and consent to sharing this video with the teams listed below after coach approval. Consent can be withdrawn.</label>
-      <p class="text-sm">Teams covered by consent: {{ consentTeams.length ? consentTeams.map(t=>t.name).join(', ') : 'No verified team scope loaded' }}</p>
-      <p class="text-xs text-slate-400">Leave consent unchecked to keep the submission private. Coaches cannot grant parental consent.</p>
+      <fieldset class="border border-slate-700 rounded p-3 space-y-2" :disabled="busy||!enabled||!ready">
+        <legend class="text-sm">Optional team sharing — choose individual teams</legend>
+        <p class="text-xs text-slate-400">Nothing is shared by default. Select only the teams you consent to; coach approval is still required. Consent applies to this club profile. Choose another club profile above to submit there.</p>
+        <label v-for="team in consentTeams" :key="team.id" class="flex gap-3 items-center text-sm py-2">
+          <input type="checkbox" :checked="selectedTeamIds.includes(team.id)" @change="toggleUploadTeam(team.id,$event.target.checked)" />
+          <span>{{ team.organization }} · {{ team.name }}</span>
+        </label>
+        <p v-if="!consentTeams.length" class="text-sm text-slate-400">No verified team scope loaded. This video will remain private.</p>
+      </fieldset>
       <button type="submit" :disabled="!enabled||!ready||!playerId||!file||busy" class="p-3 rounded bg-purple-600 disabled:opacity-50">Submit for coach review</button>
       <progress v-if="busy&&file" :value="progress" max="100" class="w-full"></progress>
       <p v-if="progress" class="text-sm" role="status">{{ progress }}% — completion requires a saved submission receipt.</p>
@@ -50,7 +56,20 @@ export const SubmissionWorkspace={
       <p>{{ item.category }} · <strong>{{ item.status }}</strong> · {{ item.created_at }}</p>
       <p class="text-sm">Team-sharing consent: {{ item.share_with_team?'Granted':'Not granted' }}</p>
       <p v-if="item.review_note" class="text-sm">Coach note: {{ item.review_note }}</p>
-      <div class="flex flex-wrap gap-2"><button @click="play(item)" :disabled="!enabled||!ready||busy" class="p-3 bg-blue-700 rounded">Private preview</button><button v-if="item.can_consent" @click="consent(item,!item.share_with_team)" :disabled="!enabled||!ready||busy" class="p-3 bg-slate-700 rounded">{{ item.share_with_team?'Withdraw consent':'Grant team consent' }}</button></div>
+      <p v-if="item.share_with_team" class="text-sm">Currently consented teams: {{ grantedTeams(item) || 'No current team scope' }}</p>
+      <button @click="play(item)" :disabled="!enabled||!ready||busy" class="p-3 bg-blue-700 rounded">Private preview</button>
+      <fieldset v-if="item.can_consent" class="border border-slate-700 rounded p-3 space-y-2" :disabled="!enabled||!ready||busy">
+        <legend class="text-sm">Grant or replace team consent</legend>
+        <p class="text-xs text-slate-400">Select individual teams explicitly. Existing consent is not preselected.</p>
+        <label v-for="team in consentTeams" :key="team.id" class="flex gap-3 items-center py-2 text-sm">
+          <input type="checkbox" :checked="(consentSelections[item.id]||[]).includes(team.id)" @change="toggleConsentTeam(item,team.id,$event.target.checked)" />
+          <span>{{ team.organization }} · {{ team.name }}</span>
+        </label>
+        <div class="flex flex-wrap gap-2">
+          <button @click="consent(item,true)" :disabled="!enabled||!ready||busy||!(consentSelections[item.id]||[]).length" class="p-3 bg-slate-700 rounded disabled:opacity-50">Save selected teams</button>
+          <button v-if="item.share_with_team" @click="consent(item,false)" :disabled="!enabled||!ready||busy" class="p-3 bg-slate-700 rounded">Withdraw all consent</button>
+        </div>
+      </fieldset>
       <details><summary class="py-2 cursor-pointer">Submission history</summary><ol class="text-xs space-y-1"><li v-for="(entry,i) in item.history" :key="i">{{ entry.at }} · {{ entry.action }} {{ entry.note }}</li></ol></details>
     </article>
   </div>

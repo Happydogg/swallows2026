@@ -42,7 +42,7 @@ test('MP4 picking creates a local preview and invalid files are rejected',async 
  c.pickFile({target:{files:[{...file,size:20971521}],value:'x'}});assert.equal(c.file.value,null);assert.match(c.error.value,/20 MiB/);
 });
 test('successful parent submission sends category and explicit consent then reloads status',async t=>{
- const {c,calls,revoked}=await setup(t);await c.selectPlayer(P);c.pickFile({target:{files:[file],value:''}});c.category.value='throwing';c.share.value=true;await c.submit();
+ const {c,calls,revoked}=await setup(t);await c.load();await c.selectPlayer(P);c.pickFile({target:{files:[file],value:''}});c.category.value='throwing';c.toggleUploadTeam(T,true);await c.submit();
  const call=calls.find(x=>x[0]==='submit');assert.equal(call[3].category,'throwing');assert.equal(call[3].share,true);assert.equal(call[3].key,V);
  assert.equal(c.items.value[0].status,'pending');assert.equal(c.file.value,null);assert.ok(revoked.length);assert.match(c.notice.value,/Submitted/);
 });
@@ -105,4 +105,48 @@ test('background consent rechecks preserve authorized playback and stop it when 
  await c.selectTeam(T,'clubhouse');await c.play(c.shared.value[0],'clubhouse');const url=c.playbackUrl.value;
  await c.refreshShared(true);assert.equal(c.playbackUrl.value,url);
  allowed=false;await c.refreshShared(true);assert.equal(c.playbackUrl.value,'');assert.equal(c.shared.value.length,0);
+});
+
+const T2='66666666-6666-4666-8666-666666666666',T3='77777777-7777-4777-8777-777777777777';
+const multiClub=async()=>[
+ {id:P,athlete_id:A,is_guardian:true,team_id:T,team_name:'First team',organization_name:'First club'},
+ {id:P,athlete_id:A,is_guardian:true,team_id:T2,team_name:'Second team',organization_name:'First club'},
+ {id:P2,athlete_id:A,is_guardian:true,team_id:T3,team_name:'Other club team',organization_name:'Other club'}];
+test('sharing defaults to no teams even when the child has multiple clubs',async t=>{
+ const {c,calls}=await setup(t,{workspace:multiClub});await c.load();await c.selectPlayer(P);c.pickFile({target:{files:[file],value:''}});await c.submit();
+ const meta=calls.find(x=>x[0]==='submit')[3];assert.equal(meta.share,false);assert.deepEqual([...meta.teamIds],[]);
+});
+test('individual team selection sends only the chosen team and never another club',async t=>{
+ const {c,calls}=await setup(t,{workspace:multiClub});await c.load();await c.selectPlayer(P);c.pickFile({target:{files:[file],value:''}});
+ assert.deepEqual(Array.from(c.consentTeams.value,x=>x.id),[T,T2]);c.toggleUploadTeam(T2,true);c.toggleUploadTeam(T3,true);await c.submit();
+ const meta=calls.find(x=>x[0]==='submit')[3];assert.deepEqual([...meta.teamIds],[T2]);assert.equal(meta.share,true);
+});
+test('switching club profiles and replacing a video clear all sharing selections',async t=>{
+ const {c}=await setup(t,{workspace:multiClub});await c.load();await c.selectPlayer(P);c.toggleUploadTeam(T,true);await c.selectPlayer(P2);
+ assert.deepEqual([...c.selectedTeamIds.value],[]);assert.equal(c.share.value,false);assert.deepEqual(Array.from(c.consentTeams.value,x=>x.id),[T3]);
+ c.toggleUploadTeam(T3,true);c.pickFile({target:{files:[file],value:''}});assert.deepEqual([...c.selectedTeamIds.value],[]);
+});
+test('a stale or injected team selection fails closed before uploading',async t=>{
+ const {c,calls}=await setup(t,{workspace:multiClub});await c.load();await c.selectPlayer(P);c.pickFile({target:{files:[file],value:''}});
+ c.selectedTeamIds.value=[T3];await c.submit();assert.equal(calls.length,0);assert.match(c.error.value,/authorized teams/);
+});
+test('existing grants are never preselected; consent replacement requires an explicit subset',async t=>{
+ const {c,calls}=await setup(t,{workspace:multiClub,list:async()=>[{...row,share_with_team:true,consent_team_ids:[T,T2]}]});await c.load();await c.selectPlayer(P);
+ const item=c.items.value[0];assert.match(c.grantedTeams(item),/First club/);await c.consent(item,true);assert.equal(calls.length,0);assert.match(c.error.value,/Select at least one/);
+ c.toggleConsentTeam(item,T2,true);c.toggleConsentTeam(item,T3,true);await c.consent(item,true);
+ assert.equal(calls[0][0],'consent');assert.deepEqual([...calls[0][4]],[T2]);assert.deepEqual([...(c.consentSelections.value[V]||[])],[]);
+});
+test('metadata refresh and logout reset upload and per-video consent drafts',async t=>{
+ const {c}=await setup(t,{workspace:multiClub});await c.load();await c.selectPlayer(P);c.toggleUploadTeam(T,true);c.toggleConsentTeam(c.items.value[0],T2,true);
+ await c.load();assert.deepEqual([...c.selectedTeamIds.value],[]);assert.equal(Object.keys(c.consentSelections.value).length,0);
+ c.toggleUploadTeam(T,true);c.reset();assert.equal(c.selectedTeamIds.value.length,0);assert.equal(Object.keys(c.consentSelections.value).length,0);
+});
+test('metadata projection preserves valid explicit team scope and rejects malformed IDs',async t=>{
+ const {service}=await serviceSetup(t,{requestJson:async route=>route==='/v2/capabilities'?{revision:'sdl004-submissions-v1',submissions:true,review:true,clubhouse:true}:{items:[{...row,consent_team_ids:[T,'invalid',T2]}]}});
+ await assert.rejects(service.list(P),/Invalid identifier/);
+});
+
+test('history refresh clears obsolete per-video consent selections',async t=>{
+ const {c}=await setup(t,{workspace:multiClub});await c.load();await c.selectPlayer(P);c.toggleConsentTeam(c.items.value[0],T,true);
+ await c.refreshItems();assert.equal(Object.keys(c.consentSelections.value).length,0);
 });

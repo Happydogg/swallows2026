@@ -44,6 +44,14 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   assert.match(flatten(host), /Private player videos/);
   const submissions=h.app.submissionController;
   submissions.changeTab('submissions');await Vue.nextTick();assert.match(flatten(host),/Submit for coach review/);
+  submissions.playerId.value='test-profile';submissions.workspace.value=[{id:'test-profile',is_guardian:true,team_id:'test-team',team_name:'Selected team',organization_name:'Test club'}];
+  await Vue.nextTick();
+  const elements=n=>[n,...n.children.flatMap(elements)];
+  const label=elements(host).find(n=>n.type==='label'&&flatten(n).includes('Test club · Selected team'));
+  assert.ok(label,'Individual team and organization label renders');
+  const checkbox=label.children.find(n=>n.type==='input');assert.equal(checkbox.props.checked,false);
+  submissions.selectedTeamIds.value=['test-team'];await Vue.nextTick();assert.equal(checkbox.props.checked,true);
+  submissions.selectedTeamIds.value=[];await Vue.nextTick();assert.equal(checkbox.props.checked,false);
   submissions.items.value=[{id:'s',category:'throwing',status:'rejected',history:[{at:'now',action:'rejected',note:'Try again'}],can_consent:true}];
   await Vue.nextTick();assert.match(flatten(host),/Submission history/);
   submissions.changeTab('review');submissions.queue.value=[{id:'s',preferred_name:'Test player',team_name:'Team',category:'pitching',status:'pending',history:[],can_review:true}];

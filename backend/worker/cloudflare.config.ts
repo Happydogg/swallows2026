@@ -1,5 +1,7 @@
 // Prepared staging target only. Never provision a bucket or deploy automatically.
 import { bindings, defineConfig } from 'cf/config';
+import {deploymentBaseline,preservedObservability} from './deploymentPreservation.mjs';
+const observability=preservedObservability(deploymentBaseline());
 export default defineConfig({
   accountId: '702be60427145f59fa040e5250602bd7',
   worker: {
@@ -13,6 +15,7 @@ export default defineConfig({
       SUPABASE_SECRET_KEY: bindings.secret(),
       SUBMISSIONS_ENABLED: bindings.json('false')
     },
-    observability: { enabled: true, traces: { enabled: true } }
+    // Local build without a baseline is NOT release-ready. Never opt into tracing.
+    ...(observability==null?{}:{observability})
   }
 });

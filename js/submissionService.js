@@ -18,7 +18,7 @@ export function createSubmissionService({auth,enabled=SUBMISSION_FEATURES_ENABLE
     verified=identity;
   }
   const project=item=>({id:uuid(item.id),player_id:uuid(item.player_id),category:categoryValue(item.category),status:status(item.status),
-    share_with_team:item.share_with_team===true,can_consent:item.can_consent===true,can_review:item.can_review===true,created_at:text(item.created_at),review_note:String(item.review_note??''),
+    share_with_team:item.share_with_team===true,consent_team_ids:Array.isArray(item.consent_team_ids)?item.consent_team_ids.map(uuid):[],can_consent:item.can_consent===true,can_review:item.can_review===true,created_at:text(item.created_at),review_note:String(item.review_note??''),
     history:Array.isArray(item.history)?item.history.map(h=>({action:String(h.action??''),at:text(h.at),note:typeof h.note==='string'?h.note:''})):[],
     preferred_name:typeof item.preferred_name==='string'?item.preferred_name:'Player',team_id:item.team_id?uuid(item.team_id):null,team_name:text(item.team_name)});
   return {

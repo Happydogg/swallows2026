@@ -1,5 +1,11 @@
 # SDL-004 submission release candidate — NOT DEPLOYED
 
+## Focused hardening checkpoint
+
+See [SDL-004-PREDEPLOY-HARDENING.md](SDL-004-PREDEPLOY-HARDENING.md) for the current local
+consent lifecycle changes, fail-closed preflight runner and Worker settings preservation guard.
+A local build is not release approval. The migration is still unapplied; v2 remains disabled.
+
 ## Scope and readiness
 
 This package adds parent/coach submissions, coach review, explicit guardian sharing consent,
@@ -52,7 +58,8 @@ Both tables enable RLS and revoke direct PUBLIC/anon/authenticated access. Narro
 RPCs perform identity checks; internal predicates and the finalize function are not executable
 by browser roles. Fixed `search_path` and explicit EXECUTE grants apply to every new function.
 The migration neither grants statistics writes nor modifies players/sessions/drill_videos or
-existing media policies. It requires the existing pilot schema and fails if that prerequisite
+existing media policies. It adds `player_team_memberships.sdl_consent_epoch` and consent-only triggers
+on player_team_memberships, athlete_guardians and profiles; these affect new v2 grants only. It requires the existing pilot schema and fails if that prerequisite
 is absent; it is not an empty-database bootstrap or a production baseline migration.
 
 New RPC groups:
@@ -74,17 +81,23 @@ and only permit pending -> approved/rejected; a conflicting review returns SQLST
 which must map to HTTP 409 in the staging PostgREST smoke test.
 
 Team sharing requires approval AND consent from the submitting verified guardian. The UI lists
-the exact selected player's teams before consent; their UUIDs are included explicitly. Server
-validation restricts them to active assignments. Consent binds both team IDs and membership-row
-IDs, so a transfer or a later rejoin does not silently inherit consent. A new explicit grant is
+individual teams with club labels for the selected player profile. All checkboxes start unchecked;
+only the selected UUIDs are sent. Another club's player profile requires separate submission/consent;
+sharing never propagates automatically across clubs. Server validation restricts consent to active
+assignments. Consent binds team IDs, membership IDs and assignment-generation UUIDs. A new membership
+column and lifecycle triggers invalidate consent on assignment changes, even reactivation of the
+same membership ID. Guardian revocation and uploader profile suspension also clear existing grants. A new explicit grant is
 required after assignment changes. Coaches without a guardian relationship cannot grant consent.
-A revoked guardian/profile or withdrawn consent immediately removes eligibility at the database
+A revoked guardian/profile or withdrawn consent removes eligibility at the database
 and next request. The Clubhouse projection excludes family details, review notes and actor history.
 
 Uploads use a per-user UUID Idempotency-Key and a server SHA-256 fingerprint of bytes/category/
 player/consent/team scope. The database allocates the media ID/key. Concurrent reservation attempts
 conflict; completed retries return the same receipt without another object write. An expired
-2-minute lease can be reclaimed with the same key and data. Metadata/submission/history completion
+2-minute lease can be reclaimed with the same key and data. If a membership/guardian/profile change
+invalidates sharing during an upload, finalization remains private. A later retry requesting the
+obsolete grant can return 409; select the current scope and use a new request key rather than
+restoring the old grant. Metadata/submission/history completion
 is atomic and rechecks role/session eligibility. New v2 code never deletes R2 objects. On an
 uncertain failure an object can remain private and uncommitted; same-key recovery reuses it.
 Uncommitted reservation retention/cleanup requires a separately reviewed operational policy.
@@ -170,14 +183,20 @@ the sprint checkpoint report. All JavaScript/ES modules and component/shell temp
 1. Review this commit, migration, complete Worker/configuration, explicit consent scope, retention
    and idempotency behavior. Confirm the backend matches approved business rules; do not auto-enable it.
 2. In project `wvurolqbjhuckkkjiiiv` only, take a recoverable backup and reconcile migration history.
-   Run the prepared read-only preflight and capture counts/grants. The new tables must not already
-   exist; pilot tables/RPC must exist. Stop on drift; do not edit an applied migration in place.
+   Use the guarded preflight runner described in the hardening report, with explicit project
+   confirmation, verified dedicated staging connection/TLS CA and reviewed migration-history manifest.
+   Both new tables must be absent; dependency types, Auth/pilot RPCs, grants, RLS, migration permissions
+   and exact history must pass. Capture counts/grants. Stop on drift; do not edit an applied migration.
 3. Obtain explicit approval before applying the versioned migration in staging. Do not use a
    production project/profile, execute ad hoc policy relaxations, or apply the pointer SQL.
 4. Run read-only postflight. Existing table counts and pilot RPC grants should match the baseline
    before any QA uploads. Test new RPCs as synthetic guardian/coach/peer/unrelated users, not only SQL owner.
 5. Review the generated local Worker package with `npm run check:worker`. Confirm exact Worker,
-   account, bucket and Supabase target; retain existing secret bindings and values. Do not call
+   account, bucket and Supabase target. Review the current deployed staging version's binding metadata
+   and observability settings (no secret values) in a local baseline; rebuild with that baseline and
+   require `npm run check:release --prefix backend/worker` to pass. Unknown bindings, settings drift
+   or no baseline block release. The pinned uploader retains secret values; do not treat omitted
+   observability as preserving remote settings. Retain existing secret bindings and values. Do not call
    secret put/delete or provisioning commands. Stop if the deployment tool proposes resource changes.
 6. With explicit deployment approval, deploy only the reviewed staging package while its backend
    flag remains false; retest the already working v1 pilot only where deployment changes affect it.

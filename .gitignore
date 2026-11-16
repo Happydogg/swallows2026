@@ -5,3 +5,6 @@ node_modules/
 .env*
 supabase/.temp/
 work/
+
+# Local reviewed provider metadata; never commit credentials.
+*.local.json

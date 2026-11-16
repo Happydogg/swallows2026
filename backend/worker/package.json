@@ -3,8 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "cf build",
-    "check:package": "node check-package.mjs"
+    "build": "SDL004_LOCAL_BUILD_ONLY=1 cf build",
+    "check:package": "node check-package.mjs",
+    "check:release": "node check-package.mjs --release"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "2.0.0-rc.0",

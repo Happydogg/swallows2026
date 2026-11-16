@@ -1,0 +1,15 @@
+{
+  "confirmed": false,
+  "accountId": "702be60427145f59fa040e5250602bd7",
+  "name": "sdl-r2-staging-gate",
+  "versionId": null,
+  "compatibilityDate": "2026-11-16",
+  "otherSettingsReviewed": false,
+  "env": {
+    "MEDIA_BUCKET": {"type": "r2", "name": "sdl-media-staging"},
+    "SUPABASE_URL": {"type": "json", "value": "https://wvurolqbjhuckkkjiiiv.supabase.co"},
+    "SUPABASE_PUBLISHABLE_KEY": {"type": "secret"},
+    "SUPABASE_SECRET_KEY": {"type": "secret"}
+  },
+  "observability": null
+}
