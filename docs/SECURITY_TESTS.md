@@ -1,5 +1,25 @@
 # SDL-004-006 staging security checks
 
+## Local Phase 1 regression tests
+
+Run from the repository root with Node.js (tested with Node 24):
+
+```sh
+node --experimental-vm-modules --test tests/authLifecycle.test.mjs
+```
+
+The suite loads the actual ES modules with synthetic Supabase responses and a minimal Vue
+reactivity/lifecycle adapter. It makes no network requests or database/storage writes.
+It covers session changes, delayed responses, logout failures, analyzer cleanup, pending
+MediaPipe initialization, frame cancellation, chart cleanup, and the existing write/media locks.
+
+To additionally exercise Vue 3 reactivity, set `SDL004_VUE_RUNTIME` to the absolute path of
+an independently installed Vue 3 CommonJS runtime (`vue/dist/vue.cjs.js`) and run the same
+command. No application dependency or bundler change is needed.
+
+These tests do not establish deployed RLS, Worker authorization, cross-tab SDK transport,
+actual GPU inference, or browser rendering. Session events are supplied by the test adapter.
+
 ## Important limitations
 
 - SQL Editor's privileged role **bypasses RLS**. A SELECT performed in SQL Editor is not evidence of browser authorization.

@@ -5,6 +5,11 @@
 
 let chartInstance = null;
 
+export function clearPlayerChart() {
+  chartInstance?.destroy();
+  chartInstance = null;
+}
+
 export function renderPlayerChartCanvas({ canvasId = 'playerVelocityChart', playerSessions, chartMode, t }) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return false;

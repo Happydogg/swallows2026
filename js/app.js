@@ -1,7 +1,7 @@
 // SDL-003: lightweight Vue application coordinator (no bundler required).
 // Feature state/commands live in composables, UI in components, I/O in services.
 import { translations } from './translations.js';
-import { supabaseClient } from './config.js';
+import { clearPlayerChart } from './chartManager.js';
 import { formatImgUrl } from './mediaStorage.js';
 import { fetchAllCloudData } from './supabaseService.js';
 import { fetchCoachRoster } from './coachRosterService.js';
@@ -23,7 +23,7 @@ import { SessionFormModal } from '../components/SessionFormModal.js';
 import { UploadVideoModal } from '../components/UploadVideoModal.js';
 import { ArAnalyzerModal } from '../components/ArAnalyzerModal.js';
 
-const { createApp, ref, onMounted, markRaw } = Vue;
+const { createApp, ref, onMounted, onUnmounted, markRaw } = Vue;
 
 createApp({
   components: {
@@ -48,7 +48,13 @@ createApp({
     const coachRosterLoading = ref(false);
     const coachRosterError = ref('');
 
-    const auth = useAuthSession();
+    const auth = useAuthSession({
+      onIdentityChange: () => clearSensitiveState(),
+      onAuthenticated: async () => {
+        void arAnalyzer.initPoseTracker();
+        await fetchAllData();
+      }
+    });
     const coach = useCoachMode(t);
     const analytics = useAnalytics({ players, sessions, selectedPlayer, currentView, searchQuery, t });
     const playerFeature = usePlayers({
@@ -69,32 +75,41 @@ createApp({
       getPlayerDisplayName: playerFeature.getPlayerDisplayName
     });
     const arAnalyzer = createArAnalyzerController({ selectedPlayer });
+    const emptyPlayerForm = { ...playerFeature.newPlayer.value };
+    const emptySessionForm = { ...sessionFeature.newSession.value };
+    const emptyVideoForm = { ...videoFeature.newDrillVideo.value };
 
-    const fetchSafeCoachRoster = async () => {
+    const fetchSafeCoachRoster = async (identity) => {
+      if (!auth.isCurrentIdentity(identity)) return;
       coachRoster.value = [];
       coachRosterError.value = '';
       coachRosterLoading.value = true;
       try {
-        coachRoster.value = await fetchCoachRoster();
+        const roster = await fetchCoachRoster();
+        if (auth.isCurrentIdentity(identity)) coachRoster.value = roster;
       } catch (err) {
-        coachRosterError.value = err.message || 'Could not retrieve team roster';
+        if (auth.isCurrentIdentity(identity)) coachRosterError.value = err.message || 'Could not retrieve team roster';
       } finally {
-        coachRosterLoading.value = false;
+        if (auth.isCurrentIdentity(identity)) coachRosterLoading.value = false;
       }
     };
     const fetchAllData = async () => {
+      const identity = auth.captureIdentity();
+      if (!auth.isCurrentIdentity(identity)) return;
       loading.value = true;
       try {
         const data = await fetchAllCloudData();
+        if (!auth.isCurrentIdentity(identity)) return;
         players.value = data.players.sort(compareJerseys);
         sessions.value = data.sessions;
         drillVideos.value = data.drillVideos;
-        if (auth.isTeamCoach.value) await fetchSafeCoachRoster();
+        if (auth.isTeamCoach.value) await fetchSafeCoachRoster(identity);
       } catch (err) {
+        if (!auth.isCurrentIdentity(identity)) return;
         auth.authError.value = err.message || 'Data request failed';
         console.error('Fetch error:', err);
       } finally {
-        loading.value = false;
+        if (auth.isCurrentIdentity(identity)) loading.value = false;
       }
     };
     const saveLanguage = () => {
@@ -110,30 +125,33 @@ createApp({
       coachRosterError.value = '';
       selectedPlayer.value = null;
       currentView.value = 'overview';
+      loading.value = false;
+      coachRosterLoading.value = false;
+      searchQuery.value = '';
+      coach.lockCoachMode();
+      arAnalyzer.resetAnalyzer();
+      clearPlayerChart();
+      analytics.expandedSessionIds.clear();
+      analytics.hasChartData.value = false;
+      playerFeature.showAddPlayerModal.value = false;
+      playerFeature.showEditPlayerModal.value = false;
+      playerFeature.editingPlayer.value = null;
+      sessionFeature.showLogModal.value = false;
+      sessionFeature.showEditSessionModal.value = false;
+      sessionFeature.activePlayerForLog.value = null;
+      sessionFeature.editingSession.value = null;
+      videoFeature.showUploadVideoModal.value = false;
+      videoFeature.activePlayerForVideo.value = null;
+      videoFeature.selectedVideoFile.value = null;
+      playerFeature.newPlayer.value = { ...emptyPlayerForm };
+      sessionFeature.newSession.value = { ...emptySessionForm };
+      videoFeature.newDrillVideo.value = { ...emptyVideoForm };
+      for (const id of Object.keys(playerFeature.failedImgs)) delete playerFeature.failedImgs[id];
     };
-    const signInAndLoad = async () => {
-      await auth.signIn();
-      if (auth.authUser.value) await fetchAllData();
-    };
-    const signOutAndClear = async () => {
-      // Clear private data immediately even when logout fails remotely.
-      clearSensitiveState();
-      await auth.signOut();
-    };
-    onMounted(async () => {
-      // Track external sign-outs and token changes, including other tabs.
-      supabaseClient.auth.onAuthStateChange((_event, session) => {
-        if (!session) {
-          clearSensitiveState();
-          auth.authUser.value = null;
-        }
-      });
-      await auth.initializeAuth();
-      if (auth.authUser.value) await fetchAllData();
-      else loading.value = false;
-      // Pose tracker starts only once login has resolved; no need on login screen.
-      if (auth.authUser.value) arAnalyzer.initPoseTracker();
-    });
+    const signInAndLoad = () => auth.signIn();
+    const signOutAndClear = () => auth.signOut();
+    onMounted(() => auth.initializeAuth());
+    onUnmounted(() => auth.disposeAuth());
 
     return {
       currentLang, t, saveLanguage, loading, isSaving, currentView, overviewTab, searchQuery,

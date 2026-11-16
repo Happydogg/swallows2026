@@ -16,7 +16,10 @@ export function createArAnalyzerController({ selectedPlayer }) {
 
   let localObjectUrl = null;
   let loopGeneration = 0;
+  let pendingFrame = null;
   let poseLandmarkerInstance = null;
+  let poseGeneration = 0;
+  let poseInitialization = null;
   let wristHistory = [];
 
   const isPlaying = ref(false);
@@ -80,18 +83,29 @@ export function createArAnalyzerController({ selectedPlayer }) {
   const currentFrameIndex = ref(0);
   const totalFramesEstimate = ref(0);
 
-  const initPoseTracker = async (retries = 25) => {
-    while (!window.initMediaPipe && retries > 0) {
-      await new Promise((res) => setTimeout(res, 100));
-      retries--;
-    }
-    if (window.initMediaPipe) {
+  const initPoseTracker = (retries = 25) => {
+    if (poseLandmarkerInstance) return Promise.resolve();
+    if (poseInitialization) return poseInitialization;
+    const generation = poseGeneration;
+    const initialization = (async () => {
       try {
-        poseLandmarkerInstance = await window.initMediaPipe();
+        while (!window.initMediaPipe && retries > 0 && generation === poseGeneration) {
+          await new Promise((res) => setTimeout(res, 100));
+          retries--;
+        }
+        if (generation !== poseGeneration || !window.initMediaPipe) return;
+        const tracker = await window.initMediaPipe();
+        if (generation !== poseGeneration) tracker.close?.();
+        else poseLandmarkerInstance = tracker;
       } catch (err) {
-        console.warn('MediaPipe init error:', err);
+        if (generation === poseGeneration) console.warn('MediaPipe init error:', err);
       }
-    }
+    })();
+    poseInitialization = initialization;
+    void initialization.then(() => {
+      if (poseInitialization === initialization) poseInitialization = null;
+    });
+    return initialization;
   };
 
   // Seed proportional timestamps immediately from clip duration so no button ever shows blank
@@ -117,7 +131,15 @@ export function createArAnalyzerController({ selectedPlayer }) {
     }
   };
 
+  const cancelPendingFrame = () => {
+    if (!pendingFrame) return;
+    if (pendingFrame.video) pendingFrame.video.cancelVideoFrameCallback(pendingFrame.id);
+    else cancelAnimationFrame(pendingFrame.id);
+    pendingFrame = null;
+  };
+
   const openAnalyzer = (video) => {
+    cancelPendingFrame();
     ++loopGeneration;
     if (localObjectUrl) { URL.revokeObjectURL(localObjectUrl); localObjectUrl = null; }
     activeAnalyzerVideo.value = video;
@@ -155,11 +177,61 @@ export function createArAnalyzerController({ selectedPlayer }) {
   };
 
   const closeAnalyzer = () => {
+    cancelPendingFrame();
     ++loopGeneration;
     if (analyzerVideoRef.value) analyzerVideoRef.value.pause();
     activeAnalyzerVideo.value = null;
     isPlaying.value = false;
     if (localObjectUrl) { URL.revokeObjectURL(localObjectUrl); localObjectUrl = null; }
+  };
+
+  // Account/session cleanup is stronger than closing the modal: discard all
+  // private frames, detach media, and invalidate pending GPU initialization.
+  const resetAnalyzer = () => {
+    closeAnalyzer();
+    poseGeneration++;
+    poseInitialization = null;
+    poseLandmarkerInstance?.close?.();
+    poseLandmarkerInstance = null;
+    const video = analyzerVideoRef.value;
+    if (video) {
+      video.onended = null;
+      video.removeAttribute('src');
+      video.load();
+    }
+    const canvas = analyzerCanvasRef.value;
+    canvas?.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
+    analyzerVideoRef.value = null;
+    analyzerCanvasRef.value = null;
+    wristHistory = [];
+    recordedPitchFrames = [];
+    pitchAnchors = null;
+    prevWristPosition = null;
+    prevWristTime = null;
+    lastTimestamp = -1;
+    lastRecordedVideoTime = -1;
+    manualRearOverride.value = null;
+    initialHeadX.value = null;
+    Object.assign(anchoredCoords, { frontWallX: null, headOrigin: null, backLegX: null });
+    Object.assign(refGuides, { frontWall: true, headBox: true, spineAxis: true });
+    girdleMetrics.value = { spineTilt: 0, separationAngle: 0, shoulderTilt: 0, pelvicTilt: 0 };
+    bauerPhases.value = [];
+    firstFaultPhase.value = null;
+    activePhaseKey.value = null;
+    playbackRate.value = 0.25;
+    showOverlay.value = true;
+    isTrackerLocked.value = false;
+    isHudExpanded.value = false;
+    currentCalculatedSpeed.value = 19.9;
+    currentTrajectoryAngle.value = 16.1;
+    leadKneeAngle.value = 158;
+    headDriftPx.value = 0;
+    elbowFlexionAngle.value = 90;
+    trunkTiltAngle.value = 0;
+    videoDuration.value = 0;
+    currentPlaybackTime.value = 0;
+    currentFrameIndex.value = 0;
+    totalFramesEstimate.value = 0;
   };
 
   const computeGirdleMetrics = (pts, worldPts = null) => {
@@ -553,9 +625,18 @@ export function createArAnalyzerController({ selectedPlayer }) {
     if (!vid || !canvas) return;
     const ctx = canvas.getContext('2d');
 
+    cancelPendingFrame();
     const generation = ++loopGeneration;
+    const scheduleFrame = () => {
+      if ('requestVideoFrameCallback' in vid && 'cancelVideoFrameCallback' in vid) {
+        pendingFrame = { video: vid, id: vid.requestVideoFrameCallback(processFrame) };
+      } else {
+        pendingFrame = { id: requestAnimationFrame(processFrame) };
+      }
+    };
     const processFrame = () => {
       if (generation !== loopGeneration) return;
+      pendingFrame = null;
       if (activeAnalyzerVideo.value && poseLandmarkerInstance && vid.readyState >= 2) {
         const now = performance.now();
         if (now > lastTimestamp) {
@@ -592,13 +673,11 @@ export function createArAnalyzerController({ selectedPlayer }) {
         }
       }
       if (activeAnalyzerVideo.value) {
-        if ('requestVideoFrameCallback' in vid) vid.requestVideoFrameCallback(processFrame);
-        else requestAnimationFrame(processFrame);
+        scheduleFrame();
       }
     };
 
-    if ('requestVideoFrameCallback' in vid) vid.requestVideoFrameCallback(processFrame);
-    else requestAnimationFrame(processFrame);
+    scheduleFrame();
   };
 
   const jumpToPhase = (phase) => {
@@ -639,6 +718,7 @@ export function createArAnalyzerController({ selectedPlayer }) {
 
   return {
     initPoseTracker,
+    resetAnalyzer,
     activeAnalyzerVideo,
     analyzerVideoRef,
     analyzerCanvasRef,
