@@ -30,12 +30,16 @@ export async function workerHarness(role = 'coach') {
       if (rpc === 'sdl_004_media_can_access') return Response.json(body.p_player_id === PLAYER &&
         (h.role === 'coach' || (h.role === 'parent' && body.p_action === 'read')));
       if (rpc === 'sdl_004_session_active') return Response.json(!h.expired&&!h.revoked);
-      if (rpc === 'sdl_004_submission_contract') return Response.json({revision:h.revision??'sdl004-submissions-v1'});
+      if (rpc === 'sdl_004_submission_contract') return Response.json({revision:h.revision??'sdl004-club-enrollment-v2'});
       if (rpc === 'sdl_004_reserve_submission') {
         if(h.conflict)return new Response(null,{status:409});
         if(h.completed)return Response.json({state:'complete',id:VIDEO,player_id:PLAYER,category:'pitching',status:'pending',share_with_team:false});
         h.savedSubmission = {p_user_id:USER,p_category:body.p_category}; return Response.json({state:'reserved',id:VIDEO,object_key:`pilot/${PLAYER}/${VIDEO}.mp4`}); }
       if (rpc === 'sdl_004_submission_can_submit') return Response.json(body.p_player_id === PLAYER && ['coach','parent'].includes(h.role));
+      if(rpc==='sdl_004_club_consent')return h.role==='parent'?Response.json(null):new Response(null,{status:403});
+      if(rpc==='sdl_004_set_club_enrollment'||rpc==='sdl_004_set_recording_permission')return h.role==='admin'?Response.json(null):new Response(null,{status:403});
+      if(rpc==='sdl_004_list_club_consents')return Response.json([]);
+      if(rpc==='sdl_004_publish_submission')return h.role==='coach'&&h.approved&&h.consent?Response.json(null):new Response(null,{status:403});
       if (rpc === 'sdl_004_submission_is_guardian') return Response.json(h.role === 'parent');
       if (rpc === 'sdl_004_review_submission') return h.role === 'coach'&&!h.selfReview ? Response.json(null) : new Response(null, { status: 403 });
       if (rpc === 'sdl_004_submission_can_read') return Response.json(h.role === 'parent' || h.role === 'coach' ||

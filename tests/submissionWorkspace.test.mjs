@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {harness,user,deferred} from './helpers/appHarness.mjs';
 const P='11111111-1111-4111-8111-111111111111',P2='22222222-2222-4222-8222-222222222222',A='33333333-3333-4333-8333-333333333333',V='44444444-4444-4444-8444-444444444444',T='55555555-5555-4555-8555-555555555555';
-const row={id:V,player_id:P,category:'pitching',status:'pending',can_review:true,can_consent:true,history:[],share_with_team:false};
+const E='88888888-8888-4888-8888-888888888888',G='99999999-9999-4999-8999-999999999999',O='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const club={id:E,generation:G,athlete_id:A,organization_id:O,organization_name:'First club',status:'active',consent_active:false,history:[]};
+const row={id:V,player_id:P,athlete_id:A,can_publish:true,publication_team_ids:[],category:'pitching',status:'pending',can_review:true,can_consent:true,history:[],share_with_team:false};
 const file={name:'clip.mp4',type:'video/mp4',size:12,lastModified:1};
 async function setup(t,overrides={},options={}){
  const h=await harness(t,user('parent'));const calls=[],revoked=[];
@@ -14,7 +16,7 @@ async function setup(t,overrides={},options={}){
  const api={enabled:true,workspace:async()=>[{id:P,athlete_id:A,is_guardian:true,is_coach:true,team_id:T,team_name:'Team',organization_name:'Club',organization_id:'org'}],
  list:async()=>[{...row}],queue:async()=>[{...row}],clubhouse:async()=>[{id:V,player_id:P,category:'pitching',preferred_name:'Child'}],
  submit:async(...args)=>{calls.push(['submit',...args]);args[3].onProgress(100);return row;},review:async(...args)=>{calls.push(['review',...args]);return {updated:true};},
- consent:async(...args)=>{calls.push(['consent',...args]);return {updated:true};},playback:async()=>new Blob(['private'],{type:'video/mp4'}),...overrides};
+ enrollments:async()=>[{...club}],clubConsent:async(...args)=>{calls.push(['clubConsent',...args]);return {updated:true};},publish:async(...args)=>{calls.push(['publish',...args]);return {updated:true};},playback:async()=>new Blob(['private'],{type:'video/mp4'}),...overrides};
  const c=h.module('composables/useSubmissionWorkspace.js').useSubmissionWorkspace({auth:h.app,players:h.app.players,coachRoster:h.app.coachRoster,
  onProfile:p=>calls.push(['profile',p.id]),service:api,urls:{createObjectURL:()=>`blob:${calls.length}`,revokeObjectURL:u=>revoked.push(u)},newKey:()=>V,pollMs:1000000,...options});
  t.after(()=>c.dispose());return{h,c,api,calls,revoked};
@@ -41,9 +43,9 @@ test('MP4 picking creates a local preview and invalid files are rejected',async 
  c.pickFile({target:{files:[{...file,type:'video/quicktime'}],value:'x'}});assert.equal(c.file.value,null);assert.match(c.error.value,/MP4/);
  c.pickFile({target:{files:[{...file,size:20971521}],value:'x'}});assert.equal(c.file.value,null);assert.match(c.error.value,/20 MiB/);
 });
-test('successful parent submission sends category and explicit consent then reloads status',async t=>{
- const {c,calls,revoked}=await setup(t);await c.load();await c.selectPlayer(P);c.pickFile({target:{files:[file],value:''}});c.category.value='throwing';c.toggleUploadTeam(T,true);await c.submit();
- const call=calls.find(x=>x[0]==='submit');assert.equal(call[3].category,'throwing');assert.equal(call[3].share,true);assert.equal(call[3].key,V);
+test('successful parent submission is private with no per-video consent parameters',async t=>{
+ const {c,calls,revoked}=await setup(t);await c.load();await c.selectPlayer(P);c.pickFile({target:{files:[file],value:''}});c.category.value='throwing';await c.submit();
+ const call=calls.find(x=>x[0]==='submit');assert.equal(call[3].category,'throwing');assert.equal(call[3].share,undefined);assert.equal(call[3].teamIds,undefined);assert.equal(call[3].key,V);
  assert.equal(c.items.value[0].status,'pending');assert.equal(c.file.value,null);assert.ok(revoked.length);assert.match(c.notice.value,/Submitted/);
 });
 test('interrupted submission keeps the same idempotency key for recovery',async t=>{
@@ -65,9 +67,9 @@ test('concurrent review conflict refreshes the queue without reporting success',
  let count=0;const {c}=await setup(t,{queue:async()=>{count++;return[{...row,status:count>1?'approved':'pending'}];},review:async()=>{throw Object.assign(Error('Concurrent review'),{status:409});}});
  await c.enterReview(T);await c.review(c.queue.value[0],'approved');assert.equal(count,2);assert.equal(c.queue.value[0].status,'approved');assert.equal(c.notice.value,'');assert.match(c.error.value,/Concurrent/);
 });
-test('consent withdrawal clears shared rows and private playback immediately in this tab',async t=>{
- const {c,calls,revoked}=await setup(t);await c.selectPlayer(P);c.items.value=[{...row,share_with_team:true}];await c.play(c.items.value[0]);c.shared.value=[row];
- await c.consent(c.items.value[0],false);assert.equal(c.playbackUrl.value,'');assert.equal(c.shared.value.length,0);assert.ok(revoked.length);assert.equal(calls[0][0],'consent');assert.equal(calls[0][2],false);
+test('club withdrawal clears shared rows and playback but preserves private history',async t=>{
+ const {c,calls,revoked}=await setup(t);await c.load();await c.selectPlayer(P);await c.play(c.items.value[0]);c.shared.value=[row];
+ await c.clubConsent(c.clubEnrollments.value[0],false);assert.equal(c.playbackUrl.value,'');assert.equal(c.shared.value.length,0);assert.ok(revoked.length);assert.equal(calls[0][0],'clubConsent');assert.equal(calls[0][2],false);assert.equal(c.items.value.length,1);
 });
 test('Clubhouse refresh drops stale rows and playback before fetching current consent',async t=>{
  let count=0;const {c}=await setup(t,{clubhouse:async()=>++count===1?[row]:[]});await c.selectTeam(T,'clubhouse');await c.play(c.shared.value[0],'clubhouse');assert.ok(c.playbackUrl.value);
@@ -91,14 +93,19 @@ test('request timeout clears loading and allows retry',async t=>{
 });
 
 async function serviceSetup(t,overrides={}){
- const h=await harness(t,user('parent')),calls=[];const transport={requestJson:async(route,opt)=>{calls.push({route,opt});if(route==='/v2/capabilities')return{revision:'sdl004-submissions-v1',submissions:true,review:true,clubhouse:true};return{items:[row]};},submit:async()=>row,submissionPlayback:async()=>new Blob(['private']),...overrides};
+ const h=await harness(t,user('parent')),calls=[];const transport={requestJson:async(route,opt)=>{calls.push({route,opt});if(route==='/v2/capabilities')return{revision:'sdl004-club-enrollment-v2',submissions:true,review:true,clubhouse:true,clubConsent:true};return{items:[row]};},submit:async()=>row,submissionPlayback:async()=>new Blob(['private']),...overrides};
  return{h,calls,service:h.module('js/submissionService.js').createSubmissionService({auth:h.app,enabled:true,transport})};
 }
 test('submission transport refuses an old or incomplete backend contract',async t=>{const {service}=await serviceSetup(t,{requestJson:async()=>({revision:'old'})});await assert.rejects(service.list(P),/required backend/);});
 test('client feature gate blocks even direct programmatic calls before any backend request',async t=>{const {h}=await serviceSetup(t);let called=false;const service=h.module('js/submissionService.js').createSubmissionService({auth:h.app,enabled:false,transport:{requestJson(){called=true;}}});await assert.rejects(service.list(P),/await verified/);assert.equal(called,false);});
-test('metadata projection strips private family fields and reviewer identity from history',async t=>{const {service}=await serviceSetup(t,{requestJson:async route=>route==='/v2/capabilities'?{revision:'sdl004-submissions-v1',submissions:true,review:true,clubhouse:true}:{items:[{...row,dob:'secret',history:[{actor:'private',action:'approved',note:'OK'}]}]}});const [item]=await service.list(P);assert.equal(item.dob,undefined);assert.equal(item.history[0].actor,undefined);});
-test('review and consent requests use only explicit fields and scoped IDs',async t=>{const {service,calls}=await serviceSetup(t);await service.review(V,'rejected','Try again');assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1).opt.body)),{decision:'rejected',note:'Try again'});await service.consent(V,false);assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1).opt.body)),{share_with_team:false,team_ids:[]});await assert.rejects(service.review(V,'pending',''),/Invalid review/);});
-
+test('metadata projection strips private family fields and reviewer identity from history',async t=>{const {service}=await serviceSetup(t,{requestJson:async route=>route==='/v2/capabilities'?{revision:'sdl004-club-enrollment-v2',submissions:true,review:true,clubhouse:true,clubConsent:true}:{items:[{...row,dob:'secret',history:[{actor:'private',action:'approved',note:'OK'}]}]}});const [item]=await service.list(P);assert.equal(item.dob,undefined);assert.equal(item.history[0].actor,undefined);});
+test('review, club consent and publication requests carry explicit scoped fields',async t=>{
+ const {service,calls}=await serviceSetup(t);await service.review(V,'rejected','Try again');assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1).opt.body)),{decision:'rejected',note:'Try again'});
+ await service.clubConsent(club,false);assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1).opt.body)),{generation:G,accept:false,policy_version:null});
+ await service.clubConsent(club,true);assert.equal(calls.at(-1).opt.body.policy_version,'sdl004-clubhouse-v1');
+ await service.publish(V,[T],[A]);assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1).opt.body)),{team_ids:[T],subject_athletes:[A]});
+ await assert.rejects(service.review(V,'pending',''),/Invalid review/);
+});
 
 test('background consent rechecks preserve authorized playback and stop it when consent disappears',async t=>{
  let allowed=true;const {c}=await setup(t,{clubhouse:async()=>allowed?[row]:[]});
@@ -107,46 +114,35 @@ test('background consent rechecks preserve authorized playback and stop it when 
  allowed=false;await c.refreshShared(true);assert.equal(c.playbackUrl.value,'');assert.equal(c.shared.value.length,0);
 });
 
-const T2='66666666-6666-4666-8666-666666666666',T3='77777777-7777-4777-8777-777777777777';
-const multiClub=async()=>[
- {id:P,athlete_id:A,is_guardian:true,team_id:T,team_name:'First team',organization_name:'First club'},
- {id:P,athlete_id:A,is_guardian:true,team_id:T2,team_name:'Second team',organization_name:'First club'},
- {id:P2,athlete_id:A,is_guardian:true,team_id:T3,team_name:'Other club team',organization_name:'Other club'}];
-test('sharing defaults to no teams even when the child has multiple clubs',async t=>{
- const {c,calls}=await setup(t,{workspace:multiClub});await c.load();await c.selectPlayer(P);c.pickFile({target:{files:[file],value:''}});await c.submit();
- const meta=calls.find(x=>x[0]==='submit')[3];assert.equal(meta.share,false);assert.deepEqual([...meta.teamIds],[]);
-});
-test('individual team selection sends only the chosen team and never another club',async t=>{
- const {c,calls}=await setup(t,{workspace:multiClub});await c.load();await c.selectPlayer(P);c.pickFile({target:{files:[file],value:''}});
- assert.deepEqual(Array.from(c.consentTeams.value,x=>x.id),[T,T2]);c.toggleUploadTeam(T2,true);c.toggleUploadTeam(T3,true);await c.submit();
- const meta=calls.find(x=>x[0]==='submit')[3];assert.deepEqual([...meta.teamIds],[T2]);assert.equal(meta.share,true);
-});
-test('switching club profiles and replacing a video clear all sharing selections',async t=>{
- const {c}=await setup(t,{workspace:multiClub});await c.load();await c.selectPlayer(P);c.toggleUploadTeam(T,true);await c.selectPlayer(P2);
- assert.deepEqual([...c.selectedTeamIds.value],[]);assert.equal(c.share.value,false);assert.deepEqual(Array.from(c.consentTeams.value,x=>x.id),[T3]);
- c.toggleUploadTeam(T3,true);c.pickFile({target:{files:[file],value:''}});assert.deepEqual([...c.selectedTeamIds.value],[]);
-});
-test('a stale or injected team selection fails closed before uploading',async t=>{
- const {c,calls}=await setup(t,{workspace:multiClub});await c.load();await c.selectPlayer(P);c.pickFile({target:{files:[file],value:''}});
- c.selectedTeamIds.value=[T3];await c.submit();assert.equal(calls.length,0);assert.match(c.error.value,/authorized teams/);
-});
-test('existing grants are never preselected; consent replacement requires an explicit subset',async t=>{
- const {c,calls}=await setup(t,{workspace:multiClub,list:async()=>[{...row,share_with_team:true,consent_team_ids:[T,T2]}]});await c.load();await c.selectPlayer(P);
- const item=c.items.value[0];assert.match(c.grantedTeams(item),/First club/);await c.consent(item,true);assert.equal(calls.length,0);assert.match(c.error.value,/Select at least one/);
- c.toggleConsentTeam(item,T2,true);c.toggleConsentTeam(item,T3,true);await c.consent(item,true);
- assert.equal(calls[0][0],'consent');assert.deepEqual([...calls[0][4]],[T2]);assert.deepEqual([...(c.consentSelections.value[V]||[])],[]);
-});
-test('metadata refresh and logout reset upload and per-video consent drafts',async t=>{
- const {c}=await setup(t,{workspace:multiClub});await c.load();await c.selectPlayer(P);c.toggleUploadTeam(T,true);c.toggleConsentTeam(c.items.value[0],T2,true);
- await c.load();assert.deepEqual([...c.selectedTeamIds.value],[]);assert.equal(Object.keys(c.consentSelections.value).length,0);
- c.toggleUploadTeam(T,true);c.reset();assert.equal(c.selectedTeamIds.value.length,0);assert.equal(Object.keys(c.consentSelections.value).length,0);
-});
-test('metadata projection preserves valid explicit team scope and rejects malformed IDs',async t=>{
- const {service}=await serviceSetup(t,{requestJson:async route=>route==='/v2/capabilities'?{revision:'sdl004-submissions-v1',submissions:true,review:true,clubhouse:true}:{items:[{...row,consent_team_ids:[T,'invalid',T2]}]}});
- await assert.rejects(service.list(P),/Invalid identifier/);
-});
 
-test('history refresh clears obsolete per-video consent selections',async t=>{
- const {c}=await setup(t,{workspace:multiClub});await c.load();await c.selectPlayer(P);c.toggleConsentTeam(c.items.value[0],T,true);
- await c.refreshItems();assert.equal(Object.keys(c.consentSelections.value).length,0);
+test('club consent defaults to no sharing and requires an explicit policy acceptance',async t=>{
+ const {c,calls}=await setup(t);await c.load();await c.selectPlayer(P);const e=c.clubEnrollments.value[0];
+ assert.equal(c.consentAccepted.value[E],undefined);await c.clubConsent(e,true);assert.equal(calls.length,0);assert.match(c.error.value,/Explicitly/);
+ c.consentAccepted.value[E]=true;await c.clubConsent(e,true);assert.equal(calls[0][0],'clubConsent');assert.equal(calls[0][1].id,E);assert.equal(calls[0][2],true);
+});
+test('each club has its own enrollment consent and accepting one does not accept another',async t=>{
+ const other={...club,id:O,organization_name:'Other club'};const {c,calls}=await setup(t,{enrollments:async()=>[club,other]});await c.load();await c.selectPlayer(P);
+ assert.equal(c.clubEnrollments.value.length,2);c.consentAccepted.value[E]=true;await c.clubConsent(c.clubEnrollments.value[0],true);
+ assert.equal(calls.length,1);assert.equal(c.consentAccepted.value[O],undefined);
+});
+test('stale enrollment generations and inactive enrollment acceptance fail closed in the UI',async t=>{
+ const {c,calls}=await setup(t);await c.load();await c.selectPlayer(P);c.consentAccepted.value[E]=true;
+ await c.clubConsent({...club,generation:O},true);assert.equal(calls.length,0);
+ c.clubEnrollments.value=[{...club,status:'ended'}];await c.clubConsent(c.clubEnrollments.value[0],true);assert.equal(calls.length,0);
+});
+test('logout and player changes discard consent and subject confirmation drafts',async t=>{
+ const {c}=await setup(t);await c.load();await c.selectPlayer(P);c.consentAccepted.value[E]=true;c.subjectConfirmed.value[V]=true;
+ await c.selectPlayer(P2);assert.equal(Object.keys(c.consentAccepted.value).length,0);assert.equal(Object.keys(c.subjectConfirmed.value).length,0);
+ c.reset();assert.equal(c.clubEnrollments.value.length,0);
+});
+test('publication requires server eligibility and explicit single-athlete confirmation',async t=>{
+ const {c,calls}=await setup(t);await c.enterReview(T);await c.publish(c.queue.value[0]);assert.equal(calls.length,0);
+ c.subjectConfirmed.value[V]=true;await c.publish(c.queue.value[0]);assert.equal(calls[0][0],'publish');assert.deepEqual([...calls[0][2]],[T]);assert.deepEqual([...calls[0][3]],[A]);
+});
+test('late club consent responses cannot restore an account switched workspace',async t=>{
+ const d=deferred();const {c}=await setup(t,{enrollments:()=>d.promise});await c.load();const loading=c.selectPlayer(P);await new Promise(r=>setTimeout(r,5));c.reset();d.resolve([club]);await loading;assert.equal(c.clubEnrollments.value.length,0);
+});
+test('consent conflict refreshes enrollment generation before another acceptance',async t=>{
+ let n=0;const {c}=await setup(t,{enrollments:async()=>[{...club,generation:++n>1?O:G}],clubConsent:async()=>{throw Object.assign(Error('Enrollment changed'),{status:409});}});await c.load();await c.selectPlayer(P);c.consentAccepted.value[E]=true;await c.clubConsent(c.clubEnrollments.value[0],true);
+ assert.equal(c.clubEnrollments.value[0].generation,O);assert.equal(Object.keys(c.consentAccepted.value).length,0);assert.match(c.error.value,/Enrollment changed/);
 });

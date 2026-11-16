@@ -80,16 +80,16 @@ test('verified Worker keeps deletion disabled and rejects non-MP4 container', as
 
 test('proposal only: authorized parent can create a pending categorized submission', async () => {
   const h = await harness('parent');
-  const response = await h.proposal.fetch(h.request(`/v2/submissions?player_id=${PLAYER}&category=throwing&share_with_team=false`, { method: 'POST', body: bytes }), h.env);
+  const response = await h.proposal.fetch(h.request(`/v2/submissions?player_id=${PLAYER}&category=throwing`, { method: 'POST', body: bytes }), h.env);
   assert.equal(response.status, 201); assert.equal((await response.json()).status, 'pending');
   assert.equal(h.savedSubmission.p_user_id, USER); assert.equal(h.savedSubmission.p_category, 'throwing');
 });
 
 test('proposal only: unauthorized player upload fails before R2 and coaches cannot grant guardian consent', async () => {
   const h = await harness('parent');
-  assert.equal((await h.proposal.fetch(h.request(`/v2/submissions?player_id=${OTHER}&category=pitching&share_with_team=false`, { method: 'POST', body: bytes }), h.env)).status, 403);
+  assert.equal((await h.proposal.fetch(h.request(`/v2/submissions?player_id=${OTHER}&category=pitching`, { method: 'POST', body: bytes }), h.env)).status, 403);
   h.role = 'coach';
-  assert.equal((await h.proposal.fetch(h.request(`/v2/submissions?player_id=${PLAYER}&category=pitching&share_with_team=true&team_ids=${OTHER}`, { method: 'POST', body: bytes }), h.env)).status, 403);
+  assert.equal((await h.proposal.fetch(h.request(`/v2/club-enrollments/${VIDEO}/consent`, { method: 'POST', body: JSON.stringify({accept:true,generation:OTHER,policy_version:'sdl004-clubhouse-v1'}),contentType:'application/json' }), h.env)).status, 403);
   assert.equal(h.writes, 0);
 });
 
@@ -116,6 +116,6 @@ for (const [approved, consent, expected] of [[false,true,403],[true,false,403],[
 
 test('proposal only: expired session cannot upload or review', async () => {
   const h = await harness('parent'); h.expired = true;
-  assert.equal((await h.proposal.fetch(h.request(`/v2/submissions?player_id=${PLAYER}&category=batting&share_with_team=false`, { method: 'POST', body: bytes }), h.env)).status, 401);
+  assert.equal((await h.proposal.fetch(h.request(`/v2/submissions?player_id=${PLAYER}&category=batting`, { method: 'POST', body: bytes }), h.env)).status, 401);
   assert.equal(h.writes, 0);
 });

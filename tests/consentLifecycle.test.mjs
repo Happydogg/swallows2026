@@ -1,80 +1,133 @@
-// Actual local SQL RPCs and triggers with synthetic data; no remote SQL or R2 calls.
+// Real SQL only in local, synthetic PGlite (explicitly authorized). No remote SQL.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import {pilotDatabase,uuid,parent,coach,teammate,player,peer,team,org,athlete,otherTeam} from './helpers/submissionDatabase.mjs';
+import {uuid,parent,coach,teammate,outsider,player,peer,team,otherTeam,org,otherOrg,athlete,peerAthlete} from './helpers/submissionDatabase.mjs';
+import {clubWorkflow,enrollment,secondClubEnrollment,adminUser} from './helpers/clubWorkflow.mjs';
 const runtime=process.env.SDL004_PGLITE_RUNTIME;
-test('consent lifecycle never resurrects obsolete grants',{skip:!runtime},async t=>{
- const db=await pilotDatabase(t,runtime);
- await db.exec(fs.readFileSync(new URL('../supabase/migrations/20261116184847_sdl004_submission_workflows.sql',import.meta.url),'utf8'));
- async function as(id,sql){await db.exec('RESET ROLE');await db.query("SELECT set_config('request.jwt.claim.sub',$1,false)",[id]);await db.exec('SET ROLE authenticated');return(await db.query(sql)).rows;}
- async function admin(sql){await db.exec('RESET ROLE');return(await db.query(sql)).rows;}
- const key=uuid(81),claim=uuid(82),fingerprint='d'.repeat(64);
- const reservation=(await as(parent,`SELECT public.sdl_004_reserve_submission('${player}','${key}','${claim}','${fingerprint}',12,'pitching',true,ARRAY['${team}'::uuid]) AS r`))[0].r;
- const id=reservation.id;
- await db.exec('RESET ROLE;SET ROLE service_role');await db.query(`SELECT public.sdl_004_finish_submission('${key}','${claim}','${parent}')`);
- await as(coach,`SELECT public.sdl_004_review_submission('${id}','approved','OK')`);
- const grant=()=>as(parent,`SELECT public.sdl_004_submission_consent('${id}',true,ARRAY['${team}'::uuid])`);
- const canRead=async()=> (await as(teammate,`SELECT public.sdl_004_submission_can_read('${id}') AS allowed`))[0].allowed;
- const membership=(await admin(`SELECT id,sdl_consent_epoch FROM public.player_team_memberships WHERE player_id='${player}' AND team_id='${team}'`))[0];
- await t.test('no-op roster synchronization preserves a current explicit grant',async()=>{
-  assert.equal(await canRead(),true);await admin(`UPDATE public.player_team_memberships SET status=status WHERE id='${membership.id}'`);
-  assert.equal(await canRead(),true);const [row]=await admin(`SELECT sdl_consent_epoch FROM public.player_team_memberships WHERE id='${membership.id}'`);assert.equal(row.sdl_consent_epoch,membership.sdl_consent_epoch);
+test('standing consent follows continuous club enrollment, not team or video',{skip:!runtime},async t=>{
+ const w=await clubWorkflow(t,runtime),{db,as,owner,generation,grant,withdraw,upload,publish,canRead,consent}=w;
+ assert.equal((await consent()).consent_active,false,'default no sharing');
+ const video=await upload();await as(coach,`SELECT public.sdl_004_review_submission('${video}','approved','Checked')`);
+ await assert.rejects(publish(video),/consent/);await grant();await publish(video);assert.equal(await canRead(video),true);
+ async function isolated(name,fn){await t.test(name,async()=>{await owner('BEGIN');try{await fn();}finally{await owner('ROLLBACK');}});}
+ const membership=(await owner(`SELECT id FROM public.player_team_memberships WHERE player_id='${player}'`))[0].id;
+ await isolated('one-time acceptance records policy, guardian, timestamp and immutable history; no annual renewal',async()=>{
+  const [receipt]=await owner(`SELECT * FROM public.sdl_club_consents WHERE enrollment_id='${enrollment}'`);
+  assert.equal(receipt.guardian_id,parent);assert.equal(receipt.policy_version,'sdl004-clubhouse-v1');assert.ok(receipt.accepted_at);
+  await grant();const [after]=await owner(`SELECT * FROM public.sdl_club_consents WHERE enrollment_id='${enrollment}'`);assert.deepEqual(after,receipt);
+  const [count]=await owner(`SELECT count(*)::int AS n FROM public.sdl_club_consents WHERE enrollment_id='${enrollment}'`);assert.equal(count.n,1);
+  await assert.rejects(owner('UPDATE public.sdl_club_consent_events SET action=action'),/immutable/);await db.exec('ROLLBACK;BEGIN');
+  await assert.rejects(owner('DELETE FROM public.sdl_club_consent_events'),/immutable/);await db.exec('ROLLBACK;BEGIN');
+  await assert.rejects(owner('TRUNCATE public.sdl_club_consent_events CASCADE'),/immutable/);
  });
- const mutations=[
-  ['same-ID status reactivation',`UPDATE public.player_team_memberships SET status='inactive' WHERE id='${membership.id}'`,`UPDATE public.player_team_memberships SET status='active' WHERE id='${membership.id}'`],
-  ['same-ID ended membership reopens',`UPDATE public.player_team_memberships SET end_date=CURRENT_DATE WHERE id='${membership.id}'`,`UPDATE public.player_team_memberships SET end_date=null WHERE id='${membership.id}'`],
-  ['future assignment restored',`UPDATE public.player_team_memberships SET start_date=CURRENT_DATE+1 WHERE id='${membership.id}'`,`UPDATE public.player_team_memberships SET start_date=CURRENT_DATE WHERE id='${membership.id}'`],
-  ['same-ID transfer back',`UPDATE public.player_team_memberships SET team_id='${otherTeam}' WHERE id='${membership.id}'`,`UPDATE public.player_team_memberships SET team_id='${team}' WHERE id='${membership.id}'`],
-  ['same-ID delete and reinsert',`DELETE FROM public.player_team_memberships WHERE id='${membership.id}'`,`INSERT INTO public.player_team_memberships(id,player_id,team_id,organization_id,status,end_date) VALUES('${membership.id}','${player}','${team}','${org}','active',null)`],
-  ['guardian reverified',`UPDATE public.athlete_guardians SET status='revoked' WHERE user_id='${parent}'`,`UPDATE public.athlete_guardians SET status='verified' WHERE user_id='${parent}'`],
-  ['profile reactivated',`UPDATE public.profiles SET status='suspended' WHERE id='${parent}'`,`UPDATE public.profiles SET status='active' WHERE id='${parent}'`]
- ];
- for(const[name,leave,rejoin]of mutations)await t.test(name,async()=>{
-  await grant();assert.equal(await canRead(),true);
-  await admin(leave);assert.equal(await canRead(),false);await admin(rejoin);assert.equal(await canRead(),false);
-  const [row]=await as(parent,`SELECT * FROM public.sdl_004_list_submissions('${player}')`);
-  assert.equal(row.share_with_team,false);assert.deepEqual(row.consent_team_ids,[]);
-  assert.ok(row.history.some(e=>e.action==='consent_invalidated'));
-  await grant();assert.equal(await canRead(),true,'only a new explicit grant restores sharing');
+ await isolated('consent has no annual expiry while enrollment remains continuous',async()=>{
+  await owner(`UPDATE public.sdl_club_consents SET accepted_at=accepted_at-interval '3 years' WHERE enrollment_id='${enrollment}'`);
+  assert.equal((await consent()).consent_active,true);assert.equal(await canRead(video),true);
  });
- await t.test('withdrawal stays withdrawn after same-ID rejoin',async()=>{
-  await as(parent,`SELECT public.sdl_004_submission_consent('${id}',false)`);
-  await admin(mutations[0][1]);await admin(mutations[0][2]);assert.equal(await canRead(),false);
+ await isolated('team transfer within the same club preserves consent and permits coach publication to the new current team',async()=>{
+  const before=await consent(),second=uuid(23);
+  await owner(`INSERT INTO public.teams(id,organization_id,status)VALUES('${second}','${org}','active')`);
+  await owner(`INSERT INTO public.team_memberships VALUES('${second}','${coach}','active','coach')`);
+  await owner(`UPDATE public.player_team_memberships SET team_id='${second}' WHERE id='${membership}'`);
+  assert.equal((await consent()).consent_active,true);assert.deepEqual((await consent()).accepted_at,before.accepted_at);
+  assert.equal(await canRead(video),false,'old team loses exposure immediately');
+  await publish(video,[second]);
+  await owner(`UPDATE public.player_team_memberships SET team_id='${second}' WHERE player_id='${peer}'`);
+  await owner(`INSERT INTO public.team_memberships VALUES('${second}','${teammate}','active','parent')`);
+  assert.equal(await canRead(video),true);assert.deepEqual((await consent()).accepted_at,before.accepted_at);
  });
- await t.test('membership generation rejects a stale captured grant even if an invalidator missed it',async()=>{
-  await grant();const [old]=await admin(`SELECT consent_team_ids,consent_membership_ids,consent_membership_epochs FROM public.sdl_video_submissions WHERE id='${id}'`);
-  await admin(mutations[0][1]);await admin(mutations[0][2]);
-  // Simulate a concurrent stale insertion invisible to invalidation, using SQL owner only.
-  await db.query(`UPDATE public.sdl_video_submissions SET share_with_team=true,consent_team_ids=$1,consent_membership_ids=$2,consent_membership_epochs=$3 WHERE id=$4`,[old.consent_team_ids,old.consent_membership_ids,JSON.stringify(old.consent_membership_epochs),id]);
-  assert.equal(await canRead(),false);
+ await isolated('temporary team gap and same-ID roster reactivation do not end continuous club consent',async()=>{
+  await owner(`UPDATE public.player_team_memberships SET status='inactive' WHERE id='${membership}'`);
+  assert.equal((await consent()).consent_active,true);assert.equal(await canRead(video),false);
+  await owner(`UPDATE public.player_team_memberships SET status='active' WHERE id='${membership}'`);
+  assert.equal((await consent()).consent_active,true);assert.equal(await canRead(video),true);
  });
- await t.test('in-flight upload loses consent across a membership cycle before finalization',async()=>{
-  const pending=uuid(83);const r=(await as(parent,`SELECT public.sdl_004_reserve_submission('${player}','${pending}','${claim}','${fingerprint}',12,'batting',true,ARRAY['${team}'::uuid]) AS r`))[0].r;
-  await admin(mutations[0][1]);await admin(mutations[0][2]);
-  await db.exec('RESET ROLE;SET ROLE service_role');await db.query(`SELECT public.sdl_004_finish_submission('${pending}','${claim}','${parent}')`);
-  const [item]=await as(parent,`SELECT * FROM public.sdl_004_list_submissions('${player}') WHERE id='${r.id}'`);
-  assert.equal(item.share_with_team,false);assert.deepEqual(item.consent_team_ids,[]);assert.ok(item.history.some(e=>e.action==='consent_invalidated'));
+ for(const status of ['inactive','ended'])await isolated(`club ${status} invalidates consent; reusing the same enrollment ID requires a fresh acceptance`,async()=>{
+  const old=await generation();await as(adminUser,`SELECT public.sdl_004_set_club_enrollment('${athlete}','${org}','${status}','${enrollment}')`);
+  assert.equal((await consent()).consent_active,false);assert.equal(await canRead(video),false);
+  await as(adminUser,`SELECT public.sdl_004_set_club_enrollment('${athlete}','${org}','active','${enrollment}')`);
+  assert.notEqual(await generation(),old);assert.equal((await consent()).consent_active,false);
+  await assert.rejects(as(parent,`SELECT public.sdl_004_club_consent('${enrollment}','${old}',true,'sdl004-clubhouse-v1')`),e=>e.code==='PT409');
+  await grant();assert.equal((await consent()).consent_active,true);assert.equal(await canRead(video),false,'old enrollment publication cannot resurrect');
  });
- await t.test('team scope requires active matching team and organization, even with a malformed membership',async()=>{
-  await admin(`INSERT INTO public.player_team_memberships(player_id,team_id,organization_id,status)VALUES('${player}','${otherTeam}','${org}','active')`);
-  await assert.rejects(as(parent,`SELECT public.sdl_004_submission_consent('${id}',true,ARRAY['${otherTeam}'::uuid])`),/Invalid team/);
-  const maliciousKey=uuid(84);
-  await assert.rejects(as(parent,`SELECT public.sdl_004_reserve_submission('${player}','${maliciousKey}','${claim}','${fingerprint}',12,'batting',true,ARRAY['${otherTeam}'::uuid])`),/Invalid team/);
-  await admin(`UPDATE public.teams SET status='inactive' WHERE id='${team}'`);
-  await assert.rejects(grant(),/Invalid team/);
-  await admin(`UPDATE public.teams SET status='active' WHERE id='${team}'`);
-  await admin(`UPDATE public.organizations SET status='suspended' WHERE id='${org}'`);await assert.rejects(grant(),/Invalid team/);
-  await admin(`UPDATE public.organizations SET status='active' WHERE id='${org}'`);
+ await isolated('later rejoin with a new enrollment defaults to no consent',async()=>{
+  await as(adminUser,`SELECT public.sdl_004_set_club_enrollment('${athlete}','${org}','ended','${enrollment}')`);
+  const [row]=await as(adminUser,`SELECT public.sdl_004_set_club_enrollment('${athlete}','${org}','active') AS id`);
+  assert.notEqual(row.id,enrollment);assert.equal((await consent(row.id)).consent_active,false);assert.equal(await canRead(video),false);
  });
- await t.test('individual team scope survives another team departure without expanding to another club',async()=>{
-  const second=uuid(24);await db.exec('RESET ROLE');await db.exec(`INSERT INTO public.teams(id,organization_id,status)VALUES('${second}','${org}','active');
-  INSERT INTO public.player_team_memberships(player_id,team_id,organization_id,status)VALUES('${player}','${second}','${org}','active'),('${peer}','${second}','${org}','active');
-  INSERT INTO public.team_memberships VALUES('${second}','${teammate}','active','parent')`);
-  await assert.rejects(as(parent,`SELECT public.sdl_004_submission_consent('${id}',true,ARRAY['${otherTeam}'::uuid])`),/Invalid team/);
-  await as(parent,`SELECT public.sdl_004_submission_consent('${id}',true,ARRAY['${team}'::uuid,'${second}'::uuid])`);
-  await admin(mutations[0][1]);assert.equal(await canRead(),true);
-  const [item]=await as(parent,`SELECT * FROM public.sdl_004_list_submissions('${player}') WHERE id='${id}'`);assert.deepEqual(item.consent_team_ids,[second]);
-  await admin(mutations[0][2]);const rows=await as(teammate,`SELECT * FROM public.sdl_004_clubhouse_videos('${team}')`);assert.equal(rows.length,0);
+ await isolated('withdrawal removes all team visibility, preserves private family/staff videos and records withdrawal',async()=>{
+  const [before]=await owner('SELECT count(*)::int AS n FROM public.sdl_media_objects');await withdraw();
+  assert.equal(await canRead(video),false);assert.equal(await canRead(video,parent),true);assert.equal(await canRead(video,coach),true);
+  const c=await consent();assert.equal(c.consent_active,false);assert.ok(c.withdrawn_at);assert.ok(c.history.some(e=>e.action==='withdrawn'));
+  const [after]=await owner('SELECT count(*)::int AS n FROM public.sdl_media_objects');assert.equal(after.n,before.n);
+  await grant();assert.equal(await canRead(video),false,'new acceptance does not silently republish withdrawn media');await publish(video);assert.equal(await canRead(video),true);
+ });
+ await isolated('clubs have separate consent and videos cannot cross organization boundaries',async()=>{
+  assert.equal((await consent(secondClubEnrollment)).consent_active,false);await grant(secondClubEnrollment);await withdraw();
+  assert.equal((await consent(secondClubEnrollment)).consent_active,true);assert.equal((await consent()).consent_active,false);
+ });
+ await isolated('cross-team and malformed cross-organization direct RPC publications fail',async()=>{
+  await assert.rejects(publish(video,[otherTeam]),/Team access denied/);
+  const second=uuid(23);await owner(`INSERT INTO public.teams(id,organization_id,status)VALUES('${second}','${org}','active')`);
+  await assert.rejects(publish(video,[second]),/Team access denied/);
+ });
+ await isolated('a viewer whose club enrollment ended loses teammate access even with stale team rows',async()=>{
+  await owner(`UPDATE public.sdl_club_enrollments SET status='ended',ended_at=now() WHERE athlete_id='${peerAthlete}'`);assert.equal(await canRead(video),false);
+ });
+ await isolated('unknown or multiple identifiable subjects are never authorized by one child consent',async()=>{
+  await assert.rejects(publish(video,[team],[]),/subjects/);await assert.rejects(publish(video,[team],[athlete,peerAthlete]),/subjects/);await assert.rejects(publish(video,[team],[peerAthlete]),/subjects/);
+ });
+ await isolated('coaches cannot grant guardian consent and parents cannot approve/publish or create enrollment',async()=>{
+  await assert.rejects(grant(enrollment,coach),/Not authorized/);await assert.rejects(grant(enrollment,outsider),/Not authorized/);
+  await assert.rejects(publish(video,[team],[athlete],parent),/Not authorized/);
+  await assert.rejects(as(parent,`SELECT public.sdl_004_set_club_enrollment('${athlete}','${org}','active')`),/Not authorized/);
+  await assert.rejects(as(coach,`SELECT public.sdl_004_set_recording_permission('${enrollment}',true,'forged')`),/Not authorized/);
+ });
+ await isolated('coach private uploads use separate recording/storage permissions, independent of sharing consent',async()=>{
+  const [denied]=await as(coach,`SELECT public.sdl_004_submission_can_submit('${player}') AS allowed`);assert.equal(denied.allowed,false);
+  await as(adminUser,`SELECT public.sdl_004_set_recording_permission('${enrollment}',true,'synthetic-recording-authorization')`);await withdraw();
+  const id=await upload(coach);assert.equal(await canRead(id,coach),true);assert.equal(await canRead(id,parent),true);assert.equal(await canRead(id),false);
+  const [row]=await as(coach,`SELECT * FROM public.sdl_004_list_submissions('${player}') WHERE id='${id}'`);assert.equal(row.status,'approved');assert.deepEqual(row.publication_team_ids,[]);
+  await grant();await publish(id);assert.equal(await canRead(id),true);
+ });
+ await isolated('dual parent-coach uploads still require another coach approval',async()=>{
+  await owner(`INSERT INTO public.athlete_guardians VALUES('${athlete}','${coach}','verified')`);
+  const id=await upload(coach);const [row]=await as(coach,`SELECT * FROM public.sdl_004_list_submissions('${player}') WHERE id='${id}'`);
+  assert.equal(row.status,'pending');assert.equal(row.source_kind,'parent');
+  await assert.rejects(as(coach,`SELECT public.sdl_004_review_submission('${id}','approved','self')`),/Not authorized/);
+  await assert.rejects(publish(id),/Approval/);
+ });
+ await isolated('player identifier reuse cannot expose old metadata or permit review to a new family',async()=>{
+  await owner(`UPDATE public.players SET athlete_id='${peerAthlete}' WHERE id='${player}'`);
+  assert.equal((await as(teammate,`SELECT * FROM public.sdl_004_list_submissions('${player}')`)).length,0);
+  await assert.rejects(as(coach,`SELECT public.sdl_004_review_submission('${video}','rejected','wrong athlete')`),/Not authorized/);
+  assert.equal(await canRead(video),false);
+ });
+ await isolated('parent-submitted videos need approval and deliberate publication; consent alone cannot publish',async()=>{
+  const id=await upload();await assert.rejects(publish(id),/Approval/);
+  await assert.rejects(as(parent,`SELECT public.sdl_004_review_submission('${id}','approved','forged')`),/Not authorized/);
+  await as(coach,`SELECT public.sdl_004_review_submission('${id}','approved','Checked')`);assert.equal(await canRead(id),false);
+  await publish(id);assert.equal(await canRead(id),true);
+ });
+ for(const entity of ['guardian','profile'])await isolated(`${entity} revocation and reactivation cannot revive standing consent`,async()=>{
+  if(entity==='guardian'){await owner(`UPDATE public.athlete_guardians SET status='revoked' WHERE user_id='${parent}'`);await owner(`UPDATE public.athlete_guardians SET status='verified' WHERE user_id='${parent}'`);}
+  else{await owner(`UPDATE public.profiles SET status='suspended' WHERE id='${parent}'`);await owner(`UPDATE public.profiles SET status='active' WHERE id='${parent}'`);}
+  assert.equal((await consent()).consent_active,false);assert.equal(await canRead(video),false);
+ });
+ await isolated('expired/revoked sessions cannot consent, publish, review, or play',async()=>{
+  await owner(`DELETE FROM auth.sessions WHERE user_id IN ('${parent}','${coach}','${teammate}')`);
+  await assert.rejects(grant(),/Not authorized/);await assert.rejects(publish(video),/Not authorized/);assert.equal(await canRead(video,parent),false);assert.equal(await canRead(video),false);
+ });
+ await isolated('an interrupted parent upload finalized after a rejoin cannot inherit the new enrollment consent',async()=>{
+  const key=uuid(401),claim=uuid(402);const r=(await as(parent,`SELECT public.sdl_004_reserve_submission('${player}','${key}','${claim}','${'c'.repeat(64)}',12,'throwing') AS r`))[0].r;
+  await as(adminUser,`SELECT public.sdl_004_set_club_enrollment('${athlete}','${org}','ended','${enrollment}')`);
+  await as(adminUser,`SELECT public.sdl_004_set_club_enrollment('${athlete}','${org}','active','${enrollment}')`);await grant();
+  await db.exec('RESET ROLE;SET ROLE service_role');await db.query(`SELECT public.sdl_004_finish_submission('${key}','${claim}','${parent}')`);
+  await as(coach,`SELECT public.sdl_004_review_submission('${r.id}','approved','Checked')`);
+  await assert.rejects(publish(r.id),/consent/);assert.equal(await canRead(r.id,parent),true);assert.equal(await canRead(r.id),false);
+ });
+ await isolated('audit, consent, enrollment and publication tables deny direct authenticated/service mutation',async()=>{
+  await assert.rejects(as(parent,'UPDATE public.sdl_club_consents SET withdrawn_at=null'),/permission denied/);
+  await db.exec('RESET ROLE;SET ROLE service_role');await assert.rejects(db.exec('UPDATE public.sdl_club_consent_events SET action=action'),/permission denied/);
  });
 });

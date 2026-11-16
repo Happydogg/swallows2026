@@ -37,39 +37,32 @@ export const SubmissionWorkspace={
       <label class="block">Category<select v-model="category" :disabled="busy" class="w-full block p-3 mt-1 bg-slate-900 rounded"><option value="pitching">Pitching</option><option value="batting">Batting</option><option value="throwing">Throwing</option></select></label>
       <label class="block">MP4 video (up to 20 MiB)<input type="file" accept="video/mp4,.mp4" @change="pickFile" :disabled="busy" class="block w-full py-3 text-sm" /></label>
       <video v-if="previewUrl" :key="previewUrl" :src="previewUrl" @error="previewError" controls playsinline class="w-full max-h-80 rounded bg-black"></video>
-      <fieldset class="border border-slate-700 rounded p-3 space-y-2" :disabled="busy||!enabled||!ready">
-        <legend class="text-sm">Optional team sharing — choose individual teams</legend>
-        <p class="text-xs text-slate-400">Nothing is shared by default. Select only the teams you consent to; coach approval is still required. Consent applies to this club profile. Choose another club profile above to submit there.</p>
-        <label v-for="team in consentTeams" :key="team.id" class="flex gap-3 items-center text-sm py-2">
-          <input type="checkbox" :checked="selectedTeamIds.includes(team.id)" @change="toggleUploadTeam(team.id,$event.target.checked)" />
-          <span>{{ team.organization }} · {{ team.name }}</span>
-        </label>
-        <p v-if="!consentTeams.length" class="text-sm text-slate-400">No verified team scope loaded. This video will remain private.</p>
-      </fieldset>
+      <p class="text-sm text-slate-400">Uploads stay private. Clubhouse consent is managed once per club enrollment below. Parent submissions also need coach approval and publication.</p>
       <button type="submit" :disabled="!enabled||!ready||!playerId||!file||busy" class="p-3 rounded bg-purple-600 disabled:opacity-50">Submit for coach review</button>
       <progress v-if="busy&&file" :value="progress" max="100" class="w-full"></progress>
       <p v-if="progress" class="text-sm" role="status">{{ progress }}% — completion requires a saved submission receipt.</p>
     </form>
+    <section v-if="clubEnrollments.length" class="space-y-3" aria-label="Club enrollment consent">
+      <h3 class="font-semibold">Clubhouse sharing by club enrollment</h3>
+      <p class="text-sm text-slate-300">Optional. Default is no sharing. Consent lasts throughout this continuous club enrollment, including team transfers, with no annual or per-video renewal. Leaving the club ends consent. Rejoining requires fresh consent. You can withdraw at any time; private videos remain available to authorized family and staff.</p>
+      <article v-for="club in clubEnrollments" :key="club.id+club.generation" class="rounded border border-slate-600 p-3 space-y-2">
+        <p class="font-semibold">{{ club.organization_name }} · {{ club.status }}</p>
+        <p class="text-sm">Clubhouse consent: {{ club.consent_active?'Active':'Not active' }}</p>
+        <p v-if="club.accepted_at" class="text-xs text-slate-400">Accepted {{ club.accepted_at }} · {{ club.policy_version }}</p>
+        <p v-if="club.withdrawn_at" class="text-xs text-slate-400">Withdrawn {{ club.withdrawn_at }}</p>
+        <label v-if="!club.consent_active&&club.status==='active'" class="flex gap-3 items-start text-sm py-2"><input type="checkbox" v-model="consentAccepted[club.id]" :disabled="!enabled||!ready||busy" /><span>I am a verified guardian and consent to authorized coaches publishing eligible single-athlete videos to my child's current teams within {{ club.organization_name }} for this continuous enrollment. This does not grant sharing to another club. Policy {{ consentPolicyVersion }}.</span></label>
+        <button v-if="!club.consent_active&&club.status==='active'" @click="clubConsent(club,true)" :disabled="!enabled||!ready||busy||consentAccepted[club.id]!==true" class="p-3 bg-blue-700 rounded disabled:opacity-50">Grant club consent</button>
+        <button v-if="club.consent_active" @click="clubConsent(club,false)" :disabled="!enabled||!ready||busy" class="p-3 bg-slate-700 rounded">Withdraw club consent</button>
+        <details><summary class="py-2">Consent history</summary><ol class="text-xs"><li v-for="(entry,i) in club.history" :key="i">{{ entry.at }} · {{ entry.action }} · {{ entry.policy_version }}</li></ol></details>
+      </article>
+    </section>
     <div class="flex flex-wrap gap-2 items-center"><label>Status<select v-model="filter" class="p-3 bg-slate-900 rounded ml-2"><option value="all">All</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select></label><button @click="refreshItems" :disabled="!enabled||!ready||!playerId||busy" class="p-3 bg-slate-700 rounded disabled:opacity-50">Refresh history</button></div>
     <p v-if="!shownItems.length" class="text-sm text-slate-400">{{ enabled&&ready?'No matching submissions.':'Submission history awaits backend verification.' }}</p>
     <article v-for="item in shownItems" :key="item.id" class="rounded bg-slate-900 p-3 space-y-2">
       <p>{{ item.category }} · <strong>{{ item.status }}</strong> · {{ item.created_at }}</p>
-      <p class="text-sm">Team-sharing consent: {{ item.share_with_team?'Granted':'Not granted' }}</p>
+      <p class="text-sm">{{ item.source_kind==='coach'?'Coach upload':'Parent submission' }} · Clubhouse publication is separate from private storage.</p>
       <p v-if="item.review_note" class="text-sm">Coach note: {{ item.review_note }}</p>
-      <p v-if="item.share_with_team" class="text-sm">Currently consented teams: {{ grantedTeams(item) || 'No current team scope' }}</p>
       <button @click="play(item)" :disabled="!enabled||!ready||busy" class="p-3 bg-blue-700 rounded">Private preview</button>
-      <fieldset v-if="item.can_consent" class="border border-slate-700 rounded p-3 space-y-2" :disabled="!enabled||!ready||busy">
-        <legend class="text-sm">Grant or replace team consent</legend>
-        <p class="text-xs text-slate-400">Select individual teams explicitly. Existing consent is not preselected.</p>
-        <label v-for="team in consentTeams" :key="team.id" class="flex gap-3 items-center py-2 text-sm">
-          <input type="checkbox" :checked="(consentSelections[item.id]||[]).includes(team.id)" @change="toggleConsentTeam(item,team.id,$event.target.checked)" />
-          <span>{{ team.organization }} · {{ team.name }}</span>
-        </label>
-        <div class="flex flex-wrap gap-2">
-          <button @click="consent(item,true)" :disabled="!enabled||!ready||busy||!(consentSelections[item.id]||[]).length" class="p-3 bg-slate-700 rounded disabled:opacity-50">Save selected teams</button>
-          <button v-if="item.share_with_team" @click="consent(item,false)" :disabled="!enabled||!ready||busy" class="p-3 bg-slate-700 rounded">Withdraw all consent</button>
-        </div>
-      </fieldset>
       <details><summary class="py-2 cursor-pointer">Submission history</summary><ol class="text-xs space-y-1"><li v-for="(entry,i) in item.history" :key="i">{{ entry.at }} · {{ entry.action }} {{ entry.note }}</li></ol></details>
     </article>
   </div>
@@ -85,11 +78,18 @@ export const SubmissionWorkspace={
         <button @click="play(item,'review')" :disabled="!enabled||!ready||busy" class="p-3 bg-blue-700 rounded">Private video preview</button>
         <template v-if="item.can_review&&item.status==='pending'"><label class="block text-sm">Review notes<textarea v-model="notes[item.id]" maxlength="1000" :disabled="busy" class="mt-1 block p-3 w-full bg-slate-800 rounded"></textarea></label><div class="flex gap-3"><button @click="review(item,'approved')" :disabled="!enabled||!ready||busy" class="p-3 bg-emerald-700 rounded">Approve</button><button @click="review(item,'rejected')" :disabled="!enabled||!ready||busy" class="p-3 bg-rose-700 rounded">Reject</button></div></template>
         <p v-else-if="item.status==='pending'" class="text-xs text-slate-400">You cannot review this submission. Another authorized coach must review your own submissions.</p>
+        <fieldset v-if="item.status==='approved'" class="border border-slate-600 p-3 rounded space-y-2" :disabled="!enabled||!ready||busy">
+          <p class="text-sm">Publishing requires active standing club consent. Scope: selected team only. Multi-child or unidentified-subject clips must remain private.</p>
+          <label v-if="item.can_publish" class="flex gap-3 items-start text-sm py-2"><input type="checkbox" v-model="subjectConfirmed[item.id]" /><span>I reviewed this clip: only this athlete is identifiable. No other child appears identifiably.</span></label>
+          <button v-if="item.can_publish" @click="publish(item,true)" :disabled="!subjectConfirmed[item.id]||busy" class="p-3 bg-purple-700 rounded disabled:opacity-50">Publish to selected team</button>
+          <p v-else class="text-sm text-slate-400">Publication unavailable: current enrollment consent or authorization is missing.</p>
+          <button v-if="item.publication_team_ids&&item.publication_team_ids.length" @click="publish(item,false)" class="p-3 bg-slate-700 rounded">Remove all Clubhouse visibility</button>
+        </fieldset>
         <details><summary class="py-2">Review history</summary><ol class="text-xs"><li v-for="(entry,i) in item.history" :key="i">{{ entry.at }} · {{ entry.action }} {{ entry.note }}</li></ol></details>
       </article>
     </template>
     <template v-else>
-      <p class="text-sm text-slate-400">Approved videos with current guardian consent only. Authorization is rechecked for every request; the list refreshes while this view is active.</p>
+      <p class="text-sm text-slate-400">Coach-published videos with current standing club consent only. Authorization is rechecked for every request; the list refreshes while this view is active.</p>
       <button @click="refreshShared" :disabled="!enabled||!ready||!teamId||busy" class="p-3 rounded bg-slate-700 disabled:opacity-50">Refresh team videos</button>
       <p v-if="!shared.length" class="text-sm text-slate-400">No approved, shareable videos loaded.</p>
       <article v-for="item in shared" :key="item.id" class="rounded bg-slate-900 p-3 flex flex-wrap items-center justify-between gap-3"><span>{{ item.preferred_name }} · {{ item.category }}</span><button @click="play(item,'clubhouse')" :disabled="!enabled||!ready||busy" class="p-3 bg-blue-700 rounded">Play approved video</button></article>

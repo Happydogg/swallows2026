@@ -1,6 +1,7 @@
 import { SUBMISSION_FEATURES_ENABLED } from './config.js';
 import { createPrivateMediaService, MediaError } from './privateMediaService.js';
-export const SUBMISSION_REVISION='sdl004-submissions-v1';
+export const CLUB_CONSENT_POLICY_VERSION='sdl004-clubhouse-v1';
+export const SUBMISSION_REVISION='sdl004-club-enrollment-v2';
 const uuid=value=>{if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value??''))throw new MediaError('Invalid identifier.');return value;};
 const categoryValue=value=>{if(!['pitching','batting','throwing'].includes(value))throw new MediaError('Invalid video category.');return value;};
 const text=value=>typeof value==='string'?value:'';
@@ -14,11 +15,11 @@ export function createSubmissionService({auth,enabled=SUBMISSION_FEATURES_ENABLE
     const identity=auth.captureIdentity();
     const caps=await transport.requestJson('/v2/capabilities',options);
     if(!auth.isCurrentIdentity(identity))throw new MediaError('Session changed.',401);
-    if(caps.revision!==SUBMISSION_REVISION||caps.submissions!==true||caps.review!==true||caps.clubhouse!==true)throw new MediaError('The required backend contract is unavailable.');
+    if(caps.revision!==SUBMISSION_REVISION||caps.submissions!==true||caps.review!==true||caps.clubhouse!==true||caps.clubConsent!==true)throw new MediaError('The required backend contract is unavailable.');
     verified=identity;
   }
   const project=item=>({id:uuid(item.id),player_id:uuid(item.player_id),category:categoryValue(item.category),status:status(item.status),
-    share_with_team:item.share_with_team===true,consent_team_ids:Array.isArray(item.consent_team_ids)?item.consent_team_ids.map(uuid):[],can_consent:item.can_consent===true,can_review:item.can_review===true,created_at:text(item.created_at),review_note:String(item.review_note??''),
+    athlete_id:item.athlete_id?uuid(item.athlete_id):null,source_kind:text(item.source_kind),publication_team_ids:Array.isArray(item.publication_team_ids)?item.publication_team_ids.map(uuid):[],can_publish:item.can_publish===true,can_review:item.can_review===true,created_at:text(item.created_at),review_note:String(item.review_note??''),
     history:Array.isArray(item.history)?item.history.map(h=>({action:String(h.action??''),at:text(h.at),note:typeof h.note==='string'?h.note:''})):[],
     preferred_name:typeof item.preferred_name==='string'?item.preferred_name:'Player',team_id:item.team_id?uuid(item.team_id):null,team_name:text(item.team_name)});
   return {
@@ -33,7 +34,15 @@ export function createSubmissionService({auth,enabled=SUBMISSION_FEATURES_ENABLE
       id:uuid(p.id),player_id:uuid(p.player_id),category:categoryValue(p.category),created_at:text(p.created_at),preferred_name:typeof p.preferred_name==='string'?p.preferred_name:'Team player'}));},
     async submit(player,file,metadata,options) {await ready(options);return transport.submit(uuid(player),file,metadata,options);},
     async review(id,decision,note,options) {await ready(options);status(decision);if(decision==='pending'||typeof note!=='string'||note.length>1000)throw new MediaError('Invalid review.');return transport.requestJson(`/v2/submissions/${uuid(id)}/review`,{...options,method:'POST',body:{decision,note}});},
-    async consent(id,share,options,teamIds=[]) {await ready(options);if(typeof share!=='boolean')throw new MediaError('Invalid consent.');return transport.requestJson(`/v2/submissions/${uuid(id)}/consent`,{...options,method:'POST',body:{share_with_team:share,team_ids:share?teamIds.map(uuid):[]}});},
+    async enrollments(athlete,options) {await ready(options);return rows(await transport.requestJson(`/v2/club-consents?athlete_id=${uuid(athlete)}`,options)).map(e=>({
+      id:uuid(e.id),generation:uuid(e.generation),athlete_id:uuid(e.athlete_id),organization_id:uuid(e.organization_id),organization_name:text(e.organization_name),status:text(e.status),
+      consent_active:e.consent_active===true,policy_version:text(e.policy_version),accepted_at:text(e.accepted_at),withdrawn_at:text(e.withdrawn_at),
+      history:Array.isArray(e.history)?e.history.map(h=>({action:text(h.action),at:text(h.at),policy_version:text(h.policy_version)})):[]}));},
+    async clubConsent(enrollment,accept,options) {await ready(options);if(typeof accept!=='boolean')throw new MediaError('Explicit consent decision required.');
+      return transport.requestJson(`/v2/club-enrollments/${uuid(enrollment.id)}/consent`,{...options,method:'POST',body:{generation:uuid(enrollment.generation),accept,policy_version:accept?CLUB_CONSENT_POLICY_VERSION:null}});},
+    async publish(id,teamIds,subjectAthletes,options) {await ready(options);
+      if(!Array.isArray(teamIds)||teamIds.length>20||!Array.isArray(subjectAthletes)||(teamIds.length&&subjectAthletes.length!==1))throw new MediaError('Only a confirmed single-athlete clip can be published.');
+      return transport.requestJson(`/v2/submissions/${uuid(id)}/publish`,{...options,method:'POST',body:{team_ids:teamIds.map(uuid),subject_athletes:subjectAthletes.map(uuid)}});},
     async playback(id,options) {await ready(options);return transport.submissionPlayback(uuid(id),options);}
   };
 }

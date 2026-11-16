@@ -1,35 +1,71 @@
--- STAGING RELEASE CANDIDATE. Generated with Supabase CLI; not applied.
--- Additive only; requires the existing private-media pilot schema.
+-- STAGING RELEASE CANDIDATE. Existing CLI-generated migration, not applied.
+-- Standing Clubhouse consent is scoped to one continuous athlete/club enrollment.
+-- Team assignments are deliberately NOT enrollment lifecycle events.
 BEGIN;
--- An assignment generation prevents same-ID reactivation (including races) from reviving consent.
-ALTER TABLE public.player_team_memberships ADD COLUMN sdl_consent_epoch uuid NOT NULL DEFAULT gen_random_uuid();
-
-CREATE TABLE public.sdl_video_submissions (
-  id uuid PRIMARY KEY REFERENCES public.sdl_media_objects(id),
-  player_id uuid NOT NULL REFERENCES public.players(id),
-  submitted_by uuid NOT NULL REFERENCES auth.users(id),
-  category text NOT NULL CHECK (category IN ('pitching','batting','throwing')),
-  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
-  share_with_team boolean NOT NULL DEFAULT false,
-  consent_team_ids uuid[] NOT NULL DEFAULT '{}',
-  consent_membership_ids uuid[] NOT NULL DEFAULT '{}',
-  consent_membership_epochs jsonb NOT NULL DEFAULT '{}'::jsonb,
-  review_note text NOT NULL DEFAULT '' CHECK (char_length(review_note) <= 1000),
-  history jsonb NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(history) = 'array'),
-  created_at timestamptz NOT NULL DEFAULT now(),
-  reviewed_at timestamptz,
-  reviewed_by uuid REFERENCES auth.users(id)
+CREATE TABLE public.sdl_club_enrollments (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ athlete_id uuid NOT NULL, organization_id uuid NOT NULL REFERENCES public.organizations(id),
+ generation uuid NOT NULL DEFAULT gen_random_uuid(),
+ status text NOT NULL DEFAULT 'active' CHECK(status IN ('active','inactive','ended')),
+ started_at timestamptz NOT NULL DEFAULT now(), ended_at timestamptz,
+ recording_storage_authorized boolean NOT NULL DEFAULT false,
+ recording_permission_ref text NOT NULL DEFAULT '',
+ CHECK(NOT recording_storage_authorized OR char_length(btrim(recording_permission_ref)) BETWEEN 1 AND 500),
+ CHECK(status<>'active' OR ended_at IS NULL)
 );
-ALTER TABLE public.sdl_video_submissions ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON public.sdl_video_submissions FROM PUBLIC, anon, authenticated;
-GRANT SELECT, INSERT, UPDATE ON public.sdl_video_submissions TO service_role;
+CREATE UNIQUE INDEX ON public.sdl_club_enrollments(athlete_id,organization_id) WHERE status='active';
+CREATE TABLE public.sdl_club_consents (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ enrollment_id uuid NOT NULL REFERENCES public.sdl_club_enrollments(id),
+ enrollment_generation uuid NOT NULL, athlete_id uuid NOT NULL, organization_id uuid NOT NULL,
+ guardian_id uuid NOT NULL REFERENCES auth.users(id), policy_version text NOT NULL,
+ accepted_at timestamptz NOT NULL DEFAULT now(), withdrawn_at timestamptz,
+ invalidated_at timestamptz, invalidation_reason text
+);
+CREATE UNIQUE INDEX ON public.sdl_club_consents(enrollment_id,enrollment_generation)
+ WHERE withdrawn_at IS NULL AND invalidated_at IS NULL;
+CREATE TABLE public.sdl_club_consent_events (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(), enrollment_id uuid NOT NULL REFERENCES public.sdl_club_enrollments(id),
+ consent_id uuid REFERENCES public.sdl_club_consents(id), actor uuid, action text NOT NULL,
+ occurred_at timestamptz NOT NULL DEFAULT now(), details jsonb NOT NULL DEFAULT '{}'
+);
+CREATE INDEX ON public.sdl_club_consent_events(enrollment_id,occurred_at);
+CREATE TABLE public.sdl_video_submissions (
+ id uuid PRIMARY KEY REFERENCES public.sdl_media_objects(id),
+ player_id uuid NOT NULL REFERENCES public.players(id), athlete_id uuid NOT NULL,
+ organization_id uuid NOT NULL REFERENCES public.organizations(id),
+ enrollment_id uuid REFERENCES public.sdl_club_enrollments(id), enrollment_generation uuid,
+ submitted_by uuid NOT NULL REFERENCES auth.users(id),
+ source_kind text NOT NULL CHECK(source_kind IN ('parent','coach')),
+ category text NOT NULL CHECK(category IN ('pitching','batting','throwing')),
+ status text NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected')),
+ publication_team_ids uuid[] NOT NULL DEFAULT '{}', publication_consent_id uuid REFERENCES public.sdl_club_consents(id),
+ subject_scope text NOT NULL DEFAULT 'unknown' CHECK(subject_scope IN ('unknown','single_athlete','multiple')),
+ subject_confirmed_by uuid REFERENCES auth.users(id), subject_confirmed_at timestamptz,
+ review_note text NOT NULL DEFAULT '' CHECK(char_length(review_note)<=1000),
+ history jsonb NOT NULL DEFAULT '[]' CHECK(jsonb_typeof(history)='array'),
+ created_at timestamptz NOT NULL DEFAULT now(), reviewed_at timestamptz, reviewed_by uuid REFERENCES auth.users(id)
+);
 CREATE INDEX ON public.sdl_video_submissions(player_id,created_at DESC);
-CREATE INDEX ON public.sdl_video_submissions(submitted_by,created_at DESC);
-CREATE INDEX ON public.sdl_video_submissions(player_id,created_at DESC)
-  WHERE status='approved' AND share_with_team;
-
--- SECURITY DEFINER is required only for narrow lookups into deny-by-default
--- tables. All functions have fixed search_path, explicit identity checks and grants.
+CREATE TABLE public.sdl_submission_uploads (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES auth.users(id),
+ request_key uuid NOT NULL, player_id uuid NOT NULL REFERENCES public.players(id),
+ athlete_id uuid NOT NULL, organization_id uuid NOT NULL, enrollment_id uuid REFERENCES public.sdl_club_enrollments(id),
+ enrollment_generation uuid, source_kind text NOT NULL CHECK(source_kind IN ('parent','coach')),
+ session_id uuid NOT NULL, fingerprint text NOT NULL CHECK(fingerprint ~ '^[0-9a-f]{64}$'),
+ byte_size bigint NOT NULL CHECK(byte_size>0 AND byte_size<=20971520),
+ category text NOT NULL CHECK(category IN ('pitching','batting','throwing')),
+ claim uuid NOT NULL, lease_until timestamptz NOT NULL, completed boolean NOT NULL DEFAULT false,
+ UNIQUE(user_id,request_key)
+);
+DO $tables$ DECLARE tab text; BEGIN
+ FOREACH tab IN ARRAY ARRAY['sdl_club_enrollments','sdl_club_consents','sdl_club_consent_events','sdl_video_submissions','sdl_submission_uploads'] LOOP
+  EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY',tab);
+  EXECUTE format('REVOKE ALL ON public.%I FROM PUBLIC,anon,authenticated,service_role',tab);
+  EXECUTE format('GRANT SELECT ON public.%I TO service_role',tab);
+ END LOOP;
+END $tables$;
+-- Mutations occur only through narrow RPCs. No direct service-key edits to consent/audit.
 CREATE FUNCTION public.sdl_004_session_active()
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
  SELECT (SELECT auth.uid()) IS NOT NULL AND EXISTS (
@@ -38,6 +74,7 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
      THEN (auth.jwt()->>'session_id')::uuid END
    AND (s.not_after IS NULL OR s.not_after>now()));
 $$;
+
 CREATE FUNCTION public.sdl_004_guardian_for(p_user uuid,p_player uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
  SELECT p_user IS NOT NULL AND EXISTS (SELECT 1 FROM public.players p
@@ -45,6 +82,7 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
  JOIN public.profiles pr ON pr.id=ag.user_id
  WHERE p.id=p_player AND ag.user_id=p_user AND ag.status='verified' AND pr.status='active');
 $$;
+
 CREATE FUNCTION public.sdl_004_coach_for(p_user uuid,p_player uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
  SELECT p_user IS NOT NULL AND EXISTS (
@@ -59,22 +97,49 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
  AND ptm.status='active' AND ptm.end_date IS NULL AND ptm.start_date<=CURRENT_DATE
  AND tm.status='active' AND tm.role='coach' AND om.status='active' AND om.role IN ('staff','admin'));
 $$;
+
+CREATE FUNCTION public.sdl_004_guardian_athlete(p_user uuid,p_athlete uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+ SELECT p_user IS NOT NULL AND EXISTS(SELECT 1 FROM public.athlete_guardians g JOIN public.profiles pr ON pr.id=g.user_id
+ WHERE g.user_id=p_user AND g.athlete_id=p_athlete AND g.status='verified' AND pr.status='active');
+$$;
+CREATE FUNCTION public.sdl_004_club_admin(p_org uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+ SELECT public.sdl_004_session_active() AND EXISTS(SELECT 1 FROM public.organization_memberships m
+ JOIN public.organizations o ON o.id=m.organization_id JOIN public.profiles p ON p.id=m.user_id
+ WHERE m.organization_id=p_org AND m.user_id=(SELECT auth.uid()) AND m.role='admin' AND m.status='active'
+ AND o.status='active' AND p.status='active');
+$$;
+CREATE FUNCTION public.sdl_004_coach_team(p_user uuid,p_player uuid,p_team uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+ SELECT public.sdl_004_coach_for(p_user,p_player) AND EXISTS(SELECT 1 FROM public.players p
+ JOIN public.player_team_memberships pm ON pm.player_id=p.id AND pm.organization_id=p.organization_id
+ JOIN public.teams t ON t.id=pm.team_id AND t.organization_id=p.organization_id
+ JOIN public.team_memberships tm ON tm.team_id=t.id AND tm.user_id=p_user
+ WHERE p.id=p_player AND t.id=p_team AND t.status='active' AND pm.status='active' AND pm.end_date IS NULL
+ AND pm.start_date<=CURRENT_DATE AND tm.status='active' AND tm.role='coach');
+$$;
+CREATE FUNCTION public.sdl_004_recording_allowed(p_user uuid,p_player uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+ SELECT public.sdl_004_coach_for(p_user,p_player) AND EXISTS(SELECT 1 FROM public.players p
+ JOIN public.sdl_club_enrollments e ON e.athlete_id=p.athlete_id AND e.organization_id=p.organization_id
+ WHERE p.id=p_player AND e.status='active' AND e.ended_at IS NULL AND e.started_at<=now() AND e.recording_storage_authorized);
+$$;
 CREATE FUNCTION public.sdl_004_submission_can_submit(p_player_id uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
  SELECT public.sdl_004_session_active() AND (public.sdl_004_guardian_for((SELECT auth.uid()),p_player_id)
- OR public.sdl_004_coach_for((SELECT auth.uid()),p_player_id));
+ OR public.sdl_004_recording_allowed((SELECT auth.uid()),p_player_id));
 $$;
 CREATE FUNCTION public.sdl_004_submission_is_guardian(p_player_id uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
  SELECT public.sdl_004_session_active() AND public.sdl_004_guardian_for((SELECT auth.uid()),p_player_id);
 $$;
+
 CREATE FUNCTION public.sdl_004_submission_can_review(p_player_id uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
  SELECT public.sdl_004_session_active() AND public.sdl_004_coach_for((SELECT auth.uid()),p_player_id);
 $$;
 
--- Team visibility requires current team membership. Parents must also have a
--- verified linked child actively assigned to that same team/organization.
 CREATE FUNCTION public.sdl_004_clubhouse_member(p_team_id uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
   SELECT public.sdl_004_session_active() AND EXISTS (
@@ -90,6 +155,7 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
             AND om.status='active' AND om.role IN ('staff','admin')))
         OR (tm.role='parent' AND EXISTS (SELECT 1 FROM public.athlete_guardians ag
           JOIN public.players child ON child.athlete_id=ag.athlete_id
+          JOIN public.sdl_club_enrollments enrollment ON enrollment.athlete_id=child.athlete_id AND enrollment.organization_id=child.organization_id AND enrollment.status='active' AND enrollment.ended_at IS NULL AND enrollment.started_at<=now()
           JOIN public.player_team_memberships ptm ON ptm.player_id=child.id
             AND ptm.organization_id=child.organization_id
           WHERE ag.user_id=tm.user_id AND ag.status='verified'
@@ -99,190 +165,292 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
   );
 $$;
 
-CREATE FUNCTION public.sdl_004_submission_can_read(p_submission_id uuid)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
-  SELECT public.sdl_004_session_active() AND EXISTS (
-    SELECT 1 FROM public.sdl_video_submissions s
-    WHERE s.id=p_submission_id AND (
-      -- Family visibility is rechecked, never based only on who uploaded.
-      (s.submitted_by=(SELECT auth.uid()) AND public.sdl_004_submission_can_submit(s.player_id))
-      OR public.sdl_004_submission_can_review(s.player_id)
-      OR (s.status='approved' AND s.share_with_team
-        -- Consent loses effect if the submitting guardian relationship is revoked.
-        AND EXISTS (SELECT 1 FROM public.players p
-          JOIN public.athlete_guardians ag ON ag.athlete_id=p.athlete_id
-          WHERE p.id=s.player_id AND ag.user_id=s.submitted_by AND ag.status='verified'
-          AND EXISTS (SELECT 1 FROM public.profiles pr WHERE pr.id=ag.user_id AND pr.status='active'))
-        AND EXISTS (SELECT 1 FROM public.player_team_memberships ptm
-          JOIN public.players p ON p.id=ptm.player_id AND p.organization_id=ptm.organization_id
- JOIN public.teams consent_team ON consent_team.id=ptm.team_id AND consent_team.organization_id=ptm.organization_id AND consent_team.status='active'
- JOIN public.organizations consent_org ON consent_org.id=ptm.organization_id AND consent_org.status='active'
-          WHERE ptm.player_id=s.player_id AND ptm.team_id=ANY(s.consent_team_ids) AND ptm.id=ANY(s.consent_membership_ids) AND s.consent_membership_epochs->>ptm.id::text=ptm.sdl_consent_epoch::text AND ptm.status='active' AND ptm.end_date IS NULL AND ptm.start_date<=CURRENT_DATE
-            AND public.sdl_004_clubhouse_member(ptm.team_id)))
-    ));
-$$;
-
-CREATE FUNCTION public.sdl_004_list_submissions(p_player_id uuid)
-RETURNS TABLE(id uuid,player_id uuid,category text,status text,share_with_team boolean,created_at timestamptz,review_note text,history jsonb,can_consent boolean,consent_team_ids uuid[])
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
-  SELECT s.id,s.player_id,s.category,s.status,s.share_with_team,s.created_at,s.review_note,s.history,(s.submitted_by=(SELECT auth.uid()) AND public.sdl_004_submission_is_guardian(s.player_id)),s.consent_team_ids
-  FROM public.sdl_video_submissions s
-  WHERE s.player_id=p_player_id AND (SELECT auth.uid()) IS NOT NULL
-    AND ((s.submitted_by=(SELECT auth.uid()) AND public.sdl_004_submission_can_submit(s.player_id))
-      OR public.sdl_004_submission_can_review(s.player_id))
-  ORDER BY s.created_at DESC LIMIT 30;
-$$;
-
--- Persistent idempotency reservations; only narrowly scoped RPCs are exposed.
-CREATE TABLE public.sdl_submission_uploads (
- id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
- user_id uuid NOT NULL REFERENCES auth.users(id), request_key uuid NOT NULL,
- player_id uuid NOT NULL REFERENCES public.players(id), session_id uuid NOT NULL,
- fingerprint text NOT NULL CHECK (fingerprint ~ '^[0-9a-f]{64}$'),
- byte_size bigint NOT NULL CHECK (byte_size>0 AND byte_size<=20971520),
- category text NOT NULL CHECK(category IN ('pitching','batting','throwing')),
- share_with_team boolean NOT NULL DEFAULT false,consent_invalidated boolean NOT NULL DEFAULT false,
- consent_team_ids uuid[] NOT NULL DEFAULT '{}',consent_membership_ids uuid[] NOT NULL DEFAULT '{}',consent_membership_epochs jsonb NOT NULL DEFAULT '{}'::jsonb,
- claim uuid NOT NULL, lease_until timestamptz NOT NULL, completed boolean NOT NULL DEFAULT false,
- UNIQUE(user_id,request_key)
-);
-ALTER TABLE public.sdl_submission_uploads ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON public.sdl_submission_uploads FROM PUBLIC,anon,authenticated;
-GRANT SELECT,INSERT,UPDATE ON public.sdl_submission_uploads TO service_role;
-CREATE INDEX ON public.sdl_submission_uploads(player_id);
-
-CREATE FUNCTION public.sdl_004_reserve_submission(p_player_id uuid,p_request_key uuid,p_claim uuid,
- p_fingerprint text,p_size bigint,p_category text,p_share boolean,p_team_ids uuid[] DEFAULT NULL)
-RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
-DECLARE r public.sdl_submission_uploads%ROWTYPE; result jsonb;
+-- Trusted enrollment administration is independent of team roster transfers.
+-- No enrollment or recording permission is inferred/backfilled from existing team rows.
+CREATE FUNCTION public.sdl_004_set_club_enrollment(p_athlete uuid,p_organization uuid,p_status text,p_enrollment uuid DEFAULT NULL)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE e public.sdl_club_enrollments%ROWTYPE; result uuid;
 BEGIN
- IF NOT public.sdl_004_submission_can_submit(p_player_id)
-   OR (p_share AND NOT public.sdl_004_submission_is_guardian(p_player_id)) THEN
-   RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501'; END IF;
- IF p_share AND (p_team_ids IS NULL OR cardinality(p_team_ids)=0 OR cardinality(p_team_ids)>20
- OR EXISTS(SELECT 1 FROM unnest(p_team_ids) wanted WHERE NOT EXISTS(
- SELECT 1 FROM public.player_team_memberships ptm JOIN public.players p ON p.id=ptm.player_id AND p.organization_id=ptm.organization_id
- JOIN public.teams consent_team ON consent_team.id=ptm.team_id AND consent_team.organization_id=ptm.organization_id AND consent_team.status='active'
- JOIN public.organizations consent_org ON consent_org.id=ptm.organization_id AND consent_org.status='active'
- WHERE p.id=p_player_id AND ptm.team_id=wanted AND ptm.status='active' AND ptm.end_date IS NULL AND ptm.start_date<=CURRENT_DATE))) THEN
- RAISE EXCEPTION 'Invalid team consent scope' USING ERRCODE='22023'; END IF;
- IF p_claim IS NULL OR p_request_key IS NULL OR p_share IS NULL THEN
-   RAISE EXCEPTION 'Invalid upload' USING ERRCODE='22023'; END IF;
- INSERT INTO public.sdl_submission_uploads(user_id,request_key,player_id,session_id,fingerprint,byte_size,category,share_with_team,consent_team_ids,consent_membership_ids,consent_membership_epochs,claim,lease_until)
- VALUES((SELECT auth.uid()),p_request_key,p_player_id,(auth.jwt()->>'session_id')::uuid,p_fingerprint,p_size,p_category,p_share,CASE WHEN p_share THEN p_team_ids ELSE '{}'::uuid[] END,
- ARRAY(SELECT ptm.id FROM public.player_team_memberships ptm JOIN public.players p ON p.id=ptm.player_id AND p.organization_id=ptm.organization_id
- JOIN public.teams consent_team ON consent_team.id=ptm.team_id AND consent_team.organization_id=ptm.organization_id AND consent_team.status='active'
- JOIN public.organizations consent_org ON consent_org.id=ptm.organization_id AND consent_org.status='active' WHERE p.id=p_player_id AND ptm.team_id=ANY(p_team_ids) AND ptm.status='active' AND ptm.end_date IS NULL AND ptm.start_date<=CURRENT_DATE),coalesce((SELECT jsonb_object_agg(ptm.id::text,ptm.sdl_consent_epoch::text) FROM public.player_team_memberships ptm JOIN public.players p ON p.id=ptm.player_id AND p.organization_id=ptm.organization_id
- JOIN public.teams consent_team ON consent_team.id=ptm.team_id AND consent_team.organization_id=ptm.organization_id AND consent_team.status='active'
- JOIN public.organizations consent_org ON consent_org.id=ptm.organization_id AND consent_org.status='active' WHERE p.id=p_player_id AND ptm.team_id=ANY(p_team_ids) AND ptm.status='active' AND ptm.end_date IS NULL AND ptm.start_date<=CURRENT_DATE),'{}'::jsonb),p_claim,now()+interval '2 minutes')
- ON CONFLICT(user_id,request_key) DO NOTHING;
- SELECT * INTO r FROM public.sdl_submission_uploads
- WHERE user_id=(SELECT auth.uid()) AND request_key=p_request_key FOR UPDATE;
- IF r.fingerprint<>p_fingerprint OR r.player_id<>p_player_id OR r.byte_size<>p_size
- OR r.category<>p_category OR r.share_with_team<>p_share THEN
- RAISE EXCEPTION 'Idempotency key reused for different upload' USING ERRCODE='PT409'; END IF;
- IF r.completed THEN
-   SELECT jsonb_build_object('state','complete','id',s.id,'player_id',s.player_id,'category',s.category,
-    'status',s.status,'share_with_team',s.share_with_team) INTO result FROM public.sdl_video_submissions s WHERE s.id=r.id;
-   RETURN result;
+ IF NOT public.sdl_004_club_admin(p_organization) THEN RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501'; END IF;
+ IF p_status IS NULL OR p_status NOT IN ('active','inactive','ended') OR NOT EXISTS(
+ SELECT 1 FROM public.players WHERE athlete_id=p_athlete AND organization_id=p_organization) THEN
+ RAISE EXCEPTION 'Invalid enrollment' USING ERRCODE='22023'; END IF;
+ IF p_enrollment IS NULL THEN
+  INSERT INTO public.sdl_club_enrollments(athlete_id,organization_id,status,ended_at)
+  VALUES(p_athlete,p_organization,p_status,CASE WHEN p_status<>'active' THEN now() END) RETURNING id INTO result;
+ ELSE
+  SELECT * INTO e FROM public.sdl_club_enrollments WHERE id=p_enrollment FOR UPDATE;
+  IF NOT FOUND OR e.athlete_id<>p_athlete OR e.organization_id<>p_organization THEN RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501'; END IF;
+  UPDATE public.sdl_club_enrollments SET status=p_status,ended_at=CASE WHEN p_status<>'active' THEN coalesce(ended_at,now()) END,
+   started_at=CASE WHEN status<>'active' AND p_status='active' THEN now() ELSE started_at END WHERE id=e.id;
+  result=e.id;
  END IF;
- IF r.claim<>p_claim AND r.lease_until>now() THEN
- RAISE EXCEPTION 'Upload already in progress' USING ERRCODE='PT409'; END IF;
+ RETURN result;
+END;
+$$;
+CREATE FUNCTION public.sdl_004_set_recording_permission(p_enrollment uuid,p_allowed boolean,p_permission_ref text)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE e public.sdl_club_enrollments%ROWTYPE;
+BEGIN
+ SELECT * INTO e FROM public.sdl_club_enrollments WHERE id=p_enrollment FOR UPDATE;
+ IF NOT FOUND OR NOT public.sdl_004_club_admin(e.organization_id) THEN RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501'; END IF;
+ IF p_allowed IS NULL OR p_permission_ref IS NULL OR char_length(btrim(p_permission_ref)) NOT BETWEEN 1 AND 500 THEN RAISE EXCEPTION 'Recording permission reference required' USING ERRCODE='22023'; END IF;
+ UPDATE public.sdl_club_enrollments SET recording_storage_authorized=p_allowed,recording_permission_ref=p_permission_ref WHERE id=e.id;
+ INSERT INTO public.sdl_club_consent_events(enrollment_id,actor,action,details)
+ VALUES(e.id,(SELECT auth.uid()),'recording_permission',jsonb_build_object('allowed',p_allowed,'reference',p_permission_ref));
+END;
+$$;
+CREATE FUNCTION public.sdl_004_active_club_consent(p_enrollment uuid,p_generation uuid)
+RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+ SELECT c.id FROM public.sdl_club_enrollments e JOIN public.sdl_club_consents c
+ ON c.enrollment_id=e.id AND c.enrollment_generation=e.generation
+ JOIN public.organizations o ON o.id=e.organization_id
+ WHERE e.id=p_enrollment AND e.generation=p_generation AND e.status='active' AND e.ended_at IS NULL AND e.started_at<=now()
+ AND c.athlete_id=e.athlete_id AND c.organization_id=e.organization_id AND c.withdrawn_at IS NULL AND c.invalidated_at IS NULL
+ AND o.status='active' AND public.sdl_004_guardian_athlete(c.guardian_id,e.athlete_id) LIMIT 1;
+$$;
+CREATE FUNCTION public.sdl_004_club_consent(p_enrollment uuid,p_generation uuid,p_accept boolean,p_policy_version text)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE e public.sdl_club_enrollments%ROWTYPE; c public.sdl_club_consents%ROWTYPE;
+BEGIN
+ SELECT * INTO e FROM public.sdl_club_enrollments WHERE id=p_enrollment FOR UPDATE;
+ IF NOT FOUND OR NOT public.sdl_004_session_active() OR NOT public.sdl_004_guardian_athlete((SELECT auth.uid()),e.athlete_id) THEN
+ RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501'; END IF;
+ IF e.generation IS DISTINCT FROM p_generation THEN RAISE EXCEPTION 'Enrollment changed; refresh' USING ERRCODE='PT409'; END IF;
+ IF p_accept IS NULL THEN RAISE EXCEPTION 'Explicit consent decision required' USING ERRCODE='22023'; END IF;
+ IF p_accept AND (p_policy_version IS DISTINCT FROM 'sdl004-clubhouse-v1' OR e.status<>'active' OR e.ended_at IS NOT NULL OR e.started_at>now()
+ OR NOT EXISTS(SELECT 1 FROM public.organizations WHERE id=e.organization_id AND status='active')) THEN
+ RAISE EXCEPTION 'Active enrollment and current consent policy required' USING ERRCODE='22023'; END IF;
+ -- Lock the guardian/profile records before acceptance; revocation must serialize or roll back.
+ PERFORM 1 FROM public.athlete_guardians WHERE athlete_id=e.athlete_id AND user_id=(SELECT auth.uid()) AND status='verified' FOR SHARE;
+ PERFORM 1 FROM public.profiles WHERE id=(SELECT auth.uid()) AND status='active' FOR SHARE;
+ IF NOT public.sdl_004_guardian_athlete((SELECT auth.uid()),e.athlete_id) THEN RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501'; END IF;
+ SELECT * INTO c FROM public.sdl_club_consents WHERE enrollment_id=e.id AND enrollment_generation=e.generation
+ AND withdrawn_at IS NULL AND invalidated_at IS NULL FOR UPDATE;
+ IF p_accept THEN
+  IF FOUND THEN RETURN; END IF; -- no annual renewal; repeated acceptance is idempotent
+  INSERT INTO public.sdl_club_consents(enrollment_id,enrollment_generation,athlete_id,organization_id,guardian_id,policy_version)
+  VALUES(e.id,e.generation,e.athlete_id,e.organization_id,(SELECT auth.uid()),p_policy_version) RETURNING * INTO c;
+  INSERT INTO public.sdl_club_consent_events(enrollment_id,consent_id,actor,action,details)
+  VALUES(e.id,c.id,(SELECT auth.uid()),'accepted',jsonb_build_object('generation',e.generation,'athlete_id',e.athlete_id,'organization_id',e.organization_id,'policy_version',c.policy_version,'accepted_at',c.accepted_at));
+ ELSE
+  IF NOT FOUND THEN RETURN; END IF;
+  UPDATE public.sdl_club_consents SET withdrawn_at=now() WHERE id=c.id;
+  INSERT INTO public.sdl_club_consent_events(enrollment_id,consent_id,actor,action,details)
+  VALUES(e.id,c.id,(SELECT auth.uid()),'withdrawn',jsonb_build_object('policy_version',c.policy_version,'accepted_at',c.accepted_at,'withdrawn_at',now()));
+ END IF;
+END;
+$$;
+CREATE FUNCTION public.sdl_004_list_club_consents(p_athlete uuid)
+RETURNS TABLE(id uuid,generation uuid,athlete_id uuid,organization_id uuid,organization_name text,status text,
+ consent_active boolean,policy_version text,accepted_at timestamptz,withdrawn_at timestamptz,history jsonb)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+ SELECT e.id,e.generation,e.athlete_id,e.organization_id,o.name,e.status,
+ public.sdl_004_active_club_consent(e.id,e.generation) IS NOT NULL,c.policy_version,c.accepted_at,c.withdrawn_at,
+ coalesce((SELECT jsonb_agg(jsonb_build_object('action',h.action,'at',h.occurred_at,'policy_version',h.details->>'policy_version') ORDER BY h.occurred_at,h.id)
+ FROM public.sdl_club_consent_events h WHERE h.enrollment_id=e.id),'[]'::jsonb)
+ FROM public.sdl_club_enrollments e JOIN public.organizations o ON o.id=e.organization_id
+ LEFT JOIN LATERAL(SELECT cc.* FROM public.sdl_club_consents cc WHERE cc.enrollment_id=e.id AND cc.enrollment_generation=e.generation ORDER BY cc.accepted_at DESC,cc.id DESC LIMIT 1)c ON true
+ WHERE e.athlete_id=p_athlete AND public.sdl_004_session_active() AND public.sdl_004_guardian_athlete((SELECT auth.uid()),p_athlete);
+$$;
+CREATE FUNCTION public.sdl_004_enrollment_lifecycle()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+BEGIN
+ IF TG_OP='INSERT' THEN
+  INSERT INTO public.sdl_club_consent_events(enrollment_id,actor,action,details)
+  VALUES(NEW.id,(SELECT auth.uid()),'enrollment_created',jsonb_build_object('generation',NEW.generation,'status',NEW.status)); RETURN NEW;
+ END IF;
+ IF ROW(OLD.id,OLD.athlete_id,OLD.organization_id,OLD.status,OLD.started_at,OLD.ended_at,OLD.generation)
+ IS DISTINCT FROM ROW(NEW.id,NEW.athlete_id,NEW.organization_id,NEW.status,NEW.started_at,NEW.ended_at,NEW.generation) THEN
+  NEW.generation=gen_random_uuid();
+  NEW.recording_storage_authorized=false; NEW.recording_permission_ref='';
+  WITH invalidated AS(UPDATE public.sdl_club_consents SET invalidated_at=now(),invalidation_reason='enrollment_changed'
+   WHERE enrollment_id=OLD.id AND withdrawn_at IS NULL AND invalidated_at IS NULL RETURNING id)
+  INSERT INTO public.sdl_club_consent_events(enrollment_id,consent_id,actor,action,details)
+  SELECT OLD.id,id,(SELECT auth.uid()),'invalidated',jsonb_build_object('reason','enrollment_changed','old_generation',OLD.generation,'new_generation',NEW.generation) FROM invalidated;
+  INSERT INTO public.sdl_club_consent_events(enrollment_id,actor,action,details)
+  VALUES(OLD.id,(SELECT auth.uid()),'enrollment_changed',jsonb_build_object('from',OLD.status,'to',NEW.status,'new_generation',NEW.generation));
+ END IF;
+ RETURN NEW;
+END;
+$$;
+CREATE TRIGGER sdl_004_enrollment_created AFTER INSERT ON public.sdl_club_enrollments FOR EACH ROW EXECUTE FUNCTION public.sdl_004_enrollment_lifecycle();
+CREATE TRIGGER sdl_004_enrollment_changed BEFORE UPDATE ON public.sdl_club_enrollments FOR EACH ROW EXECUTE FUNCTION public.sdl_004_enrollment_lifecycle();
+CREATE FUNCTION public.sdl_004_immutable_consent_audit()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+BEGIN RAISE EXCEPTION 'Consent audit is immutable' USING ERRCODE='42501'; END;
+$$;
+CREATE TRIGGER sdl_004_immutable_consent_events BEFORE UPDATE OR DELETE ON public.sdl_club_consent_events FOR EACH ROW EXECUTE FUNCTION public.sdl_004_immutable_consent_audit();
+CREATE TRIGGER sdl_004_no_truncate_consent_events BEFORE TRUNCATE ON public.sdl_club_consent_events FOR EACH STATEMENT EXECUTE FUNCTION public.sdl_004_immutable_consent_audit();
+CREATE FUNCTION public.sdl_004_guardian_consent_lifecycle()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+BEGIN
+ IF TG_TABLE_NAME='athlete_guardians' THEN
+  IF TG_OP='UPDATE' AND ROW(OLD.user_id,OLD.athlete_id,OLD.status) IS NOT DISTINCT FROM ROW(NEW.user_id,NEW.athlete_id,NEW.status) THEN RETURN NEW; END IF;
+  WITH invalidated AS(UPDATE public.sdl_club_consents SET invalidated_at=now(),invalidation_reason='guardian_changed'
+   WHERE guardian_id=OLD.user_id AND athlete_id=OLD.athlete_id AND withdrawn_at IS NULL AND invalidated_at IS NULL RETURNING id,enrollment_id)
+  INSERT INTO public.sdl_club_consent_events(enrollment_id,consent_id,actor,action,details)
+  SELECT enrollment_id,id,(SELECT auth.uid()),'invalidated',jsonb_build_object('reason','guardian_changed') FROM invalidated;
+ ELSE
+  IF TG_OP='UPDATE' AND ROW(OLD.id,OLD.status) IS NOT DISTINCT FROM ROW(NEW.id,NEW.status) THEN RETURN NEW; END IF;
+  WITH invalidated AS(UPDATE public.sdl_club_consents SET invalidated_at=now(),invalidation_reason='guardian_profile_changed'
+   WHERE guardian_id=OLD.id AND withdrawn_at IS NULL AND invalidated_at IS NULL RETURNING id,enrollment_id)
+  INSERT INTO public.sdl_club_consent_events(enrollment_id,consent_id,actor,action,details)
+  SELECT enrollment_id,id,(SELECT auth.uid()),'invalidated',jsonb_build_object('reason','guardian_profile_changed') FROM invalidated;
+ END IF;
+ IF TG_OP='DELETE' THEN RETURN OLD; END IF; RETURN NEW;
+END;
+$$;
+CREATE TRIGGER sdl_004_guardian_consent_changed AFTER UPDATE OF user_id,athlete_id,status OR DELETE ON public.athlete_guardians FOR EACH ROW EXECUTE FUNCTION public.sdl_004_guardian_consent_lifecycle();
+CREATE TRIGGER sdl_004_guardian_profile_changed AFTER UPDATE OF id,status OR DELETE ON public.profiles FOR EACH ROW EXECUTE FUNCTION public.sdl_004_guardian_consent_lifecycle();
+CREATE FUNCTION public.sdl_004_reserve_submission(p_player_id uuid,p_request_key uuid,p_claim uuid,
+ p_fingerprint text,p_size bigint,p_category text)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE r public.sdl_submission_uploads%ROWTYPE; p public.players%ROWTYPE; e public.sdl_club_enrollments%ROWTYPE;
+BEGIN
+ IF NOT public.sdl_004_submission_can_submit(p_player_id) THEN RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501'; END IF;
+ IF p_claim IS NULL OR p_request_key IS NULL THEN RAISE EXCEPTION 'Invalid upload' USING ERRCODE='22023'; END IF;
+ SELECT * INTO p FROM public.players WHERE id=p_player_id;
+ SELECT * INTO e FROM public.sdl_club_enrollments WHERE athlete_id=p.athlete_id AND organization_id=p.organization_id
+ AND status='active' AND ended_at IS NULL AND started_at<=now() FOR SHARE;
+ INSERT INTO public.sdl_submission_uploads(user_id,request_key,player_id,athlete_id,organization_id,enrollment_id,enrollment_generation,source_kind,session_id,fingerprint,byte_size,category,claim,lease_until)
+ VALUES((SELECT auth.uid()),p_request_key,p_player_id,p.athlete_id,p.organization_id,e.id,e.generation,
+ CASE WHEN public.sdl_004_guardian_for((SELECT auth.uid()),p_player_id) THEN 'parent' ELSE 'coach' END,
+ (auth.jwt()->>'session_id')::uuid,p_fingerprint,p_size,p_category,p_claim,now()+interval '2 minutes')
+ ON CONFLICT(user_id,request_key) DO NOTHING;
+ SELECT * INTO r FROM public.sdl_submission_uploads WHERE user_id=(SELECT auth.uid()) AND request_key=p_request_key FOR UPDATE;
+ IF r.fingerprint<>p_fingerprint OR r.player_id<>p_player_id OR r.byte_size<>p_size OR r.category<>p_category
+ OR r.athlete_id IS DISTINCT FROM p.athlete_id OR r.organization_id IS DISTINCT FROM p.organization_id THEN
+ RAISE EXCEPTION 'Idempotency key reused for different upload' USING ERRCODE='PT409'; END IF;
+ IF r.completed THEN RETURN jsonb_build_object('state','complete','id',r.id,'player_id',r.player_id,'category',r.category,
+ 'status',(SELECT status FROM public.sdl_video_submissions WHERE id=r.id)); END IF;
+ IF r.claim<>p_claim AND r.lease_until>now() THEN RAISE EXCEPTION 'Upload already in progress' USING ERRCODE='PT409'; END IF;
  UPDATE public.sdl_submission_uploads SET claim=p_claim,lease_until=now()+interval '2 minutes',session_id=(auth.jwt()->>'session_id')::uuid WHERE id=r.id;
  RETURN jsonb_build_object('state','reserved','id',r.id,'object_key','pilot/'||r.player_id::text||'/'||r.id::text||'.mp4');
 END;
 $$;
 CREATE FUNCTION public.sdl_004_finish_submission(p_request_key uuid,p_claim uuid,p_user_id uuid)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
-DECLARE r public.sdl_submission_uploads%ROWTYPE; result jsonb;
+DECLARE r public.sdl_submission_uploads%ROWTYPE;
 BEGIN
  SELECT * INTO r FROM public.sdl_submission_uploads WHERE user_id=p_user_id AND request_key=p_request_key FOR UPDATE;
  IF NOT FOUND OR r.claim<>p_claim THEN RAISE EXCEPTION 'Upload conflict' USING ERRCODE='PT409'; END IF;
- IF NOT EXISTS(SELECT 1 FROM auth.sessions s WHERE s.id=r.session_id AND s.user_id=p_user_id AND (s.not_after IS NULL OR s.not_after>now()))
- OR NOT (public.sdl_004_guardian_for(p_user_id,r.player_id) OR public.sdl_004_coach_for(p_user_id,r.player_id))
- OR (r.share_with_team AND NOT public.sdl_004_guardian_for(p_user_id,r.player_id)) THEN
- RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM auth.sessions WHERE id=r.session_id AND user_id=p_user_id AND (not_after IS NULL OR not_after>now()))
+ OR NOT EXISTS(SELECT 1 FROM public.players WHERE id=r.player_id AND athlete_id=r.athlete_id AND organization_id=r.organization_id)
+ OR NOT(CASE WHEN r.source_kind='parent' THEN public.sdl_004_guardian_for(p_user_id,r.player_id)
+ ELSE public.sdl_004_recording_allowed(p_user_id,r.player_id) END) THEN RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501'; END IF;
  IF NOT r.completed THEN
-   IF r.lease_until<=now() THEN RAISE EXCEPTION 'Upload lease expired' USING ERRCODE='PT409'; END IF;
-   INSERT INTO public.sdl_media_objects(id,player_id,uploaded_by,object_key,content_type,byte_size)
-   VALUES(r.id,r.player_id,p_user_id,'pilot/'||r.player_id::text||'/'||r.id::text||'.mp4','video/mp4',r.byte_size);
-   INSERT INTO public.sdl_video_submissions(id,player_id,submitted_by,category,share_with_team,history)
-   VALUES(r.id,r.player_id,p_user_id,r.category,r.share_with_team,
-   jsonb_build_array(jsonb_build_object('action','submitted','actor',p_user_id,'at',now(),'team_ids',r.consent_team_ids))||CASE WHEN r.consent_invalidated THEN jsonb_build_array(jsonb_build_object('action','consent_invalidated','reason','assignment_changed_during_upload','at',now())) ELSE '[]'::jsonb END);
-   UPDATE public.sdl_video_submissions SET consent_team_ids=r.consent_team_ids,consent_membership_ids=r.consent_membership_ids,consent_membership_epochs=r.consent_membership_epochs WHERE id=r.id;
-   UPDATE public.sdl_submission_uploads SET completed=true WHERE id=r.id;
+  IF r.lease_until<=now() THEN RAISE EXCEPTION 'Upload lease expired' USING ERRCODE='PT409'; END IF;
+  INSERT INTO public.sdl_media_objects(id,player_id,uploaded_by,object_key,content_type,byte_size)
+  VALUES(r.id,r.player_id,p_user_id,'pilot/'||r.player_id::text||'/'||r.id::text||'.mp4','video/mp4',r.byte_size);
+  INSERT INTO public.sdl_video_submissions(id,player_id,athlete_id,organization_id,enrollment_id,enrollment_generation,submitted_by,source_kind,category,status,history)
+  VALUES(r.id,r.player_id,r.athlete_id,r.organization_id,r.enrollment_id,r.enrollment_generation,p_user_id,r.source_kind,r.category,
+  CASE WHEN r.source_kind='coach' THEN 'approved' ELSE 'pending' END,
+  jsonb_build_array(jsonb_build_object('action','uploaded_private','actor',p_user_id,'at',now(),'source',r.source_kind)));
+  UPDATE public.sdl_submission_uploads SET completed=true WHERE id=r.id;
  END IF;
- SELECT jsonb_build_object('id',s.id,'player_id',s.player_id,'category',s.category,'status',s.status,'share_with_team',s.share_with_team)
- INTO result FROM public.sdl_video_submissions s WHERE s.id=r.id;
- RETURN result;
+ RETURN(SELECT jsonb_build_object('id',id,'player_id',player_id,'category',category,'status',status) FROM public.sdl_video_submissions WHERE id=r.id);
 END;
 $$;
-
 CREATE FUNCTION public.sdl_004_review_submission(p_id uuid,p_decision text,p_note text DEFAULT '')
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
-DECLARE target public.sdl_video_submissions%ROWTYPE;
+DECLARE s public.sdl_video_submissions%ROWTYPE;
 BEGIN
-  IF (SELECT auth.uid()) IS NULL OR p_decision NOT IN ('approved','rejected') OR p_decision IS NULL
-    OR p_note IS NULL OR char_length(p_note)>1000 THEN RAISE EXCEPTION 'Invalid review'; END IF;
-  SELECT * INTO target FROM public.sdl_video_submissions WHERE id=p_id FOR UPDATE;
-  IF NOT FOUND OR NOT public.sdl_004_submission_can_review(target.player_id) OR target.submitted_by=(SELECT auth.uid()) THEN
-    RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501';
-  END IF;
-  IF target.status<>'pending' THEN RAISE EXCEPTION 'Already reviewed' USING ERRCODE='PT409'; END IF;
-  UPDATE public.sdl_video_submissions SET status=p_decision,review_note=p_note,
-    reviewed_at=now(),reviewed_by=(SELECT auth.uid()),
-    history=history||jsonb_build_array(jsonb_build_object('action',p_decision,'actor',(SELECT auth.uid()),'at',now(),'note',p_note))
-  WHERE id=p_id;
+ IF p_decision IS NULL OR p_decision NOT IN ('approved','rejected') OR p_note IS NULL OR char_length(p_note)>1000 THEN RAISE EXCEPTION 'Invalid review' USING ERRCODE='22023'; END IF;
+ SELECT * INTO s FROM public.sdl_video_submissions WHERE id=p_id FOR UPDATE;
+ IF NOT FOUND OR NOT EXISTS(SELECT 1 FROM public.players WHERE id=s.player_id AND athlete_id=s.athlete_id AND organization_id=s.organization_id) OR NOT public.sdl_004_submission_can_review(s.player_id) OR s.submitted_by=(SELECT auth.uid()) THEN RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501'; END IF;
+ IF s.status<>'pending' THEN RAISE EXCEPTION 'Already reviewed' USING ERRCODE='PT409'; END IF;
+ UPDATE public.sdl_video_submissions SET status=p_decision,review_note=p_note,reviewed_at=now(),reviewed_by=(SELECT auth.uid()),
+ history=history||jsonb_build_array(jsonb_build_object('action',p_decision,'actor',(SELECT auth.uid()),'at',now(),'note',p_note)) WHERE id=s.id;
 END;
 $$;
-
-CREATE FUNCTION public.sdl_004_submission_consent(p_id uuid,p_share boolean,p_team_ids uuid[] DEFAULT NULL)
+CREATE FUNCTION public.sdl_004_submission_can_publish(p_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+ SELECT public.sdl_004_session_active() AND EXISTS(SELECT 1 FROM public.sdl_video_submissions s
+ JOIN public.players p ON p.id=s.player_id AND p.athlete_id=s.athlete_id AND p.organization_id=s.organization_id
+ WHERE s.id=p_id AND s.status='approved' AND public.sdl_004_coach_for((SELECT auth.uid()),s.player_id)
+ AND public.sdl_004_active_club_consent(s.enrollment_id,s.enrollment_generation) IS NOT NULL);
+$$;
+CREATE FUNCTION public.sdl_004_publish_submission(p_id uuid,p_team_ids uuid[],p_subject_athletes uuid[])
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
-DECLARE target public.sdl_video_submissions%ROWTYPE;
+DECLARE s public.sdl_video_submissions%ROWTYPE; consent uuid;
 BEGIN
-  SELECT * INTO target FROM public.sdl_video_submissions WHERE id=p_id FOR UPDATE;
-  IF (SELECT auth.uid()) IS NULL OR NOT FOUND OR target.submitted_by<>(SELECT auth.uid())
-    OR p_share IS NULL OR NOT public.sdl_004_submission_is_guardian(target.player_id) THEN
-    RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501';
-  END IF;
- IF p_share AND (p_team_ids IS NULL OR cardinality(p_team_ids)=0 OR cardinality(p_team_ids)>20
- OR EXISTS(SELECT 1 FROM unnest(p_team_ids) wanted WHERE NOT EXISTS(
- SELECT 1 FROM public.player_team_memberships ptm JOIN public.players p ON p.id=ptm.player_id AND p.organization_id=ptm.organization_id
- JOIN public.teams consent_team ON consent_team.id=ptm.team_id AND consent_team.organization_id=ptm.organization_id AND consent_team.status='active'
- JOIN public.organizations consent_org ON consent_org.id=ptm.organization_id AND consent_org.status='active'
- WHERE p.id=target.player_id AND ptm.team_id=wanted AND ptm.status='active' AND ptm.end_date IS NULL AND ptm.start_date<=CURRENT_DATE))) THEN
- RAISE EXCEPTION 'Invalid team consent scope' USING ERRCODE='22023'; END IF;
-  UPDATE public.sdl_video_submissions SET share_with_team=p_share,consent_team_ids=CASE WHEN p_share THEN p_team_ids ELSE '{}'::uuid[] END,
-    consent_membership_ids=CASE WHEN p_share THEN ARRAY(SELECT ptm.id FROM public.player_team_memberships ptm JOIN public.players p ON p.id=ptm.player_id AND p.organization_id=ptm.organization_id
- JOIN public.teams consent_team ON consent_team.id=ptm.team_id AND consent_team.organization_id=ptm.organization_id AND consent_team.status='active'
- JOIN public.organizations consent_org ON consent_org.id=ptm.organization_id AND consent_org.status='active' WHERE p.id=target.player_id AND ptm.team_id=ANY(p_team_ids) AND ptm.status='active' AND ptm.end_date IS NULL AND ptm.start_date<=CURRENT_DATE) ELSE '{}'::uuid[] END,
-    consent_membership_epochs=CASE WHEN p_share THEN coalesce((SELECT jsonb_object_agg(ptm.id::text,ptm.sdl_consent_epoch::text) FROM public.player_team_memberships ptm JOIN public.players p ON p.id=ptm.player_id AND p.organization_id=ptm.organization_id
- JOIN public.teams consent_team ON consent_team.id=ptm.team_id AND consent_team.organization_id=ptm.organization_id AND consent_team.status='active'
- JOIN public.organizations consent_org ON consent_org.id=ptm.organization_id AND consent_org.status='active' WHERE p.id=target.player_id AND ptm.team_id=ANY(p_team_ids) AND ptm.status='active' AND ptm.end_date IS NULL AND ptm.start_date<=CURRENT_DATE),'{}'::jsonb) ELSE '{}'::jsonb END,
-    history=history||jsonb_build_array(jsonb_build_object('action','consent','share',p_share,'team_ids',CASE WHEN p_share THEN p_team_ids ELSE '{}'::uuid[] END,'actor',(SELECT auth.uid()),'at',now()))
-  WHERE id=p_id;
+ SELECT * INTO s FROM public.sdl_video_submissions WHERE id=p_id FOR UPDATE;
+ IF NOT FOUND OR NOT EXISTS(SELECT 1 FROM public.players WHERE id=s.player_id AND athlete_id=s.athlete_id AND organization_id=s.organization_id) OR NOT public.sdl_004_submission_can_review(s.player_id) THEN RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501'; END IF;
+ IF p_team_ids IS NULL OR cardinality(p_team_ids)>20 THEN RAISE EXCEPTION 'Invalid team scope' USING ERRCODE='22023'; END IF;
+ IF cardinality(p_team_ids)>0 THEN
+  IF NOT public.sdl_004_submission_can_publish(s.id) THEN RAISE EXCEPTION 'Approval and active club consent required' USING ERRCODE='42501'; END IF;
+  -- Unknown/multiple identifiable children are PRIVATE. This is an accountable coach
+  -- single-subject safety attestation, not automatic detection or multi-subject consent.
+  IF p_subject_athletes IS NULL OR cardinality(p_subject_athletes)<>1 OR p_subject_athletes[1] IS DISTINCT FROM s.athlete_id THEN
+   RAISE EXCEPTION 'Multiple or unknown subjects cannot be published' USING ERRCODE='22023'; END IF;
+  IF EXISTS(SELECT 1 FROM unnest(p_team_ids) wanted WHERE wanted IS NULL OR NOT public.sdl_004_coach_team((SELECT auth.uid()),s.player_id,wanted)
+   OR NOT EXISTS(SELECT 1 FROM public.teams WHERE id=wanted AND organization_id=s.organization_id)) THEN RAISE EXCEPTION 'Team access denied' USING ERRCODE='42501'; END IF;
+  PERFORM 1 FROM public.sdl_club_enrollments WHERE id=s.enrollment_id FOR SHARE;
+  consent=public.sdl_004_active_club_consent(s.enrollment_id,s.enrollment_generation);
+  PERFORM 1 FROM public.sdl_club_consents WHERE id=consent FOR SHARE;
+  IF consent IS NULL OR public.sdl_004_active_club_consent(s.enrollment_id,s.enrollment_generation) IS DISTINCT FROM consent THEN RAISE EXCEPTION 'Consent changed; refresh' USING ERRCODE='PT409'; END IF;
+ END IF;
+ UPDATE public.sdl_video_submissions SET publication_team_ids=ARRAY(SELECT DISTINCT unnest(p_team_ids)),publication_consent_id=consent,
+ subject_scope=CASE WHEN cardinality(p_team_ids)>0 THEN 'single_athlete' ELSE 'unknown' END,
+ subject_confirmed_by=CASE WHEN cardinality(p_team_ids)>0 THEN (SELECT auth.uid()) END,
+ subject_confirmed_at=CASE WHEN cardinality(p_team_ids)>0 THEN now() END,
+ history=history||jsonb_build_array(jsonb_build_object('action',CASE WHEN cardinality(p_team_ids)>0 THEN 'published' ELSE 'unpublished' END,
+ 'team_ids',p_team_ids,'consent_id',consent,'subject_athletes',p_subject_athletes,'safety_policy','single-athlete-v1','actor',(SELECT auth.uid()),'at',now())) WHERE id=s.id;
 END;
 $$;
-
+CREATE FUNCTION public.sdl_004_clubhouse_visible(p_id uuid,p_team uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+ SELECT public.sdl_004_clubhouse_member(p_team) AND EXISTS(SELECT 1 FROM public.sdl_video_submissions s
+ JOIN public.players p ON p.id=s.player_id AND p.athlete_id=s.athlete_id AND p.organization_id=s.organization_id
+ JOIN public.player_team_memberships pm ON pm.player_id=p.id AND pm.organization_id=s.organization_id
+ JOIN public.teams t ON t.id=pm.team_id AND t.organization_id=s.organization_id
+ WHERE s.id=p_id AND s.status='approved' AND s.subject_scope='single_athlete' AND s.subject_confirmed_by IS NOT NULL
+ AND t.id=p_team AND t.status='active' AND p_team=ANY(s.publication_team_ids)
+ AND pm.status='active' AND pm.end_date IS NULL AND pm.start_date<=CURRENT_DATE
+ AND s.publication_consent_id=public.sdl_004_active_club_consent(s.enrollment_id,s.enrollment_generation));
+$$;
+CREATE FUNCTION public.sdl_004_submission_can_read(p_submission_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+ SELECT public.sdl_004_session_active() AND EXISTS(SELECT 1 FROM public.sdl_video_submissions s
+ JOIN public.players p ON p.id=s.player_id AND p.athlete_id=s.athlete_id AND p.organization_id=s.organization_id
+ WHERE s.id=p_submission_id AND (public.sdl_004_guardian_for((SELECT auth.uid()),s.player_id)
+ OR public.sdl_004_coach_for((SELECT auth.uid()),s.player_id)
+ OR EXISTS(SELECT 1 FROM unnest(s.publication_team_ids) team WHERE public.sdl_004_clubhouse_visible(s.id,team))));
+$$;
+CREATE FUNCTION public.sdl_004_list_submissions(p_player_id uuid)
+RETURNS TABLE(id uuid,player_id uuid,athlete_id uuid,category text,status text,source_kind text,created_at timestamptz,
+ review_note text,history jsonb,can_review boolean,can_publish boolean,publication_team_ids uuid[])
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+ SELECT s.id,s.player_id,s.athlete_id,s.category,s.status,s.source_kind,s.created_at,s.review_note,s.history,
+ s.status='pending' AND s.submitted_by<>(SELECT auth.uid()) AND public.sdl_004_submission_can_review(s.player_id),
+ public.sdl_004_submission_can_publish(s.id),s.publication_team_ids FROM public.sdl_video_submissions s
+ JOIN public.players p ON p.id=s.player_id AND p.athlete_id=s.athlete_id AND p.organization_id=s.organization_id
+ WHERE s.player_id=p_player_id AND public.sdl_004_session_active() AND (public.sdl_004_guardian_for((SELECT auth.uid()),s.player_id)
+ OR public.sdl_004_coach_for((SELECT auth.uid()),s.player_id)) ORDER BY s.created_at DESC LIMIT 30;
+$$;
+CREATE FUNCTION public.sdl_004_review_queue(p_team_id uuid,p_status text DEFAULT 'pending')
+RETURNS TABLE(id uuid,player_id uuid,athlete_id uuid,preferred_name text,team_id uuid,team_name text,category text,status text,
+ source_kind text,created_at timestamptz,review_note text,history jsonb,can_review boolean,can_publish boolean,publication_team_ids uuid[])
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+ SELECT s.id,s.player_id,s.athlete_id,p.preferred_name,t.id,t.name,s.category,s.status,s.source_kind,s.created_at,s.review_note,s.history,
+ s.status='pending' AND s.submitted_by<>(SELECT auth.uid()),public.sdl_004_submission_can_publish(s.id),s.publication_team_ids
+ FROM public.sdl_video_submissions s JOIN public.players p ON p.id=s.player_id AND p.athlete_id=s.athlete_id AND p.organization_id=s.organization_id
+ JOIN public.teams t ON t.id=p_team_id AND t.organization_id=s.organization_id
+ WHERE public.sdl_004_session_active() AND public.sdl_004_coach_team((SELECT auth.uid()),s.player_id,p_team_id)
+ AND (p_status='all' OR s.status=p_status) ORDER BY s.created_at DESC LIMIT 50;
+$$;
 CREATE FUNCTION public.sdl_004_clubhouse_videos(p_team_id uuid)
 RETURNS TABLE(id uuid,player_id uuid,category text,created_at timestamptz,preferred_name text)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
-  SELECT s.id,s.player_id,s.category,s.created_at,(SELECT p.preferred_name FROM public.players p WHERE p.id=s.player_id) FROM public.sdl_video_submissions s
-  WHERE public.sdl_004_clubhouse_member(p_team_id) AND s.status='approved' AND s.share_with_team
-    AND public.sdl_004_submission_can_read(s.id)
-    AND EXISTS (SELECT 1 FROM public.players owner_player
-      JOIN public.athlete_guardians ag ON ag.athlete_id=owner_player.athlete_id
-      JOIN public.profiles pr ON pr.id=ag.user_id
-      WHERE owner_player.id=s.player_id AND ag.user_id=s.submitted_by AND ag.status='verified' AND pr.status='active')
-    AND EXISTS (SELECT 1 FROM public.player_team_memberships ptm
-      JOIN public.players p ON p.id=ptm.player_id AND p.organization_id=ptm.organization_id
- JOIN public.teams consent_team ON consent_team.id=ptm.team_id AND consent_team.organization_id=ptm.organization_id AND consent_team.status='active'
- JOIN public.organizations consent_org ON consent_org.id=ptm.organization_id AND consent_org.status='active'
-      WHERE ptm.player_id=s.player_id AND ptm.team_id=p_team_id AND ptm.team_id=ANY(s.consent_team_ids) AND ptm.id=ANY(s.consent_membership_ids) AND s.consent_membership_epochs->>ptm.id::text=ptm.sdl_consent_epoch::text AND ptm.status='active' AND ptm.end_date IS NULL AND ptm.start_date<=CURRENT_DATE)
-  ORDER BY s.created_at DESC LIMIT 30;
+ SELECT s.id,s.player_id,s.category,s.created_at,p.preferred_name FROM public.sdl_video_submissions s
+ JOIN public.players p ON p.id=s.player_id WHERE public.sdl_004_clubhouse_visible(s.id,p_team_id)
+ ORDER BY s.created_at DESC LIMIT 30;
 $$;
-
-
+CREATE FUNCTION public.sdl_004_submission_contract()
+RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+ SELECT CASE WHEN public.sdl_004_session_active() THEN jsonb_build_object('revision','sdl004-club-enrollment-v2') ELSE NULL END;
+$$;
 CREATE FUNCTION public.sdl_004_workspace_players()
 RETURNS TABLE(id uuid,athlete_id uuid,preferred_name text,organization_id uuid,organization_name text,team_id uuid,team_name text,is_guardian boolean,is_coach boolean,can_clubhouse boolean)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
@@ -294,95 +462,14 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
  WHERE public.sdl_004_session_active() AND (public.sdl_004_guardian_for((SELECT auth.uid()),p.id)
  OR (public.sdl_004_coach_for((SELECT auth.uid()),p.id) AND EXISTS (SELECT 1 FROM public.team_memberships tm WHERE tm.team_id=t.id AND tm.user_id=(SELECT auth.uid()) AND tm.role='coach' AND tm.status='active')));
 $$;
-CREATE FUNCTION public.sdl_004_submission_contract()
-RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
- SELECT CASE WHEN public.sdl_004_session_active() THEN jsonb_build_object('revision','sdl004-submissions-v1') ELSE NULL END;
-$$;
-CREATE FUNCTION public.sdl_004_review_queue(p_team_id uuid,p_status text DEFAULT 'pending')
-RETURNS TABLE(id uuid,player_id uuid,preferred_name text,team_id uuid,team_name text,category text,status text,share_with_team boolean,created_at timestamptz,review_note text,history jsonb,can_review boolean)
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
- SELECT s.id,s.player_id,p.preferred_name,t.id,t.name,s.category,s.status,s.share_with_team,s.created_at,s.review_note,s.history,(s.status='pending' AND s.submitted_by<>(SELECT auth.uid()))
- FROM public.sdl_video_submissions s JOIN public.players p ON p.id=s.player_id
- JOIN public.player_team_memberships ptm ON ptm.player_id=p.id AND ptm.organization_id=p.organization_id
- JOIN public.teams t ON t.id=ptm.team_id AND t.organization_id=ptm.organization_id
- WHERE t.id=p_team_id AND public.sdl_004_submission_can_review(s.player_id)
- AND EXISTS(SELECT 1 FROM public.team_memberships tm WHERE tm.team_id=t.id AND tm.user_id=(SELECT auth.uid()) AND tm.role='coach' AND tm.status='active')
- AND ptm.status='active' AND ptm.end_date IS NULL AND ptm.start_date<=CURRENT_DATE
- AND (p_status='all' OR s.status=p_status)
- ORDER BY s.created_at DESC LIMIT 50;
-$$;
-CREATE FUNCTION public.sdl_004_advance_membership_consent_epoch()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
-BEGIN
- IF ROW(OLD.id,OLD.player_id,OLD.team_id,OLD.organization_id,OLD.status,OLD.start_date,OLD.end_date,OLD.sdl_consent_epoch)
- IS DISTINCT FROM ROW(NEW.id,NEW.player_id,NEW.team_id,NEW.organization_id,NEW.status,NEW.start_date,NEW.end_date,NEW.sdl_consent_epoch) THEN
-   NEW.sdl_consent_epoch=gen_random_uuid();
- END IF;
- RETURN NEW;
-END;
-$$;
-CREATE TRIGGER sdl_004_membership_consent_epoch BEFORE UPDATE OF id,player_id,team_id,organization_id,status,start_date,end_date,sdl_consent_epoch
- ON public.player_team_memberships FOR EACH ROW EXECUTE FUNCTION public.sdl_004_advance_membership_consent_epoch();
 
--- Consent must never revive when an existing membership/guardian/profile is reused.
--- These triggers only invalidate new submission consent, never v1 media or statistics.
-CREATE FUNCTION public.sdl_004_invalidate_membership_consent()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
-BEGIN
- IF TG_OP='UPDATE' AND ROW(OLD.id,OLD.player_id,OLD.team_id,OLD.organization_id,OLD.status,OLD.start_date,OLD.end_date)
-  IS NOT DISTINCT FROM ROW(NEW.id,NEW.player_id,NEW.team_id,NEW.organization_id,NEW.status,NEW.start_date,NEW.end_date) THEN RETURN NEW; END IF;
- UPDATE public.sdl_video_submissions s SET
-   consent_membership_ids=array_remove(s.consent_membership_ids,OLD.id),
-   consent_membership_epochs=s.consent_membership_epochs-OLD.id::text,
-   consent_team_ids=ARRAY(SELECT DISTINCT ptm.team_id FROM public.player_team_memberships ptm
-     WHERE ptm.id=ANY(array_remove(s.consent_membership_ids,OLD.id)) AND ptm.team_id=ANY(s.consent_team_ids)
-       AND ptm.status='active' AND ptm.end_date IS NULL AND ptm.start_date<=CURRENT_DATE),
-   share_with_team=cardinality(array_remove(s.consent_membership_ids,OLD.id))>0,
-   history=s.history||jsonb_build_array(jsonb_build_object('action','consent_invalidated','reason','membership_changed','at',now()))
- WHERE OLD.id=ANY(s.consent_membership_ids);
- UPDATE public.sdl_submission_uploads SET share_with_team=false,consent_team_ids='{}',consent_membership_ids='{}',consent_membership_epochs='{}',consent_invalidated=true
- WHERE OLD.id=ANY(consent_membership_ids) AND NOT completed;
- IF TG_OP='DELETE' THEN RETURN OLD; END IF; RETURN NEW;
-END;
-$$;
-CREATE TRIGGER sdl_004_membership_consent_lifecycle
- AFTER UPDATE OF id,player_id,team_id,organization_id,status,start_date,end_date OR DELETE
- ON public.player_team_memberships FOR EACH ROW EXECUTE FUNCTION public.sdl_004_invalidate_membership_consent();
-
-CREATE FUNCTION public.sdl_004_invalidate_guardian_consent()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
-BEGIN
- IF TG_OP='UPDATE' AND ROW(OLD.user_id,OLD.athlete_id,OLD.status) IS NOT DISTINCT FROM ROW(NEW.user_id,NEW.athlete_id,NEW.status) THEN RETURN NEW; END IF;
- UPDATE public.sdl_video_submissions s SET share_with_team=false,consent_team_ids='{}',consent_membership_ids='{}',consent_membership_epochs='{}',
-   history=s.history||jsonb_build_array(jsonb_build_object('action','consent_invalidated','reason','guardian_changed','at',now()))
- WHERE s.submitted_by=OLD.user_id AND s.share_with_team
-  AND EXISTS(SELECT 1 FROM public.players p WHERE p.id=s.player_id AND p.athlete_id=OLD.athlete_id);
- UPDATE public.sdl_submission_uploads u SET share_with_team=false,consent_team_ids='{}',consent_membership_ids='{}',consent_membership_epochs='{}',consent_invalidated=true
- WHERE u.user_id=OLD.user_id AND u.share_with_team AND NOT completed
-  AND EXISTS(SELECT 1 FROM public.players p WHERE p.id=u.player_id AND p.athlete_id=OLD.athlete_id);
- IF TG_OP='DELETE' THEN RETURN OLD; END IF; RETURN NEW;
-END;
-$$;
-CREATE TRIGGER sdl_004_guardian_consent_lifecycle AFTER UPDATE OF user_id,athlete_id,status OR DELETE
- ON public.athlete_guardians FOR EACH ROW EXECUTE FUNCTION public.sdl_004_invalidate_guardian_consent();
-
-CREATE FUNCTION public.sdl_004_invalidate_profile_consent()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
-BEGIN
- IF TG_OP='UPDATE' AND ROW(OLD.id,OLD.status) IS NOT DISTINCT FROM ROW(NEW.id,NEW.status) THEN RETURN NEW; END IF;
- UPDATE public.sdl_video_submissions s SET share_with_team=false,consent_team_ids='{}',consent_membership_ids='{}',consent_membership_epochs='{}',
-   history=s.history||jsonb_build_array(jsonb_build_object('action','consent_invalidated','reason','profile_changed','at',now()))
- WHERE s.submitted_by=OLD.id AND s.share_with_team;
- UPDATE public.sdl_submission_uploads SET share_with_team=false,consent_team_ids='{}',consent_membership_ids='{}',consent_membership_epochs='{}',consent_invalidated=true
- WHERE user_id=OLD.id AND share_with_team AND NOT completed;
- IF TG_OP='DELETE' THEN RETURN OLD; END IF; RETURN NEW;
-END;
-$$;
-CREATE TRIGGER sdl_004_profile_consent_lifecycle AFTER UPDATE OF id,status OR DELETE
- ON public.profiles FOR EACH ROW EXECUTE FUNCTION public.sdl_004_invalidate_profile_consent();
-
-DO $grants$ DECLARE r record; BEGIN FOR r IN SELECT p.oid::regprocedure AS sig,p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname=ANY(ARRAY['sdl_004_advance_membership_consent_epoch','sdl_004_invalidate_profile_consent','sdl_004_invalidate_guardian_consent','sdl_004_invalidate_membership_consent','sdl_004_review_queue','sdl_004_session_active','sdl_004_guardian_for','sdl_004_coach_for','sdl_004_submission_can_submit','sdl_004_submission_is_guardian','sdl_004_submission_can_review','sdl_004_clubhouse_member','sdl_004_submission_can_read','sdl_004_list_submissions','sdl_004_reserve_submission','sdl_004_finish_submission','sdl_004_review_submission','sdl_004_submission_consent','sdl_004_clubhouse_videos','sdl_004_workspace_players','sdl_004_submission_contract']) LOOP
-EXECUTE 'REVOKE ALL ON FUNCTION '||r.sig||' FROM PUBLIC,anon,authenticated';
-IF r.proname=ANY(ARRAY['sdl_004_advance_membership_consent_epoch','sdl_004_invalidate_profile_consent','sdl_004_invalidate_guardian_consent','sdl_004_invalidate_membership_consent','sdl_004_guardian_for','sdl_004_coach_for','sdl_004_finish_submission']) THEN EXECUTE 'GRANT EXECUTE ON FUNCTION '||r.sig||' TO service_role'; ELSE EXECUTE 'GRANT EXECUTE ON FUNCTION '||r.sig||' TO authenticated'; END IF;
-END LOOP; END $grants$;
+DO $grants$ DECLARE r record; BEGIN
+ FOR r IN SELECT p.oid::regprocedure AS sig,p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+ WHERE n.nspname='public' AND p.proname=ANY(ARRAY['sdl_004_session_active','sdl_004_guardian_for','sdl_004_coach_for','sdl_004_guardian_athlete','sdl_004_club_admin','sdl_004_coach_team','sdl_004_recording_allowed','sdl_004_submission_can_submit','sdl_004_submission_is_guardian','sdl_004_submission_can_review','sdl_004_clubhouse_member','sdl_004_set_club_enrollment','sdl_004_set_recording_permission','sdl_004_active_club_consent','sdl_004_club_consent','sdl_004_list_club_consents','sdl_004_enrollment_lifecycle','sdl_004_immutable_consent_audit','sdl_004_guardian_consent_lifecycle','sdl_004_reserve_submission','sdl_004_finish_submission','sdl_004_review_submission','sdl_004_submission_can_publish','sdl_004_publish_submission','sdl_004_clubhouse_visible','sdl_004_submission_can_read','sdl_004_list_submissions','sdl_004_review_queue','sdl_004_clubhouse_videos','sdl_004_submission_contract','sdl_004_workspace_players']) LOOP
+ EXECUTE 'REVOKE ALL ON FUNCTION '||r.sig||' FROM PUBLIC,anon,authenticated,service_role';
+ IF r.proname=ANY(ARRAY['sdl_004_guardian_for','sdl_004_guardian_athlete','sdl_004_coach_for','sdl_004_club_admin','sdl_004_coach_team','sdl_004_recording_allowed','sdl_004_active_club_consent','sdl_004_finish_submission','sdl_004_enrollment_lifecycle','sdl_004_immutable_consent_audit','sdl_004_guardian_consent_lifecycle','sdl_004_clubhouse_visible']) THEN
+ EXECUTE 'GRANT EXECUTE ON FUNCTION '||r.sig||' TO service_role';
+ ELSE EXECUTE 'GRANT EXECUTE ON FUNCTION '||r.sig||' TO authenticated'; END IF;
+ END LOOP;
+END $grants$;
 COMMIT;

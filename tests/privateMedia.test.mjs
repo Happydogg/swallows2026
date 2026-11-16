@@ -251,3 +251,15 @@ test('aborting an in-flight upload cancels XHR without a successful receipt', as
   assert.equal(started, true); controller.abort();
   await assert.rejects(uploading, e => e.name === 'AbortError'); assert.equal(aborted, true);
 });
+
+test('v2 MP4 transport uploads privately and accepts a receipt without per-video consent',async t=>{
+ const receipt={id:VIDEO,player_id:PLAYER,category:'pitching',status:'pending'},xhr=xhrMock(201,receipt);
+ const {service}=await serviceHarness(t,{xhrFactory:()=>xhr});const progress=[];
+ const result=await service.submit(PLAYER,file,{category:'pitching',key:VIDEO},{onProgress:n=>progress.push(n)});
+ assert.equal(xhr.url,`https://sdl-r2-staging-gate.sampson-ho.workers.dev/v2/submissions?player_id=${PLAYER}&category=pitching`);
+ assert.equal(xhr.headers['Idempotency-Key'],VIDEO);assert.equal(result.id,VIDEO);assert.deepEqual(progress,[50,100]);assert.equal(result.share_with_team,undefined);
+});
+test('v2 transport rejects attempts to attach per-video consent before a network request',async t=>{
+ let requests=0;const {service}=await serviceHarness(t,{xhrFactory:()=>{requests++;}});
+ assert.throws(()=>service.submit(PLAYER,file,{category:'pitching',key:VIDEO,share:true,teamIds:[OTHER]}),/Invalid submission/);assert.equal(requests,0);
+});

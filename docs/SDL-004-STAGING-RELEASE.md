@@ -1,162 +1,45 @@
-# SDL-004 submission release candidate — NOT DEPLOYED
+# SDL-004 staging release candidate — NOT DEPLOYED
 
-## Focused hardening checkpoint
+The current business rule and API are documented in
+[SDL-004-CLUB-CONSENT.md](SDL-004-CLUB-CONSENT.md). Standing optional Clubhouse consent belongs to
+one athlete/club/continuous enrollment, survives internal team transfers and has no annual or
+per-video renewal. A club departure/rejoin or withdrawal cannot revive an obsolete consent receipt.
+The earlier per-video/per-team pending design is superseded.
 
-See [SDL-004-PREDEPLOY-HARDENING.md](SDL-004-PREDEPLOY-HARDENING.md) for the current local
-consent lifecycle changes, fail-closed preflight runner and Worker settings preservation guard.
-A local build is not release approval. The migration is still unapplied; v2 remains disabled.
+Both flags remain disabled:
 
-## Scope and readiness
+- `js/config.js`: `SUBMISSION_FEATURES_ENABLED=false`.
+- `backend/worker/cloudflare.config.ts`: `SUBMISSIONS_ENABLED='false'`.
 
-This package adds parent/coach submissions, coach review, explicit guardian sharing consent,
-athlete-based My Players, and approved Team Clubhouse media to the existing private-media pilot.
-The application, database and Worker changes are locally tested only. **New operations remain
-disabled in the frontend (`SUBMISSION_FEATURES_ENABLED=false`) and Worker configuration
-(`SUBMISSIONS_ENABLED='false'`).** Existing v1 private-media endpoints and locks are preserved.
+No live SQL, deployment, provider setting change, push, merge or production access occurred.
+Local SQL tests use isolated synthetic PGlite fixtures with explicit user authorization.
+The existing v1 pilot, statistics locks and private R2 architecture are preserved. No public
+media URLs, secrets in browser code, extra paid resources or new deployment bindings are added.
 
-The release candidate is not a production deployment authorization. No provider mutation,
-remote SQL application, secret/binding update, R2 deletion, push, or merge occurred in this sprint.
-Read-only catalog inspection verified the auth.sessions columns required for revocation checks;
-no production database was queried. Existing live pilot successes were supplied by the user,
-not repeated or relabeled as new live tests.
+## Artifacts and prerequisites
 
-## Prepared artifacts
+- Existing CLI-generated, still-unapplied migration:
+  `supabase/migrations/20261116184847_sdl004_submission_workflows.sql`.
+  It creates five tables, narrow RPCs and lifecycle/immutable-audit triggers; there is no compatibility
+  migration. Existing player_team_memberships is not altered by this final design.
+- Complete Worker entrypoint: `backend/worker/index.mjs`; preserved v1 `pilot.mjs`; current v2
+  implementation `submissionRoutes.mjs` with revision `sdl004-club-enrollment-v2` checked on every call.
+- Existing staging-only configuration, pinned local build tools, exact metadata preservation guard
+  and `check:release`. Unknown binding/compatibility/settings drift blocks release; the uploader
+  retains existing secret values. Local builds without reviewed metadata are not deployable artifacts.
+- Guarded `backend/release/run-staging-preflight.mjs`, read-only pre/postflight SQL and deliberately
+  unconfirmed `worker-baseline.example.json`. Both old workflow tables and all three new consent
+  tables must be absent. Old draft schema/functions, missing pilot prerequisites, grants/RLS drift,
+  incompatible dependency types and unreconciled migration history raise errors.
+- `backend/proposals/*` are compatibility pointers to canonical source. Do not apply old proposal SQL.
 
-- `supabase/migrations/20261116184847_sdl004_submission_workflows.sql`: created by Supabase CLI
-  `migration new`; additive staging candidate, not applied. The timestamp is CLI-generated UTC.
-- `backend/worker/index.mjs`: complete staging entrypoint; routes v1 to the preserved pilot
-  and v2 to the new handler. Includes preflight, error handling and default-off gate.
-- `backend/worker/pilot.mjs`: verified pilot implementation with helper exports; unchanged v1 semantics.
-- `backend/worker/submissionRoutes.mjs`: v2 routes using the same Supabase/R2 bindings.
-- `backend/worker/cloudflare.config.ts`: only the named staging Worker/account, existing private
-  bucket and staging Supabase URL. Explicit bucket identity prevents provisioning a new bucket.
-- `backend/worker/package.json` and lockfile: pinned Cloudflare CLI/Vite build tools, separate
-  from the browser's Vue global/ES-module architecture. `npm run build` performs local build only.
-- `backend/worker/check-package.mjs`: verifies generated target, bucket, Supabase URL,
-  default-off gate, built entrypoint and absence of embedded secret values.
-- `backend/release/staging-preflight.sql` and `staging-postflight.sql`: read-only inventory/grants
-  checks for a future explicitly authorized staging rollout.
-- `backend/proposals/*`: compatibility pointers to the canonical migration/Worker sources;
-  do not apply the old proposal SQL as a second migration.
-
-Supabase CLI 3.2.0 generated the migration. Its configuration directory was isolated with
-`SUPABASE_HOME=/tmp/sdl004-supabase-home`; no project linking or database push was performed.
-Cloudflare CLI `cf` is used for the new configuration (not an unnecessary Wrangler migration).
-References: https://developers.cloudflare.com/cf/projects/ and
-https://developers.cloudflare.com/cf/projects/cloudflare-config/ .
-
-## Database contract
-
-New tables:
-
-- `sdl_video_submissions`: private media reference, owner/player, category, pending/approved/
-  rejected status, explicit sharing scope, review note, reviewer/timestamps and append-only-via-API history.
-- `sdl_submission_uploads`: per-user idempotency key, server-generated media ID, byte/metadata
-  fingerprint, reservation claim, lease, originating auth session and completion state.
-
-Both tables enable RLS and revoke direct PUBLIC/anon/authenticated access. Narrow authenticated
-RPCs perform identity checks; internal predicates and the finalize function are not executable
-by browser roles. Fixed `search_path` and explicit EXECUTE grants apply to every new function.
-The migration neither grants statistics writes nor modifies players/sessions/drill_videos or
-existing media policies. It adds `player_team_memberships.sdl_consent_epoch` and consent-only triggers
-on player_team_memberships, athlete_guardians and profiles; these affect new v2 grants only. It requires the existing pilot schema and fails if that prerequisite
-is absent; it is not an empty-database bootstrap or a production baseline migration.
-
-New RPC groups:
-
-- Session/contract: `sdl_004_session_active`, `sdl_004_submission_contract`.
-- Authorization: `sdl_004_submission_can_submit`, `sdl_004_submission_is_guardian`,
-  `sdl_004_submission_can_review`, `sdl_004_clubhouse_member`, `sdl_004_submission_can_read`.
-- Upload: `sdl_004_reserve_submission` (caller bearer) and `sdl_004_finish_submission`
-  (Worker secret only). Internal `guardian_for`/`coach_for` predicates are not public client APIs.
-- Read/review/consent: `sdl_004_list_submissions`, `sdl_004_review_queue`,
-  `sdl_004_review_submission`, `sdl_004_submission_consent`, `sdl_004_clubhouse_videos`.
-- Dashboard: `sdl_004_workspace_players`, returning explicit baseball/organization/team fields only.
-
-Guardians must be verified and profiles active. Coaches need active profile, team, organization,
-team-coach membership, org staff/admin membership and consistent, currently active player assignment.
-Future assignments cannot authorize access. Parents without team-coach privileges cannot approve;
-self-review is prohibited even for dual parent/coach accounts. Review transitions lock the row
-and only permit pending -> approved/rejected; a conflicting review returns SQLSTATE PT409,
-which must map to HTTP 409 in the staging PostgREST smoke test.
-
-Team sharing requires approval AND consent from the submitting verified guardian. The UI lists
-individual teams with club labels for the selected player profile. All checkboxes start unchecked;
-only the selected UUIDs are sent. Another club's player profile requires separate submission/consent;
-sharing never propagates automatically across clubs. Server validation restricts consent to active
-assignments. Consent binds team IDs, membership IDs and assignment-generation UUIDs. A new membership
-column and lifecycle triggers invalidate consent on assignment changes, even reactivation of the
-same membership ID. Guardian revocation and uploader profile suspension also clear existing grants. A new explicit grant is
-required after assignment changes. Coaches without a guardian relationship cannot grant consent.
-A revoked guardian/profile or withdrawn consent removes eligibility at the database
-and next request. The Clubhouse projection excludes family details, review notes and actor history.
-
-Uploads use a per-user UUID Idempotency-Key and a server SHA-256 fingerprint of bytes/category/
-player/consent/team scope. The database allocates the media ID/key. Concurrent reservation attempts
-conflict; completed retries return the same receipt without another object write. An expired
-2-minute lease can be reclaimed with the same key and data. If a membership/guardian/profile change
-invalidates sharing during an upload, finalization remains private. A later retry requesting the
-obsolete grant can return 409; select the current scope and use a new request key rather than
-restoring the old grant. Metadata/submission/history completion
-is atomic and rechecks role/session eligibility. New v2 code never deletes R2 objects. On an
-uncertain failure an object can remain private and uncommitted; same-key recovery reuses it.
-Uncommitted reservation retention/cleanup requires a separately reviewed operational policy.
-This is retry idempotency, not global duplicate-content detection across deliberately new keys.
-
-Session checks validate the JWT's session ID against auth.sessions and not_after. Local tests
-cover deleted/expired sessions; actual Supabase logout/revocation timing must be verified live.
-The v1 pilot's authorization behavior is preserved; these new session checks apply to v2.
-
-## Worker API (prepared, not live)
-
-Every v2 endpoint requires bearer authentication plus an active database session. Origins remain
-localhost/127.0.0.1 on port 5500. All responses are no-store. No new public bucket or signed public
-URL architecture is introduced. GET/POST/OPTIONS are supported; no deletion endpoint is added.
-
-| Route | Contract |
-| --- | --- |
-| GET /v2/capabilities | Exact revision `sdl004-submissions-v1`, with submissions/review/clubhouse true only if the DB contract exists |
-| GET /v2/workspace | Curated authorized player/athlete/organization/team context and role flags |
-| POST /v2/submissions?player_id=...&category=...&share_with_team=...&team_ids=... | Raw MP4, <=20 MiB; UUID Idempotency-Key; optional explicit consent team scope; 201 validated receipt |
-| GET /v2/submissions?player_id=... | Own/coach-authorized status, review history and consent capability; newest 30 |
-| GET /v2/review?team_id=...&status=pending\|approved\|rejected\|all | Team-scoped review queue with server-derived can_review; newest 50 |
-| POST /v2/submissions/:id/review | JSON decision and note, max 1000 characters; 409 on reviewed/conflicting state |
-| POST /v2/submissions/:id/consent | JSON share_with_team and team_ids for a grant; only the submitting verified guardian |
-| GET /v2/clubhouse?team_id=... | Approved, consented and currently authorized baseball-only media list; newest 30 |
-| GET /v2/submissions/:id/playback | Private bytes after fresh owner/coach/consented-team authorization; Range supported |
-
-The frontend requires BOTH its explicit deployment flag AND exact server capability negotiation.
-It never probes/calls v2 in the default-off configuration. It does not infer review permissions
-from the old editing switch. Network errors preserve an upload's request key for safe retry;
-401/403, logout/account changes and scope changes discard private lists/URLs and abort requests.
-UI counters explicitly count displayed items, not an unbounded total.
-
-## User interface and remaining limits
-
-- Parent: verified child picker, categories, local MP4 preview, explicit team consent, upload
-  progress, status filters, review history, grant/withdraw consent, and own-profile navigation.
-- Coach: existing roster preserved with team selection and review navigation, scoped queue,
-  player/team identification, private preview, notes, approve/reject, audit history and conflicts.
-- Clubhouse: approved team-media listing and playback with safe loading/empty/error states.
-- My Players: one card per athlete across club records, multiple children, club/team context
-  from the new authorized service, baseball fields and links to permitted existing profiles/stats.
-  Dual-role accounts retain both parent and coach functionality. No new statistics-write grant.
-
-This is implemented and locally testable, but **not operational against staging until deployment
-and verification**. Disabled UI can show existing verified athlete cards and prepare local previews;
-server-backed memberships/statuses remain unavailable, not fabricated.
-
-Consent withdrawal clears the actor's shared view/Blob immediately. Other open Clubhouse tabs
-refresh every 5 seconds while visible and on focus; playback continues only if refreshed eligibility
-still includes the clip. Server access is denied immediately on the next request after withdrawal.
-Previously delivered bytes cannot be remotely erased. Strict instantaneous cross-client revocation
-would require an approved realtime invalidation design; polling is not represented as that guarantee.
-
-Native browser/mobile visual testing and live v2 authorization are outstanding. Existing successful
-live v1 tests were not rerun. Local Vue rendering validates bindings, not real layout, codec or GPU behavior.
-Uploads are limited to the pilot's MP4/20 MiB contract; ftyp checks are not malware scanning or full decoding.
-No cursor pagination beyond 30/50 entries, notifications, global deduplication, general administrator
-stats editing or production configuration was added.
+The enrollment ledger requires a verified club registration/enrollment process before enablement.
+It must receive explicit ends/inactivations/rejoins; team roster changes do not define club departure.
+Prepared administrator APIs can maintain it, but upstream registration synchronization/backfill has
+not been implemented or verified. New coach uploads require separate recording/storage evidence,
+default false. Neither membership nor Clubhouse consent supplies that evidence automatically.
+Unknown/multi-child clips stay private; coaches must perform the documented single-subject safety
+review before publication. All-subject/redaction authorization is a separate future design.
 
 ## Reproducible local validation
 
@@ -167,61 +50,86 @@ npm run check:worker
 npm test
 ```
 
-Root dependencies are test-only, pinned Vue 3.5.13 and PGlite 0.5.16. The browser still loads
-Vue globals and ES modules without a bundler. Backend build dependencies are independently locked.
-The test runner requires the built Worker and supplies real Vue/PGlite runtimes; Miniflare/workerd
-checks the built package with outbound traffic forbidden. Tests use synthetic actors/data and
-local storage only. SQL fixture coverage is a reduced reference schema, not a live migration test.
+Root dependencies are test-only pinned Vue/PGlite; the browser remains Vue global build and ES
+modules without a bundler. The Worker build has its own locked dependencies. Current full result:
+**173 passed, 0 failed, 0 skipped**, including existing v1/authentication/analyzer/statistics regression
+cases, real isolated SQL, actual Vue compilation/rendering, and local workerd with outbound traffic
+forbidden. Mocked authorization/R2 tests are labeled; they do not prove deployed policies.
+Native mobile testing, actual PostgreSQL contention, Supabase/PostgREST responses and live v2
+storage/authorization remain staging checks. Previously supplied live pilot results were not rerun.
 
-The full suite includes the existing 74 regression scenarios (adapted to the canonical backend
-contract where necessary), new upload/session/conflict/security/UI cases, actual local SQL,
-Vue custom-renderer flows, and a real local Workers runtime check. Final totals are recorded in
-the sprint checkpoint report. All JavaScript/ES modules and component/shell templates are checked.
+## Exact sequence after separate staging authorization
 
-## Exact next steps for a separately authorized staging rollout
+1. Review this checkpoint and migration against the approved enrollment/recording/privacy rules.
+   Confirm project `wvurolqbjhuckkkjiiiv`, take a recoverable backup and review actual schema and
+   migration-history presence/versions. Save a local reviewed manifest with that `project_ref` and
+   `history: {"exists": true|false, "versions": [...]}`; an absent history table requires an explicitly
+   reviewed empty list. A failed query is not evidence of absence. Do not edit an applied migration.
+2. With an approved staging connection in `SDL004_STAGING_DB_URL` and an approved CA path in
+   `SDL004_STAGING_CA_FILE`, run the guarded read-only preflight. It accepts only the dedicated
+   `db.wvurolqbjhuckkkjiiiv.supabase.co` host, postgres user/database, port 5432, verified TLS and no
+   connection query overrides/poolers. It ignores inherited PostgreSQL overrides/startup files.
+   Credentials belong in a secure environment, never source or command arguments.
 
-1. Review this commit, migration, complete Worker/configuration, explicit consent scope, retention
-   and idempotency behavior. Confirm the backend matches approved business rules; do not auto-enable it.
-2. In project `wvurolqbjhuckkkjiiiv` only, take a recoverable backup and reconcile migration history.
-   Use the guarded preflight runner described in the hardening report, with explicit project
-   confirmation, verified dedicated staging connection/TLS CA and reviewed migration-history manifest.
-   Both new tables must be absent; dependency types, Auth/pilot RPCs, grants, RLS, migration permissions
-   and exact history must pass. Capture counts/grants. Stop on drift; do not edit an applied migration.
-3. Obtain explicit approval before applying the versioned migration in staging. Do not use a
-   production project/profile, execute ad hoc policy relaxations, or apply the pointer SQL.
-4. Run read-only postflight. Existing table counts and pilot RPC grants should match the baseline
-   before any QA uploads. Test new RPCs as synthetic guardian/coach/peer/unrelated users, not only SQL owner.
-5. Review the generated local Worker package with `npm run check:worker`. Confirm exact Worker,
-   account, bucket and Supabase target. Review the current deployed staging version's binding metadata
-   and observability settings (no secret values) in a local baseline; rebuild with that baseline and
-   require `npm run check:release --prefix backend/worker` to pass. Unknown bindings, settings drift
-   or no baseline block release. The pinned uploader retains secret values; do not treat omitted
-   observability as preserving remote settings. Retain existing secret bindings and values. Do not call
-   secret put/delete or provisioning commands. Stop if the deployment tool proposes resource changes.
-6. With explicit deployment approval, deploy only the reviewed staging package while its backend
-   flag remains false; retest the already working v1 pilot only where deployment changes affect it.
-7. In a separately reviewed staging version, set the Worker flag true while frontend flag remains
-   false. Use synthetic accounts to test every v2 route, idempotency retry/conflicts, self-review,
-   suspended memberships, withdrawn consent, cross-org access and session revocation. Use a valid
-   synthetic MP4. Verify CORS, Content-Length and actual 409 behavior; no production or real child data.
-8. Only after those checks pass, review a frontend change enabling `SUBMISSION_FEATURES_ENABLED`.
-   Capability negotiation must pass. Smoke test mobile upload/playback, dashboards, consent and
-   logout/account changes. Do not disable gates via an unreviewed browser-console workaround.
-9. Keep rollback artifacts and audit results. Push/PR/merge/deploy require their own authorization;
-   none are performed by local build or test commands.
+   ```sh
+   node backend/release/run-staging-preflight.mjs \
+     --confirm-project wvurolqbjhuckkkjiiiv \
+     --manifest /approved/path/staging-history.local.json
+   ```
 
-## Rollback and production preparation
+   Capture confirmed project/PASS, preserved counts, dependency and grant results. Stop on any
+   error; reconcile schema/history instead of bypassing the guard.
+3. Obtain explicit approval to apply the migration in staging. Run read-only postflight and compare
+   existing table counts/pilot grants before new QA writes. Verify RLS, denied direct writes (including
+   service-role consent/audit writes), immutable audit and internal function EXECUTE restrictions.
+   Exercise authenticated RPCs as synthetic users, not only SQL owner. Record required enrollment
+   and recording evidence through approved administrator operations; do not invent historic consent.
+4. Read/review the current staging Worker version, all binding metadata and exact observability
+   settings. Never export secret values. Use the unconfirmed baseline example and save a reviewed
+   `.local.json` outside Git. Review additional settings (routes, compatibility flags, placement,
+   limits, logpush, tails); `otherSettingsReviewed` is an operator attestation, not an automated live
+   diff. Stop on unrepresented settings drift. Recheck the remote version immediately before release.
 
-- First disable the new frontend feature and revert to the known pilot UI if necessary. Any
-  Worker flag change/redeployment/rollback is a provider mutation requiring explicit approval.
-- A Worker rollback does not roll back R2 objects or PostgreSQL. Preserve new tables, histories,
-  media metadata, reservations and object keys. Do not DROP tables or purge objects as a routine rollback.
-- Old v1 endpoints retain private family/coach access; they do not grant teammates access to pending media.
-- Reconcile uncertain uploads using request keys and metadata before considering separately approved cleanup.
-- Production remains a **separate blocked release**: no production endpoints, credentials, database
-  baseline or resource identifiers were read or prepared. Do not reuse the hardcoded staging config
-  as a production target. Inventory production only under explicit authorization, reconcile prerequisite
-  schema/history, prepare a separately reviewed environment manifest/guard, backup/retention plan and
-  deployment approval, then repeat cross-user tests with synthetic production QA records if approved.
-- Require security/business review, passing local/live staging QA, data-preservation comparison,
-  rollback ownership, privacy/consent approval, and explicit release authorization before production.
+   ```sh
+   SDL004_WORKER_BASELINE=/approved/path/staging-worker.local.json npm run check:worker
+   SDL004_WORKER_BASELINE=/approved/path/staging-worker.local.json npm run check:release --prefix backend/worker
+   ```
+
+   The release check intentionally fails without this baseline. `SDL004_LOCAL_BUILD_ONLY=1` is for
+   local validation and must never be supplied to a deployment. Do not assume omitting observability
+   preserves deployed settings. Do not put/delete secrets or provision/rebind a bucket.
+5. Obtain explicit approval to deploy only the reviewed staging Worker, keeping its flag false.
+   Retest affected v1 behavior. Do not invoke deployment as a build hook or use a production target.
+6. Separately review enabling the Worker flag while the frontend stays off. Use synthetic guardian,
+   dual-role parent/coach, coach, admin, teammate and unrelated accounts. Verify exact contract,
+   CORS, expired/revoked sessions, direct RPC/API denial, uploads/idempotency/lease recovery, pending
+   approval/review conflict, single-subject safety confirmation, current-team scope, cross-club denial,
+   private storage without sharing, withdrawal, transfer, explicit departure and same-ID/new-ID rejoin.
+   Verify actual simultaneous transactions and stale generations. Neither new consent nor enrollment
+   reactivation should automatically republish prior withdrawn/ended-enrollment media.
+7. Only after these checks pass, review frontend enablement. Smoke test mobile consent cards,
+   upload/codec/playback, My Players, coach queue/publication, logout/account switching, team transfers,
+   withdrawal in other open tabs and retained private videos. No console bypass of gates.
+8. Retain reviewed artifacts, counts and audit results. Push/PR/merge and production require separate
+   authorization. No rollout command in this checklist was executed during local implementation.
+
+## Rollback and remaining limitations
+
+Disable new frontend operations first. Worker rollback/redeployment or flag changes require provider
+approval. Preserve consent receipts/events, enrollment generations, metadata, reservations and R2
+objects; do not drop tables/purge clips or restore withdrawn consent as routine rollback. A Worker
+rollback is not a database rollback. Account for enrollment/guardian lifecycle triggers in any
+separately reviewed downgrade. Reconcile uncertain uploads by request key; cleanup/retention and
+legal erasure need their own approved procedure.
+
+Existing v1 private-media access remains separate from v2 publication; legacy clips are not
+implicitly shared. Existing strictness of v1 session checks is not changed by v2. Current team
+visibility is rechecked on every server request, and Clubhouse tabs poll/focus-refresh; already
+received video bytes cannot be erased remotely. MP4 ftyp validation is not malware/content scanning.
+Lists retain the existing 30/50 item limits, not an unbounded total or cursor pagination.
+
+Production is a separate blocked release: no production endpoints, secrets, schema baselines or
+resource identifiers were accessed/prepared. Do not reuse this hardcoded staging configuration for
+production. A future production release needs its own reviewed environment/dependency/history
+manifest, backup/retention and enrollment integration plan, explicit approval, controlled deployment
+sequence, data-preservation comparison and independent security/regression verification.

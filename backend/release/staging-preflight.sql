@@ -12,12 +12,12 @@ BEGIN
  OR jsonb_typeof(expected->'versions') IS DISTINCT FROM 'array' THEN
    RAISE EXCEPTION 'SDL004 preflight: reviewed migration-history expectation required';
  END IF;
- IF to_regclass('public.sdl_video_submissions') IS NOT NULL OR to_regclass('public.sdl_submission_uploads') IS NOT NULL THEN
-   RAISE EXCEPTION 'SDL004 preflight: both new tables must be absent; existing or partial deployment detected';
+ IF EXISTS(SELECT 1 FROM unnest(ARRAY['public.sdl_video_submissions','public.sdl_submission_uploads','public.sdl_club_enrollments','public.sdl_club_consents','public.sdl_club_consent_events']) name WHERE to_regclass(name) IS NOT NULL) THEN
+   RAISE EXCEPTION 'SDL004 preflight: all new workflow tables must be absent; existing or partial deployment detected';
  END IF;
  IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='player_team_memberships' AND column_name='sdl_consent_epoch')
  OR EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public'
-   AND (p.proname LIKE 'sdl_004_submission_%' OR p.proname LIKE 'sdl_004_invalidate_%'
+   AND (p.proname=ANY(ARRAY['sdl_004_session_active','sdl_004_guardian_for','sdl_004_coach_for','sdl_004_guardian_athlete','sdl_004_club_admin','sdl_004_coach_team','sdl_004_recording_allowed','sdl_004_submission_can_submit','sdl_004_submission_is_guardian','sdl_004_submission_can_review','sdl_004_clubhouse_member','sdl_004_set_club_enrollment','sdl_004_set_recording_permission','sdl_004_active_club_consent','sdl_004_club_consent','sdl_004_list_club_consents','sdl_004_enrollment_lifecycle','sdl_004_immutable_consent_audit','sdl_004_guardian_consent_lifecycle','sdl_004_reserve_submission','sdl_004_finish_submission','sdl_004_review_submission','sdl_004_submission_can_publish','sdl_004_publish_submission','sdl_004_clubhouse_visible','sdl_004_submission_can_read','sdl_004_list_submissions','sdl_004_review_queue','sdl_004_clubhouse_videos','sdl_004_submission_contract','sdl_004_workspace_players']) OR p.proname LIKE 'sdl_004_submission_%' OR p.proname LIKE 'sdl_004_invalidate_%'
    OR p.proname=ANY(ARRAY['sdl_004_session_active','sdl_004_guardian_for','sdl_004_coach_for','sdl_004_clubhouse_member','sdl_004_clubhouse_videos','sdl_004_workspace_players','sdl_004_review_queue','sdl_004_review_submission','sdl_004_reserve_submission','sdl_004_finish_submission','sdl_004_advance_membership_consent_epoch']))) THEN
    RAISE EXCEPTION 'SDL004 preflight: release schema/function drift detected';
  END IF;

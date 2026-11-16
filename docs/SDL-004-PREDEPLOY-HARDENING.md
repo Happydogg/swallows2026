@@ -1,4 +1,9 @@
-# SDL-004 focused pre-deployment hardening
+# SDL-004 focused pre-deployment hardening (historical checkpoint)
+
+**Consent rules below are superseded by [SDL-004-CLUB-CONSENT.md](SDL-004-CLUB-CONSENT.md).**
+This report records the b0fa4b0 checkpoint; do not apply its per-team/per-video architecture or
+assignment-generation instructions to the current pending migration. Use the current staging
+release checklist and its five-table preflight instead.
 
 Local changes from `c05c85fac9fcaa1c3a020a8d3c9149d6affc0cec` on `codex-SDL-004`.
 No live SQL, deployment, secret/provider change, push, merge or production access was performed.

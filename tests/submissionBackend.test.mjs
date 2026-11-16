@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {workerHarness,PLAYER,OTHER,VIDEO,ORIGIN,bytes} from './helpers/workerHarness.mjs';
-const upload=`/v2/submissions?player_id=${PLAYER}&category=pitching&share_with_team=false`;
+const upload=`/v2/submissions?player_id=${PLAYER}&category=pitching`;
 async function h(role='parent'){const h=await workerHarness(role);h.env.SUBMISSIONS_ENABLED='true';return h;}
 test('complete package keeps v2 disabled by default while preserving v1 private routes',async()=>{
  const x=await h();delete x.env.SUBMISSIONS_ENABLED;
@@ -15,8 +15,8 @@ test('complete package preflight admits idempotency headers and denies other ori
 });
 test('capability negotiation requires both current session and exact database revision',async()=>{
  const x=await h();let r=await x.packaged.fetch(x.request('/v2/capabilities'),x.env);assert.equal(r.status,200);
- assert.equal((await r.json()).revision,'sdl004-submissions-v1');x.revision='old';assert.equal((await x.packaged.fetch(x.request('/v2/capabilities'),x.env)).status,503);
- x.revision='sdl004-submissions-v1';x.revoked=true;assert.equal((await x.packaged.fetch(x.request('/v2/capabilities'),x.env)).status,401);
+ assert.equal((await r.json()).revision,'sdl004-club-enrollment-v2');x.revision='old';assert.equal((await x.packaged.fetch(x.request('/v2/capabilities'),x.env)).status,503);
+ x.revision='sdl004-club-enrollment-v2';x.revoked=true;assert.equal((await x.packaged.fetch(x.request('/v2/capabilities'),x.env)).status,401);
 });
 test('completed idempotency receipt is returned without another object write',async()=>{
  const x=await h();x.completed=true;const r=await x.packaged.fetch(x.request(upload,{method:'POST',body:bytes}),x.env);
@@ -40,4 +40,37 @@ test('direct unauthorized player and self-review calls fail closed',async()=>{
 });
 test('revoked session is rejected even if Auth user endpoint still returns a user',async()=>{
  const x=await h();x.revoked=true;assert.equal((await x.packaged.fetch(x.request(upload,{method:'POST',body:bytes}),x.env)).status,401);assert.equal(x.writes,0);
+});
+
+test('old per-video consent and upload sharing parameters fail closed',async()=>{
+ const x=await h();const r=await x.packaged.fetch(x.request(upload+'&share_with_team=true&team_ids='+OTHER,{method:'POST',body:bytes}),x.env);assert.equal(r.status,400);assert.equal(x.writes,0);
+ assert.equal((await x.packaged.fetch(x.request(`/v2/submissions/${VIDEO}/consent`,{method:'POST',body:'{}',contentType:'application/json'}),x.env)).status,404);
+});
+test('standing club consent forwards guardian token, enrollment generation and policy only',async()=>{
+ const x=await h();const r=await x.packaged.fetch(x.request(`/v2/club-enrollments/${VIDEO}/consent`,{method:'POST',body:JSON.stringify({accept:true,generation:OTHER,policy_version:'sdl004-clubhouse-v1',guardian:'forged'}),contentType:'application/json'}),x.env);
+ assert.equal(r.status,200);const call=x.calls.find(c=>c.url.endsWith('/sdl_004_club_consent'));assert.equal(call.init.headers.Authorization,'Bearer synthetic');assert.equal(call.init.headers.apikey,x.env.SUPABASE_PUBLISHABLE_KEY);
+ assert.deepEqual(JSON.parse(call.init.body),{p_enrollment:VIDEO,p_generation:OTHER,p_accept:true,p_policy_version:'sdl004-clubhouse-v1'});
+});
+test('coaches cannot forge club consent, enrollment or recording permission via the Worker',async()=>{
+ const x=await h('coach');for(const[path,body]of [[`/v2/club-enrollments/${VIDEO}/consent`,{accept:true,generation:OTHER,policy_version:'sdl004-clubhouse-v1'}],
+ ['/v2/club-enrollments',{athlete_id:PLAYER,organization_id:OTHER,status:'active'}],[`/v2/club-enrollments/${VIDEO}/recording`,{allowed:true,permission_ref:'forged'}]])
+ assert.equal((await x.packaged.fetch(x.request(path,{method:'POST',body:JSON.stringify(body),contentType:'application/json'}),x.env)).status,403);
+});
+test('Worker rejects missing/obsolete consent policy and multi-child publication before authorization RPC',async()=>{
+ const x=await h('coach');for(const subjects of [[],[PLAYER,OTHER]])assert.equal((await x.packaged.fetch(x.request(`/v2/submissions/${VIDEO}/publish`,{method:'POST',body:JSON.stringify({team_ids:[OTHER],subject_athletes:subjects}),contentType:'application/json'}),x.env)).status,400);
+ assert.equal(x.calls.some(c=>c.url.endsWith('/sdl_004_publish_submission')),false);
+ const r=await x.packaged.fetch(x.request(`/v2/club-enrollments/${VIDEO}/consent`,{method:'POST',body:JSON.stringify({accept:true,generation:OTHER,policy_version:'old'}),contentType:'application/json'}),x.env);assert.equal(r.status,400);
+});
+test('coach publication requires server approval/consent and forwards explicit team and subject scope',async()=>{
+ const x=await h('coach');const request=()=>x.request(`/v2/submissions/${VIDEO}/publish`,{method:'POST',body:JSON.stringify({team_ids:[OTHER],subject_athletes:[PLAYER]}),contentType:'application/json'});
+ assert.equal((await x.packaged.fetch(request(),x.env)).status,403);x.approved=true;x.consent=true;assert.equal((await x.packaged.fetch(request(),x.env)).status,200);
+ const call=x.calls.filter(c=>c.url.endsWith('/sdl_004_publish_submission')).at(-1);assert.equal(call.init.headers.Authorization,'Bearer synthetic');assert.deepEqual(JSON.parse(call.init.body),{p_id:VIDEO,p_team_ids:[OTHER],p_subject_athletes:[PLAYER]});
+});
+test('all direct v2 routes reject the previous per-video database contract',async()=>{
+ const x=await h();x.revision='sdl004-submissions-v1';assert.equal((await x.packaged.fetch(x.request(upload,{method:'POST',body:bytes}),x.env)).status,503);assert.equal(x.writes,0);
+});
+test('club consent withdrawal never deletes or modifies R2 media',async()=>{
+ const x=await h('parent');x.seed();const count=x.objects.size;
+ const r=await x.packaged.fetch(x.request(`/v2/club-enrollments/${VIDEO}/consent`,{method:'POST',body:JSON.stringify({accept:false,generation:OTHER}),contentType:'application/json'}),x.env);
+ assert.equal(r.status,200);assert.equal(x.objects.size,count);assert.equal(x.deletes,0);assert.equal(x.writes,0);
 });

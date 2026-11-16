@@ -79,7 +79,7 @@ export function createPrivateMediaService({ auth, client = supabaseClient, baseU
         const xhr = xhrFactory();
         const abort = () => xhr.abort();
         const finish = (fn, value) => { signal?.removeEventListener('abort', abort); fn(value); };
-        xhr.open('POST', submission ? `${WORKER}/v2/submissions?player_id=${playerId}&category=${submission.category}&share_with_team=${submission.share}&team_ids=${(submission.teamIds||[]).map(id).join(',')}` : `${WORKER}/v1/media?player_id=${playerId}`);
+        xhr.open('POST', submission ? `${WORKER}/v2/submissions?player_id=${playerId}&category=${submission.category}` : `${WORKER}/v1/media?player_id=${playerId}`);
         xhr.timeout = 60000;
         xhr.withCredentials = false;
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
@@ -97,11 +97,11 @@ export function createPrivateMediaService({ auth, client = supabaseClient, baseU
           if (xhr.status !== 201) return finish(reject, failure(xhr.status));
           try {
             const result = JSON.parse(xhr.responseText);
-            if (!UUID.test(result.id) || result.player_id !== playerId || (submission ? (!['pending','approved','rejected'].includes(result.status)||result.category!==submission.category||typeof result.share_with_team!=='boolean') : result.byte_size !== file.size || result.content_type !== 'video/mp4')) {
+            if (!UUID.test(result.id) || result.player_id !== playerId || (submission ? (!['pending','approved','rejected'].includes(result.status)||result.category!==submission.category) : result.byte_size !== file.size || result.content_type !== 'video/mp4')) {
               throw new MediaError('Invalid upload receipt. Refresh the list before retrying.');
             }
             onProgress(100);
-            finish(resolve, submission ? {id:result.id,player_id:playerId,category:result.category,status:result.status,share_with_team:result.share_with_team} : { id: result.id, player_id: playerId, byte_size: result.byte_size, content_type: result.content_type });
+            finish(resolve, submission ? {id:result.id,player_id:playerId,category:result.category,status:result.status} : { id: result.id, player_id: playerId, byte_size: result.byte_size, content_type: result.content_type });
           } catch (error) { finish(reject, error instanceof MediaError ? error : new MediaError('Invalid upload receipt. Refresh the list before retrying.')); }
         };
         xhr.onerror = () => finish(reject, new MediaError('Upload interrupted. Refresh the list before retrying; the file may have been saved.'));
@@ -139,7 +139,7 @@ export function createPrivateMediaService({ auth, client = supabaseClient, baseU
     },
     submissionPlayback(mediaId,options) { return request(`/v2/submissions/${id(mediaId)}/playback`,{...options,blob:true}); },
     submit(playerId,file,metadata,options) {
-      if(!['pitching','batting','throwing'].includes(metadata.category)||typeof metadata.share!=='boolean') throw new MediaError('Invalid submission.');
+      if(!['pitching','batting','throwing'].includes(metadata.category)||metadata.share===true||metadata.teamIds?.length) throw new MediaError('Invalid submission.');
       id(metadata.key); return uploadRoute(playerId,file,{...options,submission:metadata});
     }
 
