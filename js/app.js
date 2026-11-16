@@ -11,6 +11,8 @@ import { useCoachMode } from '../composables/useCoachMode.js';
 import { useAuthSession } from '../composables/useAuthSession.js';
 import { usePlayers } from '../composables/usePlayers.js';
 import { useSessions } from '../composables/useSessions.js';
+import { usePrivateMedia } from '../composables/usePrivateMedia.js';
+import { PrivateMediaPanel } from '../components/PrivateMediaPanel.js';
 import { useVideos } from '../composables/useVideos.js';
 import { useAnalytics } from '../composables/useAnalytics.js';
 import { useRosterCsv } from '../composables/useRosterCsv.js';
@@ -27,7 +29,7 @@ const { createApp, ref, onMounted, onUnmounted, markRaw } = Vue;
 
 createApp({
   components: {
-    AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile,
+    AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel,
     SessionFormModal, UploadVideoModal, ArAnalyzerModal
   },
   setup() {
@@ -75,6 +77,7 @@ createApp({
       getPlayerDisplayName: playerFeature.getPlayerDisplayName
     });
     const arAnalyzer = createArAnalyzerController({ selectedPlayer });
+    const privateMedia = usePrivateMedia({ auth, players, coachRoster, analyzer: arAnalyzer });
     const emptyPlayerForm = { ...playerFeature.newPlayer.value };
     const emptySessionForm = { ...sessionFeature.newSession.value };
     const emptyVideoForm = { ...videoFeature.newDrillVideo.value };
@@ -129,7 +132,7 @@ createApp({
       coachRosterLoading.value = false;
       searchQuery.value = '';
       coach.lockCoachMode();
-      arAnalyzer.resetAnalyzer();
+      privateMedia.resetMedia();
       clearPlayerChart();
       analytics.expandedSessionIds.clear();
       analytics.hasChartData.value = false;
@@ -161,6 +164,7 @@ createApp({
       ...coach, ...analytics, ...playerFeature, ...sessionFeature, ...videoFeature, ...csvFeature,
       ...arAnalyzer,
       // Passing the original refs (not Vue-unwrapped copies) maintains DOM/video ownership.
+      privateMediaController: markRaw(privateMedia),
       analyzerController: markRaw(arAnalyzer)
     };
   }

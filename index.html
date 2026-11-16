@@ -126,6 +126,8 @@
       @add-player="openAddPlayerModal" @lock-coach="lockCoachMode"
       @unlock-coach="unlockCoachMode"></app-header>
 
+    <private-media-panel :controller="privateMediaController"></private-media-panel>
+
     <!-- Loading Indicator -->
     <div v-if="loading" class="p-8 text-center text-slate-400 font-mono text-sm no-print">
       {{ t('syncingData') }}

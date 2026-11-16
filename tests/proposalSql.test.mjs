@@ -1,0 +1,87 @@
+// Optional local PostgreSQL/WASM check of the draft, never a Supabase connection.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { pathToFileURL } from 'node:url';
+const runtime = process.env.SDL004_PGLITE_RUNTIME;
+const uuid = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+const parent = uuid(1), coach = uuid(2), teammate = uuid(3), outsider = uuid(4);
+const player = uuid(11), peer = uuid(12), otherPlayer = uuid(13), team = uuid(21), otherTeam = uuid(22), org = uuid(31), otherOrg = uuid(32), athlete = uuid(41), peerAthlete = uuid(42);
+const media = uuid(51);
+test('proposal SQL: local PostgreSQL role isolation, review history, consent and approved teammate access', { skip: !runtime }, async t => {
+  const { PGlite } = await import(pathToFileURL(runtime).href);
+  const db = new PGlite(); t.after(() => db.close());
+  await db.exec(`
+    CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;
+    CREATE SCHEMA auth;
+    CREATE TABLE auth.users(id uuid PRIMARY KEY);
+    CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+    GRANT USAGE ON SCHEMA public,auth TO anon,authenticated,service_role;
+    CREATE TABLE public.profiles(id uuid PRIMARY KEY,status text);
+    CREATE TABLE public.organizations(id uuid PRIMARY KEY,status text);
+    CREATE TABLE public.teams(id uuid PRIMARY KEY,organization_id uuid,status text);
+    CREATE TABLE public.players(id uuid PRIMARY KEY,athlete_id uuid,organization_id uuid);
+    CREATE TABLE public.athlete_guardians(athlete_id uuid,user_id uuid,status text);
+    CREATE TABLE public.player_team_memberships(player_id uuid,team_id uuid,organization_id uuid,status text,end_date date);
+    CREATE TABLE public.team_memberships(team_id uuid,user_id uuid,status text,role text);
+    CREATE TABLE public.organization_memberships(organization_id uuid,user_id uuid,status text,role text);
+    CREATE TABLE public.sdl_media_objects(id uuid PRIMARY KEY,player_id uuid,uploaded_by uuid,object_key text UNIQUE,
+      content_type text CHECK(content_type='video/mp4'),byte_size bigint CHECK(byte_size>0 AND byte_size<=20971520),created_at timestamptz DEFAULT now());
+    ALTER TABLE public.sdl_media_objects ENABLE ROW LEVEL SECURITY;
+    GRANT ALL ON public.sdl_media_objects TO service_role;
+    INSERT INTO auth.users VALUES('${parent}'),('${coach}'),('${teammate}'),('${outsider}');
+    INSERT INTO public.profiles SELECT id,'active' FROM auth.users;
+    INSERT INTO public.organizations VALUES('${org}','active'),('${otherOrg}','active');
+    INSERT INTO public.teams VALUES('${team}','${org}','active'),('${otherTeam}','${otherOrg}','active');
+    INSERT INTO public.players VALUES('${player}','${athlete}','${org}'),('${peer}','${peerAthlete}','${org}'),('${otherPlayer}','${uuid(43)}','${otherOrg}');
+    INSERT INTO public.athlete_guardians VALUES('${athlete}','${parent}','verified'),('${peerAthlete}','${teammate}','verified');
+    INSERT INTO public.player_team_memberships VALUES('${player}','${team}','${org}','active',null),('${peer}','${team}','${org}','active',null),('${otherPlayer}','${otherTeam}','${otherOrg}','active',null);
+    INSERT INTO public.team_memberships VALUES('${team}','${coach}','active','coach'),('${team}','${teammate}','active','parent');
+    INSERT INTO public.organization_memberships VALUES('${org}','${coach}','active','staff');
+  `);
+  await db.exec(fs.readFileSync(new URL('./fixtures/deployedMediaAuthorization.sql', import.meta.url), 'utf8'));
+  await db.exec(fs.readFileSync(new URL('../backend/proposals/submissions.sql', import.meta.url), 'utf8'));
+  async function as(id, sql) {
+    await db.exec('RESET ROLE');
+    await db.query("SELECT set_config('request.jwt.claim.sub',$1,false)", [id ?? '']);
+    await db.exec('SET ROLE authenticated');
+    return (await db.query(sql)).rows;
+  }
+  const boolean = async (who, expression) => (await as(who, `SELECT ${expression} AS allowed`))[0].allowed;
+  assert.equal(await boolean(parent, `public.sdl_004_submission_can_submit('${player}')`), true);
+  assert.equal(await boolean(parent, `public.sdl_004_submission_can_submit('${otherPlayer}')`), false);
+  assert.equal(await boolean(outsider, `public.sdl_004_submission_can_submit('${player}')`), false);
+  assert.equal(await boolean(coach, `public.sdl_004_submission_can_review('${player}')`), true);
+  assert.equal(await boolean(parent, `public.sdl_004_submission_can_review('${player}')`), false);
+  assert.equal(await boolean(null, `public.sdl_004_submission_can_submit('${player}')`), false);
+  await assert.rejects(as(parent, 'SELECT * FROM public.sdl_video_submissions'), /permission denied/);
+  const record = `SELECT public.sdl_004_record_submission('${media}','${player}','${parent}','pilot/${player}/${media}.mp4',12,'pitching',true)`;
+  await assert.rejects(as(parent, record), /permission denied/);
+  await db.exec('RESET ROLE; SET ROLE service_role'); await db.exec(record);
+  assert.equal((await as(parent, `SELECT * FROM public.sdl_004_list_submissions('${player}')`))[0].status, 'pending');
+  assert.equal(await boolean(teammate, `public.sdl_004_submission_can_read('${media}')`), false);
+  assert.equal((await as(teammate, `SELECT * FROM public.sdl_004_clubhouse_videos('${team}')`)).length, 0);
+  await assert.rejects(as(parent, `SELECT public.sdl_004_review_submission('${media}','approved','forged')`), /Not authorized/);
+  await as(coach, `SELECT public.sdl_004_review_submission('${media}','approved','Checked')`);
+  const reviewed = (await as(parent, `SELECT * FROM public.sdl_004_list_submissions('${player}')`))[0];
+  assert.equal(reviewed.status, 'approved'); assert.equal(reviewed.history.length, 2);
+  assert.equal(reviewed.history[1].actor, coach);
+  await assert.rejects(as(coach, `SELECT public.sdl_004_review_submission('${media}','rejected','duplicate')`), /Already reviewed/);
+  assert.equal(await boolean(teammate, `public.sdl_004_submission_can_read('${media}')`), true);
+  const shared = await as(teammate, `SELECT * FROM public.sdl_004_clubhouse_videos('${team}')`);
+  assert.equal(shared.length, 1); assert.equal(shared[0].history, undefined); assert.equal(shared[0].review_note, undefined);
+  assert.equal(await boolean(outsider, `public.sdl_004_submission_can_read('${media}')`), false);
+  assert.equal((await as(teammate, `SELECT * FROM public.sdl_004_clubhouse_videos('${otherTeam}')`)).length, 0);
+  await assert.rejects(as(coach, `SELECT public.sdl_004_submission_consent('${media}',true)`), /Not authorized/);
+  await as(parent, `SELECT public.sdl_004_submission_consent('${media}',false)`);
+  assert.equal(await boolean(teammate, `public.sdl_004_submission_can_read('${media}')`), false);
+  assert.equal((await as(teammate, `SELECT * FROM public.sdl_004_clubhouse_videos('${team}')`)).length, 0);
+  await as(parent, `SELECT public.sdl_004_submission_consent('${media}',true)`);
+  await db.exec('RESET ROLE'); await db.exec(`UPDATE public.athlete_guardians SET status='revoked' WHERE user_id='${parent}'`);
+  assert.equal(await boolean(parent, `public.sdl_004_submission_can_submit('${player}')`), false);
+  assert.equal(await boolean(teammate, `public.sdl_004_submission_can_read('${media}')`), false);
+  // Revoked parent sharing must disappear even to the coach listing Clubhouse.
+  assert.equal((await as(coach, `SELECT * FROM public.sdl_004_clubhouse_videos('${team}')`)).length, 0);
+  await db.exec('RESET ROLE'); await db.exec(`UPDATE public.profiles SET status='suspended' WHERE id='${coach}'`);
+  assert.equal(await boolean(coach, `public.sdl_004_submission_can_review('${player}')`), false);
+});

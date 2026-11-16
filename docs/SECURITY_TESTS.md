@@ -1,11 +1,11 @@
 # SDL-004-006 staging security checks
 
-## Local Phase 1 regression tests
+## Local authentication and Phase 3 regression tests
 
 Run from the repository root with Node.js (tested with Node 24):
 
 ```sh
-node --experimental-vm-modules --test tests/authLifecycle.test.mjs
+node --experimental-vm-modules --test tests/*.test.mjs
 ```
 
 The suite loads the actual ES modules with synthetic Supabase responses and a minimal Vue
@@ -17,6 +17,13 @@ To additionally exercise Vue 3 reactivity, set `SDL004_VUE_RUNTIME` to the absol
 an independently installed Vue 3 CommonJS runtime (`vue/dist/vue.cjs.js`) and run the same
 command. No application dependency or bundler change is needed.
 
+The media suite includes the downloaded Worker source with synthetic R2/Supabase responses.
+Worker proposal tests mock RPC decisions. The separate SQL test runs the draft in a local
+PostgreSQL/WASM fixture only when `SDL004_PGLITE_RUNTIME` points to an installed PGlite runtime.
+It never connects to Supabase and does not prove deployed RLS. The real Vue compiler/renderer
+test is skipped unless `SDL004_VUE_RUNTIME` is set. See `SDL-004-PHASE3-REPORT.md` for the verified
+contract, changes, blockers and deployment prerequisites.
+
 These tests do not establish deployed RLS, Worker authorization, cross-tab SDK transport,
 actual GPU inference, or browser rendering. Session events are supplied by the test adapter.
 
@@ -25,7 +32,7 @@ actual GPU inference, or browser rendering. Session events are supplied by the t
 - SQL Editor's privileged role **bypasses RLS**. A SELECT performed in SQL Editor is not evidence of browser authorization.
 - An empty dashboard alone does not establish isolation. Test direct REST requests under three separate signed-in users.
 - The new RPC returns **only** team name, preferred/baseball name, jersey, position, throws and bats, plus UUIDs. Do not add legal name, DOB, family contact, HKLL number, photos, statistics or media until separately consented and approved.
-- Staging still points at a production R2 signer/public storage URL unless separately isolated. Avoid upload/delete. Check the Cloudflare Worker server-side authorization before opening staging to others.
+- Phase 3 removes legacy production/public R2 URLs from configuration. Legacy upload/delete helpers remain locked; the new private flow uses only the verified staging Worker. No live uploads/deletes were performed during local validation.
 
 ## Run sequence
 

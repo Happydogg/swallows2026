@@ -11,20 +11,19 @@ import {
 } from './mediaStorage.js';
 
 export async function fetchAllCloudData() {
-  const [pRes, sRes, vRes] = await Promise.all([
+  const [pRes, sRes] = await Promise.all([
     supabaseClient.from('players').select('*').order('jersey', { ascending: true }),
-    supabaseClient.from('sessions').select('*').order('session_date', { ascending: false }),
-    supabaseClient.from('drill_videos').select('*').order('session_date', { ascending: false })
+    supabaseClient.from('sessions').select('*').order('session_date', { ascending: false })
   ]);
 
   if (pRes.error) console.error('Players Error:', pRes.error);
   if (sRes.error) console.error('Sessions Error:', sRes.error);
-  if (vRes.error) console.error('Videos Error:', vRes.error);
 
   return {
     players: pRes.data || [],
     sessions: sRes.data || [],
-    drillVideos: vRes.data || []
+    // Private videos come only from the authenticated Worker, never stored public URLs.
+    drillVideos: []
   };
 }
 
