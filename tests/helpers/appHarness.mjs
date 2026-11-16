@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import {webcrypto} from 'node:crypto';
 import vm from 'node:vm';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 const realVue = process.env.SDL004_VUE_RUNTIME
@@ -74,7 +75,7 @@ export async function harness(t, initialUser = null) {
     onMounted: fn => { h.mount = fn; }, onUnmounted: fn => { h.unmount = fn; },
     createApp: options => ({ mount() { h.options = options; h.app = options.setup(); } })
   };
-  const context = vm.createContext({ Vue, AbortController, DOMException, Blob, window: {
+  const context = vm.createContext({ Vue, AbortController, DOMException, Blob, crypto:webcrypto, window: {
     supabase: { createClient: () => db },
     initMediaPipe: async () => {
       h.poseCalls++;
@@ -85,7 +86,7 @@ export async function harness(t, initialUser = null) {
   Chart: class { constructor(_ctx, config) { h.chartConfig = config; } destroy() { h.chartDestroyed = (h.chartDestroyed ?? 0) + 1; } },
   URL: { createObjectURL: () => 'blob:synthetic', revokeObjectURL: url => h.revoked.push(url) },
   console: { error() {}, warn() {}, log() {} },
-  setTimeout, clearTimeout, performance, requestAnimationFrame: fn => h.frames.push(fn), cancelAnimationFrame: id => { h.cancelledFrame = id; },
+  setTimeout, clearTimeout, setInterval, clearInterval, performance, requestAnimationFrame: fn => h.frames.push(fn), cancelAnimationFrame: id => { h.cancelledFrame = id; },
   alert() {}, fetch(...args) {
     if (h.fetchImpl) return h.fetchImpl(...args);
     assert.fail('Network access forbidden in lifecycle tests');

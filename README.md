@@ -1,3 +1,6 @@
+> Current release candidate: see `docs/SDL-004-STAGING-RELEASE.md` and `docs/SDL-004-SPRINT-REPORT.md`.
+> New submission/review/Clubhouse operations are implemented locally and remain disabled pending staging deployment and verification.
+
 # SDL-004-006 | Staging-only safe coach roster and direct security testing
 
 This package was prepared from the verified SDL-004-005 staging auth patch and SDL-004-002/003/004 migrations present in this conversation. It **has not** been executed on the Supabase server or exercised in a live browser.

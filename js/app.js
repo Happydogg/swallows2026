@@ -11,6 +11,8 @@ import { useCoachMode } from '../composables/useCoachMode.js';
 import { useAuthSession } from '../composables/useAuthSession.js';
 import { usePlayers } from '../composables/usePlayers.js';
 import { useSessions } from '../composables/useSessions.js';
+import { useSubmissionWorkspace } from '../composables/useSubmissionWorkspace.js';
+import { SubmissionWorkspace } from '../components/SubmissionWorkspace.js';
 import { usePrivateMedia } from '../composables/usePrivateMedia.js';
 import { PrivateMediaPanel } from '../components/PrivateMediaPanel.js';
 import { useVideos } from '../composables/useVideos.js';
@@ -29,7 +31,7 @@ const { createApp, ref, onMounted, onUnmounted, markRaw } = Vue;
 
 createApp({
   components: {
-    AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel,
+    AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, SubmissionWorkspace,
     SessionFormModal, UploadVideoModal, ArAnalyzerModal
   },
   setup() {
@@ -55,6 +57,7 @@ createApp({
       onAuthenticated: async () => {
         void arAnalyzer.initPoseTracker();
         await fetchAllData();
+        await submissionWorkspace.load();
       }
     });
     const coach = useCoachMode(t);
@@ -78,6 +81,7 @@ createApp({
     });
     const arAnalyzer = createArAnalyzerController({ selectedPlayer });
     const privateMedia = usePrivateMedia({ auth, players, coachRoster, analyzer: arAnalyzer });
+    const submissionWorkspace=useSubmissionWorkspace({auth,players,coachRoster,onProfile:playerFeature.selectPlayer});
     const emptyPlayerForm = { ...playerFeature.newPlayer.value };
     const emptySessionForm = { ...sessionFeature.newSession.value };
     const emptyVideoForm = { ...videoFeature.newDrillVideo.value };
@@ -133,6 +137,7 @@ createApp({
       searchQuery.value = '';
       coach.lockCoachMode();
       privateMedia.resetMedia();
+      submissionWorkspace.reset();
       clearPlayerChart();
       analytics.expandedSessionIds.clear();
       analytics.hasChartData.value = false;
@@ -154,7 +159,7 @@ createApp({
     const signInAndLoad = () => auth.signIn();
     const signOutAndClear = () => auth.signOut();
     onMounted(() => auth.initializeAuth());
-    onUnmounted(() => auth.disposeAuth());
+    onUnmounted(() => { auth.disposeAuth(); submissionWorkspace.dispose(); });
 
     return {
       currentLang, t, saveLanguage, loading, isSaving, currentView, overviewTab, searchQuery,
@@ -164,6 +169,7 @@ createApp({
       ...coach, ...analytics, ...playerFeature, ...sessionFeature, ...videoFeature, ...csvFeature,
       ...arAnalyzer,
       // Passing the original refs (not Vue-unwrapped copies) maintains DOM/video ownership.
+      submissionController: markRaw(submissionWorkspace),
       privateMediaController: markRaw(privateMedia),
       analyzerController: markRaw(arAnalyzer)
     };

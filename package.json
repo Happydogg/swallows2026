@@ -1,0 +1,13 @@
+{
+  "name": "swallows-datalab-validation",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/run.mjs",
+    "check:worker": "npm run build --prefix backend/worker && npm run check:package --prefix backend/worker"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.16",
+    "vue": "3.5.13"
+  }
+}

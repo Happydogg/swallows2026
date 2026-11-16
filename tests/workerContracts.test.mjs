@@ -2,69 +2,7 @@
 // Proposal tests use mocked RPC decisions; they do NOT validate SQL or deployed RLS.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import vm from 'node:vm';
-import { webcrypto } from 'node:crypto';
-const PLAYER = '11111111-1111-4111-8111-111111111111';
-const OTHER = '22222222-2222-4222-8222-222222222222';
-const VIDEO = '33333333-3333-4333-8333-333333333333';
-const USER = '44444444-4444-4444-8444-444444444444';
-const ORIGIN = 'http://localhost:5500';
-const bytes = new Uint8Array([0,0,0,12,102,116,121,112,105,115,111,109]);
-async function harness(role = 'coach') {
-  const h = { role, records: [], objects: new Map(), calls: [], writes: 0, deletes: 0, expired: false };
-  const env = { SUPABASE_URL: 'https://wvurolqbjhuckkkjiiiv.supabase.co',
-    SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_synthetic', SUPABASE_SECRET_KEY: 'sb_secret_synthetic',
-    MEDIA_BUCKET: {
-      async put(key, value) { if (h.failPut) throw Error('R2 failed'); h.writes++; h.objects.set(key, value); },
-      async delete(key) { h.deletes++; h.objects.delete(key); },
-      async get(key) { const value = h.objects.get(key); if (!value) return null;
-        return { body: new Blob([value]).stream(), size: value.byteLength }; }
-    }
-  };
-  const fetchMock = async (url, init = {}) => {
-    assert.equal(url.startsWith(env.SUPABASE_URL + '/'), true, 'only staging Supabase calls');
-    h.calls.push({ url, init });
-    if (url.endsWith('/auth/v1/user')) return h.expired ? new Response(null, { status: 401 }) : Response.json({ id: USER });
-    const rpc = url.split('/rpc/')[1];
-    if (rpc && init.headers.apikey === env.SUPABASE_PUBLISHABLE_KEY) {
-      if (h.failRpc) return new Response(null, { status: 503 });
-      const body = JSON.parse(init.body);
-      if (rpc === 'sdl_004_media_can_access') return Response.json(body.p_player_id === PLAYER &&
-        (h.role === 'coach' || (h.role === 'parent' && body.p_action === 'read')));
-      if (rpc === 'sdl_004_submission_can_submit') return Response.json(body.p_player_id === PLAYER && ['coach','parent'].includes(h.role));
-      if (rpc === 'sdl_004_submission_is_guardian') return Response.json(h.role === 'parent');
-      if (rpc === 'sdl_004_review_submission') return h.role === 'coach' ? Response.json(null) : new Response(null, { status: 403 });
-      if (rpc === 'sdl_004_submission_can_read') return Response.json(h.role === 'parent' || h.role === 'coach' ||
-        (h.role === 'teammate' && h.approved && h.consent));
-      if (rpc === 'sdl_004_clubhouse_videos') return Response.json(h.approved && h.consent && h.role === 'teammate' ? [{ id: VIDEO, player_id: PLAYER, category: 'pitching' }] : []);
-      if (rpc === 'sdl_004_list_submissions') return Response.json(h.role === 'parent' || h.role === 'coach' ? h.records : []);
-      return new Response(null, { status: 403 });
-    }
-    assert.equal(init.headers.apikey, env.SUPABASE_SECRET_KEY);
-    assert.equal(init.headers.Authorization, undefined, 'never confuse browser bearer and service key');
-    if (h.failMetadata) return new Response(null, { status: 503 });
-    if (rpc === 'sdl_004_record_submission') { h.savedSubmission = JSON.parse(init.body); return new Response(null, { status: 204 }); }
-    if (init.method === 'POST') { h.records.push(JSON.parse(init.body)); return new Response(null, { status: 201 }); }
-    return Response.json(h.records);
-  };
-  const context = vm.createContext({ fetch: fetchMock, Headers, Request, Response, URL, Uint8Array, crypto: webcrypto });
-  const source = fs.readFileSync(new URL('../backend/verified/staging-worker.phase2.mjs', import.meta.url), 'utf8');
-  const module = new vm.SourceTextModule(source + '\nexport { verifyIdentity, adminQuery, limitedBytes, configOk, validId, json, ORIGINS };', { context });
-  await module.link(() => { throw Error('unexpected dependency'); }); await module.evaluate();
-  h.worker = module.namespace.default;
-  const proposalModule = new vm.SourceTextModule(fs.readFileSync(new URL('../backend/proposals/submissionRoutes.mjs', import.meta.url), 'utf8'), { context });
-  await proposalModule.link(() => { throw Error('unexpected dependency'); }); await proposalModule.evaluate();
-  h.proposal = proposalModule.namespace.createSubmissionRoutes(module.namespace);
-  h.env = env;
-  h.request = (path, { method = 'GET', body, auth = true, origin = ORIGIN, contentType = 'video/mp4' } = {}) => new Request('https://sdl-r2-staging-gate.sampson-ho.workers.dev' + path,
-    { method, headers: { Origin: origin, ...(auth ? { Authorization: 'Bearer synthetic' } : {}),
-      ...(body ? { 'Content-Type': contentType, 'Content-Length': String(body.byteLength ?? body.length) } : {}) }, ...(body ? { body } : {}) });
-  h.seed = () => { const key = `pilot/${PLAYER}/${VIDEO}.mp4`;
-    h.records = [{ id: VIDEO, player_id: PLAYER, object_key: key, byte_size: bytes.length, content_type: 'video/mp4' }];
-    h.objects.set(key, bytes); };
-  return h;
-}
+import {workerHarness as harness,PLAYER,OTHER,VIDEO,USER,ORIGIN,bytes} from './helpers/workerHarness.mjs';
 
 test('verified Worker health and configured localhost preflight are read-only', async () => {
   const h = await harness();
@@ -151,7 +89,7 @@ test('proposal only: unauthorized player upload fails before R2 and coaches cann
   const h = await harness('parent');
   assert.equal((await h.proposal.fetch(h.request(`/v2/submissions?player_id=${OTHER}&category=pitching&share_with_team=false`, { method: 'POST', body: bytes }), h.env)).status, 403);
   h.role = 'coach';
-  assert.equal((await h.proposal.fetch(h.request(`/v2/submissions?player_id=${PLAYER}&category=pitching&share_with_team=true`, { method: 'POST', body: bytes }), h.env)).status, 403);
+  assert.equal((await h.proposal.fetch(h.request(`/v2/submissions?player_id=${PLAYER}&category=pitching&share_with_team=true&team_ids=${OTHER}`, { method: 'POST', body: bytes }), h.env)).status, 403);
   assert.equal(h.writes, 0);
 });
 

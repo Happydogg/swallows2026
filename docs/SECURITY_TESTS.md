@@ -1,3 +1,18 @@
+## Current complete local validation
+
+```sh
+npm ci --ignore-scripts
+npm ci --prefix backend/worker --ignore-scripts
+npm run check:worker
+npm test
+```
+
+This includes the original 74 scenarios plus versioned submission backend, UI, dashboard,
+consent, idempotency and packaged workerd checks. All data/services are isolated and synthetic.
+No test command deploys or connects to a remote database. See `SDL-004-STAGING-RELEASE.md`
+for prepared migration/API contracts and explicit deployment gates. The historical read-only
+pilot instructions below do not authorize live writes or migration application.
+
 # SDL-004-006 staging security checks
 
 ## Local authentication and Phase 3 regression tests

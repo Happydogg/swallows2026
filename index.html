@@ -126,6 +126,7 @@
       @add-player="openAddPlayerModal" @lock-coach="lockCoachMode"
       @unlock-coach="unlockCoachMode"></app-header>
 
+    <submission-workspace :controller="submissionController"></submission-workspace>
     <private-media-panel :controller="privateMediaController"></private-media-panel>
 
     <!-- Loading Indicator -->
@@ -135,7 +136,7 @@
 
     <!-- SDL-001: TeamOverview extracted without changing root view routing -->
     <coach-team-roster v-else-if="currentView === 'overview' && isTeamCoach"
-      :roster="coachRoster" :loading="coachRosterLoading" :error="coachRosterError"></coach-team-roster>
+      :roster="coachRoster" :loading="coachRosterLoading" :error="coachRosterError" @open-review="submissionController.enterReview($event)"></coach-team-roster>
     <team-overview v-else-if="currentView === 'overview'"
       :t="t"
       :players="players"
@@ -182,7 +183,7 @@
       :is-session-expanded="isSessionExpanded" :toggle-session-expand="toggleSessionExpand"
       :get-attack-angle-color="getAttackAngleColor" :open-edit-session-modal="openEditSessionModal"
       :remove-session="removeSession" :delete-drill-video="deleteDrillVideo"
-      @back="currentView = 'overview'"></player-profile>
+      @open-submissions="submissionController.changeTab('submissions'); submissionController.selectPlayer($event)" @back="currentView = 'overview'"></player-profile>
 
     <!-- SDL-002: Unified Player Form (Add / Edit) -->
     <player-form-modal

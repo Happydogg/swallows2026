@@ -53,7 +53,7 @@ export const PrivateMediaPanel = {
   </template>
   <details class="text-sm border-t border-slate-700 pt-3">
     <summary class="cursor-pointer py-2">Parent submissions and Team Clubhouse</summary>
-    <p class="text-slate-400 py-2">Parent submissions, coach review, and team sharing are not yet available. Private pilot clips are never automatically approved or shared with teammates.</p>
+    <p class="text-slate-400 py-2">Use the workspace above for parent submissions, coach review and team sharing after backend verification. Private pilot clips are never automatically approved or shared with teammates.</p>
   </details>
 </section>`
 };

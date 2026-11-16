@@ -12,3 +12,6 @@ export const R2_PUBLIC_BASE_URL = '';
 export const PRIVATE_MEDIA_WORKER_URL = 'https://sdl-r2-staging-gate.sampson-ho.workers.dev';
 
 export const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Enable only after the versioned backend is deployed AND its security checks pass.
+export const SUBMISSION_FEATURES_ENABLED = false;

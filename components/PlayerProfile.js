@@ -34,7 +34,7 @@ export const PlayerProfile = {
     removeSession: { type: Function, required: true },
     deleteDrillVideo: { type: Function, required: true }
   },
-  emits: ["back"],
+  emits: ["back", "open-submissions"],
   template: `
 <div class="space-y-6">
 
@@ -174,6 +174,7 @@ export const PlayerProfile = {
       <div>
         <h3 class="text-base font-bold text-white flex items-center gap-2">
           <span>📹</span> {{ t('videoAnalysisSection') }}
+          <button @click="$emit('open-submissions',selectedPlayer.id)" class="ml-2 p-3 rounded bg-slate-700 text-xs no-print">Submission history</button>
         </h3>
         <p class="text-xs text-slate-400">{{ t('videoAnalysisSubtitle') }}</p>
       </div>

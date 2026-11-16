@@ -11,6 +11,7 @@ const messages = {
   401: 'Your session expired or was revoked. Sign in again.',
   403: 'You do not have permission to access this media.',
   404: 'This video could not be found.',
+  409: 'Another upload or review is in progress or already completed. Refresh before retrying.',
   411: 'The browser did not send the file length. Please retry with a supported browser.',
   413: 'Choose a non-empty MP4 file no larger than 20 MiB.',
   415: 'This service accepts MP4 video files only.',
@@ -70,6 +71,46 @@ export function createPrivateMediaService({ auth, client = supabaseClient, baseU
       throw new MediaError('The media service returned an invalid response.');
     }
   }
+  async function uploadRoute(playerId, file, { signal, onProgress = () => {}, submission } = {}) {
+      id(playerId); validateMediaFile(file);
+      const { token, identity } = await bearer(signal);
+      return new Promise((resolve, reject) => {
+        if (signal?.aborted) { reject(new DOMException('Cancelled', 'AbortError')); return; }
+        const xhr = xhrFactory();
+        const abort = () => xhr.abort();
+        const finish = (fn, value) => { signal?.removeEventListener('abort', abort); fn(value); };
+        xhr.open('POST', submission ? `${WORKER}/v2/submissions?player_id=${playerId}&category=${submission.category}&share_with_team=${submission.share}&team_ids=${(submission.teamIds||[]).map(id).join(',')}` : `${WORKER}/v1/media?player_id=${playerId}`);
+        xhr.timeout = 60000;
+        xhr.withCredentials = false;
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.setRequestHeader('Content-Type', 'video/mp4');
+        if(submission) xhr.setRequestHeader('Idempotency-Key', id(submission.key));
+        // Blob/File bodies let the browser set Content-Length; JS cannot set it.
+        xhr.upload.onprogress = event => {
+          if (event.lengthComputable && auth.isCurrentIdentity(identity) && !signal?.aborted) {
+            onProgress(Math.min(99, Math.floor(event.loaded / event.total * 100)));
+          }
+        };
+        xhr.onload = () => {
+          if (signal?.aborted) return finish(reject, new DOMException('Cancelled', 'AbortError'));
+          if (!auth.isCurrentIdentity(identity)) return finish(reject, failure(401));
+          if (xhr.status !== 201) return finish(reject, failure(xhr.status));
+          try {
+            const result = JSON.parse(xhr.responseText);
+            if (!UUID.test(result.id) || result.player_id !== playerId || (submission ? (!['pending','approved','rejected'].includes(result.status)||result.category!==submission.category||typeof result.share_with_team!=='boolean') : result.byte_size !== file.size || result.content_type !== 'video/mp4')) {
+              throw new MediaError('Invalid upload receipt. Refresh the list before retrying.');
+            }
+            onProgress(100);
+            finish(resolve, submission ? {id:result.id,player_id:playerId,category:result.category,status:result.status,share_with_team:result.share_with_team} : { id: result.id, player_id: playerId, byte_size: result.byte_size, content_type: result.content_type });
+          } catch (error) { finish(reject, error instanceof MediaError ? error : new MediaError('Invalid upload receipt. Refresh the list before retrying.')); }
+        };
+        xhr.onerror = () => finish(reject, new MediaError('Upload interrupted. Refresh the list before retrying; the file may have been saved.'));
+        xhr.ontimeout = () => finish(reject, new MediaError('Upload timed out. Refresh the list before retrying; the file may have been saved.'));
+        xhr.onabort = () => finish(reject, new DOMException('Cancelled', 'AbortError'));
+        signal?.addEventListener('abort', abort, { once: true });
+        try { xhr.send(file); } catch { finish(reject, new MediaError('Unable to start the upload.')); }
+      });
+    }
   return {
     async authorize(playerId, action, options = {}) {
       if (!['read', 'upload'].includes(action)) throw new MediaError('Unsupported media action.');
@@ -91,44 +132,16 @@ export function createPrivateMediaService({ auth, client = supabaseClient, baseU
       });
     },
     playback(mediaId, options) { return request(`/v1/media/${id(mediaId)}`, { ...options, blob: true }); },
-    async upload(playerId, file, { signal, onProgress = () => {} } = {}) {
-      id(playerId); validateMediaFile(file);
-      const { token, identity } = await bearer(signal);
-      return new Promise((resolve, reject) => {
-        if (signal?.aborted) { reject(new DOMException('Cancelled', 'AbortError')); return; }
-        const xhr = xhrFactory();
-        const abort = () => xhr.abort();
-        const finish = (fn, value) => { signal?.removeEventListener('abort', abort); fn(value); };
-        xhr.open('POST', `${WORKER}/v1/media?player_id=${playerId}`);
-        xhr.timeout = 60000;
-        xhr.withCredentials = false;
-        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-        xhr.setRequestHeader('Content-Type', 'video/mp4');
-        // Blob/File bodies let the browser set Content-Length; JS cannot set it.
-        xhr.upload.onprogress = event => {
-          if (event.lengthComputable && auth.isCurrentIdentity(identity) && !signal?.aborted) {
-            onProgress(Math.min(99, Math.floor(event.loaded / event.total * 100)));
-          }
-        };
-        xhr.onload = () => {
-          if (signal?.aborted) return finish(reject, new DOMException('Cancelled', 'AbortError'));
-          if (!auth.isCurrentIdentity(identity)) return finish(reject, failure(401));
-          if (xhr.status !== 201) return finish(reject, failure(xhr.status));
-          try {
-            const result = JSON.parse(xhr.responseText);
-            if (!UUID.test(result.id) || result.player_id !== playerId || result.byte_size !== file.size || result.content_type !== 'video/mp4') {
-              throw new MediaError('Invalid upload receipt. Refresh the list before retrying.');
-            }
-            onProgress(100);
-            finish(resolve, { id: result.id, player_id: playerId, byte_size: result.byte_size, content_type: result.content_type });
-          } catch (error) { finish(reject, error instanceof MediaError ? error : new MediaError('Invalid upload receipt. Refresh the list before retrying.')); }
-        };
-        xhr.onerror = () => finish(reject, new MediaError('Upload interrupted. Refresh the list before retrying; the file may have been saved.'));
-        xhr.ontimeout = () => finish(reject, new MediaError('Upload timed out. Refresh the list before retrying; the file may have been saved.'));
-        xhr.onabort = () => finish(reject, new DOMException('Cancelled', 'AbortError'));
-        signal?.addEventListener('abort', abort, { once: true });
-        try { xhr.send(file); } catch { finish(reject, new MediaError('Unable to start the upload.')); }
-      });
+    upload(playerId,file,options) { return uploadRoute(playerId,file,options); },
+    requestJson(route,options) {
+      if(!/^\/v2\/[a-z0-9/?=&_-]+$/i.test(route)) throw new MediaError('Invalid submission route.');
+      return request(route,options);
+    },
+    submissionPlayback(mediaId,options) { return request(`/v2/submissions/${id(mediaId)}/playback`,{...options,blob:true}); },
+    submit(playerId,file,metadata,options) {
+      if(!['pitching','batting','throwing'].includes(metadata.category)||typeof metadata.share!=='boolean') throw new MediaError('Invalid submission.');
+      id(metadata.key); return uploadRoute(playerId,file,{...options,submission:metadata});
     }
+
   };
 }

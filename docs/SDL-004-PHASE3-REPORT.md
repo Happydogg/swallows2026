@@ -1,3 +1,5 @@
+> Historical checkpoint at `9b917e7`. The next local sprint is documented in `SDL-004-SPRINT-REPORT.md` and `SDL-004-STAGING-RELEASE.md`; its new operations remain gated.
+
 # SDL-004 R2 Phase 3 implementation checkpoint
 
 ## Outcome and limits

@@ -42,6 +42,14 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   const host = node('root'); app.mount(host); t.after(() => app.unmount());
   const flatten = n => `${n.text} ${n.children.map(flatten).join(' ')}`;
   assert.match(flatten(host), /Private player videos/);
+  const submissions=h.app.submissionController;
+  submissions.changeTab('submissions');await Vue.nextTick();assert.match(flatten(host),/Submit for coach review/);
+  submissions.items.value=[{id:'s',category:'throwing',status:'rejected',history:[{at:'now',action:'rejected',note:'Try again'}],can_consent:true}];
+  await Vue.nextTick();assert.match(flatten(host),/Submission history/);
+  submissions.changeTab('review');submissions.queue.value=[{id:'s',preferred_name:'Test player',team_name:'Team',category:'pitching',status:'pending',history:[],can_review:true}];
+  await Vue.nextTick();assert.match(flatten(host),/Approve/);
+  submissions.changeTab('clubhouse');submissions.shared.value=[{id:'s',preferred_name:'Test teammate',category:'batting'}];
+  await Vue.nextTick();assert.match(flatten(host),/Play approved video/);
   h.app.privateMediaController.mediaReadAllowed.value = true;
   h.app.privateMediaController.mediaPlayerId.value = '11111111-1111-4111-8111-111111111111';
   h.app.privateMediaController.mediaItems.value = [{ id: '33333333-3333-4333-8333-333333333333', byte_size: 12 }];
