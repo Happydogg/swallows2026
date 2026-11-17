@@ -22,15 +22,17 @@ export async function workerHarness(role = 'coach') {
   const fetchMock = async (url, init = {}) => {
     assert.equal(url.startsWith(env.SUPABASE_URL + '/'), true, 'only staging Supabase calls');
     h.calls.push({ url, init });
-    if (url.endsWith('/auth/v1/user')) return h.expired ? new Response(null, { status: 401 }) : Response.json({ id: USER });
+    if (url.endsWith('/auth/v1/user')) return h.expired ? new Response(null, { status: 401 }) : Response.json({ id: h.actor??USER });
     const rpc = url.split('/rpc/')[1];
     if (rpc && init.headers.apikey === env.SUPABASE_PUBLISHABLE_KEY) {
       if (h.failRpc) return new Response(null, { status: 503 });
       const body = JSON.parse(init.body);
+      if(h.rpcOverride)return h.rpcOverride(rpc,body);
       if (rpc === 'sdl_004_media_can_access') return Response.json(body.p_player_id === PLAYER &&
         (h.role === 'coach' || (h.role === 'parent' && body.p_action === 'read')));
       if (rpc === 'sdl_004_session_active') return Response.json(!h.expired&&!h.revoked);
-      if (rpc === 'sdl_004_submission_contract') return Response.json({revision:h.revision??'sdl004-club-enrollment-v2',enrollmentAdmin:h.adminContract!==false,clubhouseRoster:h.statisticsContract!==false,clubhouseLeaderboard:h.statisticsContract!==false,parentStatistics:h.statisticsContract!==false,statisticsConsent:h.statisticsContract!==false});
+      if (rpc === 'sdl_004_submission_contract') return Response.json({revision:h.revision??'sdl004-club-enrollment-v2',enrollmentAdmin:h.adminContract!==false,clubhouseRoster:h.statisticsContract!==false,clubhouseLeaderboard:h.statisticsContract!==false,parentStatistics:h.statisticsContract!==false,statisticsConsent:h.statisticsContract!==false,pilotWorkflow:h.finalPilot?'sdl004-final-pilot-v1':null});
+      if(rpc.startsWith('sdl_004_pilot_')&&h.pilotRpc)return h.pilotRpc(rpc,body);
       if(['sdl_004_clubhouse_roster','sdl_004_clubhouse_leaderboard','sdl_004_player_statistics'].includes(rpc)){
         if(h.statisticsStatus)return new Response(null,{status:h.statisticsStatus});
         const allowed=rpc==='sdl_004_player_statistics'?h.role==='parent'&&body.p_player_id===PLAYER:['coach','parent','teammate'].includes(h.role)&&body.p_team_id===OTHER;
@@ -74,9 +76,7 @@ export async function workerHarness(role = 'coach') {
   function load(file){if(!cache.has(file.href))cache.set(file.href,new vm.SourceTextModule(fs.readFileSync(file,'utf8'),{context,identifier:file.href}));return cache.get(file.href);}
   const packaged=load(new URL('../../backend/worker/index.mjs',import.meta.url));
   await packaged.link((specifier,parent)=>load(new URL(specifier,parent.identifier)));await packaged.evaluate();h.packaged=packaged.namespace.default;
-  const proposalModule = new vm.SourceTextModule(fs.readFileSync(new URL('../../backend/worker/submissionRoutes.mjs', import.meta.url), 'utf8'), { context });
-  await proposalModule.link(() => { throw Error('unexpected dependency'); }); await proposalModule.evaluate();
-  h.proposal = proposalModule.namespace.createSubmissionRoutes(module.namespace);
+  h.proposal = load(new URL('../../backend/worker/submissionRoutes.mjs',import.meta.url)).namespace.createSubmissionRoutes(module.namespace);
   h.env = env;
   h.request = (path, { method = 'GET', body, auth = true, origin = ORIGIN, contentType = 'video/mp4' } = {}) => new Request('https://sdl-r2-staging-gate.sampson-ho.workers.dev' + path,
     { method, headers: { Origin: origin, 'Idempotency-Key': VIDEO, ...(auth ? { Authorization: 'Bearer synthetic' } : {}),

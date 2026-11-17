@@ -12,6 +12,7 @@ const messages = {
   403: 'You do not have permission to access this media.',
   404: 'This video could not be found.',
   409: 'Another upload or review is in progress or already completed. Refresh before retrying.',
+  410: 'This invitation expired or was revoked. Request a new invitation from the club.',
   411: 'The browser did not send the file length. Please retry with a supported browser.',
   413: 'Choose a non-empty MP4 file no larger than 20 MiB.',
   415: 'This service accepts MP4 video files only.',

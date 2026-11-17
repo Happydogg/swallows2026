@@ -1,3 +1,7 @@
+import {createPilotWorkflowService} from './pilotWorkflowService.js';
+import {usePilotWorkspace} from '../composables/usePilotWorkspace.js';
+import {PilotWorkspace} from '../components/PilotWorkspace.js';
+import {PerformanceInbox} from '../components/PerformanceInbox.js';
 // SDL-003: lightweight Vue application coordinator (no bundler required).
 // Feature state/commands live in composables, UI in components, I/O in services.
 import { translations } from './translations.js';
@@ -33,7 +37,7 @@ const { createApp, ref, onMounted, onUnmounted, markRaw, computed } = Vue;
 
 createApp({
   components: {
-    AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
+    PilotWorkspace, PerformanceInbox, AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
     SessionFormModal, UploadVideoModal, ArAnalyzerModal
   },
   setup() {
@@ -56,8 +60,10 @@ createApp({
     const coachRosterLoading = ref(false);
     const coachRosterError = ref('');
 
+    let initialInvitation='';
     const auth = useAuthSession({
-      onIdentityChange: () => clearSensitiveState(),
+      onInvitation:token=>{initialInvitation=token;},
+      onIdentityChange: previous => {if(previous?.userId)initialInvitation='';clearSensitiveState();},
       onAuthenticated: async () => {
         if (auth.isVerifiedGuardian.value && !auth.isTeamCoach.value) {
           submissionWorkspace.changeTab('players');
@@ -67,6 +73,8 @@ createApp({
         await fetchAllData();
         await submissionWorkspace.load();
         await enrollmentAdmin.load();
+        await pilotWorkspace.load();
+        if(initialInvitation){pilotWorkspace.redemptionToken.value=initialInvitation;initialInvitation='';}
       }
     });
     const coach = useCoachMode(t);
@@ -97,9 +105,18 @@ createApp({
       sessions,
       onProfile: (player,permitted=[])=>{guardianProfileId.value=player.id;guardianProfileSessions.value=permitted;playerFeature.selectPlayer(player);},
       onFamilyStatistics: (id,rows,denied=false)=>{if(guardianProfileId.value===id){guardianProfileSessions.value=rows;if(denied){guardianProfileId.value='';selectedPlayer.value=null;currentView.value='overview';clearPlayerChart();analytics.hasChartData.value=false;}else analytics.renderPlayerChart();}},
+      onBulkShare:(row,mode)=>pilotWorkspace.share(row,mode,{},false),
       onPrivateVideos: playerId => { void privateMedia.selectMediaPlayer(playerId); }
     });
     const enrollmentAdmin = useEnrollmentAdmin({ auth });
+    const pilotWorkspace=usePilotWorkspace({auth,onLinked:async()=>{const identity=auth.captureIdentity();await auth.reloadMemberships();if(!auth.isCurrentIdentity(identity))return;await fetchAllData();if(auth.isCurrentIdentity(identity))await submissionWorkspace.load();},onUpdated:()=>{void submissionWorkspace.load();}});
+    // Fragments are not sent in HTTP requests. Remove the invitation before any sharing/navigation.
+    if(window.location?.hash?.startsWith('#guardian-invite=')){
+      const token=window.location.hash.slice('#guardian-invite='.length);
+      window.history?.replaceState(null,'',window.location.pathname+window.location.search);
+      if(/^[a-f0-9]{64}$/.test(token))initialInvitation=token;
+    }
+
     const emptyPlayerForm = { ...playerFeature.newPlayer.value };
     const emptySessionForm = { ...sessionFeature.newSession.value };
     const emptyVideoForm = { ...videoFeature.newDrillVideo.value };
@@ -132,6 +149,14 @@ createApp({
           return;
         }
         if (auth.isTeamCoach.value) {
+          if(pilotWorkspace.enabled){
+            await fetchSafeCoachRoster(identity);
+            if(!auth.isCurrentIdentity(identity))return;
+            const linked=auth.isVerifiedGuardian.value?await fetchVerifiedGuardianPlayers(auth.guardianLinks.value):[];
+            if(!auth.isCurrentIdentity(identity))return;
+            players.value=[...new Map([...coachRoster.value,...linked].map(p=>[p.id,p])).values()].sort(compareJerseys);
+            sessions.value=[];drillVideos.value=[];return;
+          }
           const data = await fetchAllCloudData();
           if (!auth.isCurrentIdentity(identity)) return;
           players.value = data.players.sort(compareJerseys);
@@ -183,6 +208,7 @@ createApp({
       privateMedia.resetMedia();
       submissionWorkspace.reset();
       enrollmentAdmin.reset();
+      pilotWorkspace.reset();
       clearPlayerChart();
       analytics.expandedSessionIds.clear();
       analytics.hasChartData.value = false;
@@ -202,9 +228,9 @@ createApp({
       for (const id of Object.keys(playerFeature.failedImgs)) delete playerFeature.failedImgs[id];
     };
     const signInAndLoad = () => auth.signIn();
-    const signOutAndClear = () => auth.signOut();
+    const signOutAndClear = () => {initialInvitation='';return auth.signOut();};
     onMounted(() => auth.initializeAuth());
-    onUnmounted(() => { auth.disposeAuth(); submissionWorkspace.dispose(); enrollmentAdmin.dispose(); });
+    onUnmounted(() => { auth.disposeAuth(); submissionWorkspace.dispose(); enrollmentAdmin.dispose();pilotWorkspace.dispose(); });
 
     return {
       currentLang, t, saveLanguage, loading, isSaving, currentView, overviewTab, searchQuery,
@@ -213,8 +239,17 @@ createApp({
       ...auth, signInAndLoad, signOutAndClear,
       ...coach, ...analytics, ...playerFeature, ...sessionFeature, ...videoFeature, ...csvFeature,
       ...arAnalyzer,
-      selectPlayer: player=>{guardianProfileId.value='';guardianProfileSessions.value=[];playerFeature.selectPlayer(player);},
+      selectPlayer: async player=>{
+        guardianProfileId.value='';guardianProfileSessions.value=[];playerFeature.selectPlayer(player);
+        if(pilotWorkspace.enabled){
+          const identity=auth.captureIdentity();sessions.value=[];
+          try{const rows=await createPilotWorkflowService({auth}).coachStatistics(player.id);
+          if(auth.isCurrentIdentity(identity)&&selectedPlayer.value?.id===player.id){sessions.value=rows;analytics.renderPlayerChart();}}
+          catch(error){if(auth.isCurrentIdentity(identity)&&selectedPlayer.value?.id===player.id){sessions.value=[];auth.authError.value=error.message;}}
+        }
+      },
       // Passing the original refs (not Vue-unwrapped copies) maintains DOM/video ownership.
+      pilotController:markRaw(pilotWorkspace),
       submissionController: markRaw(submissionWorkspace),
       enrollmentAdminController: markRaw(enrollmentAdmin),
       privateMediaController: markRaw(privateMedia),

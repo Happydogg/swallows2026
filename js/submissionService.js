@@ -38,13 +38,13 @@ export function createSubmissionService({auth,enabled=SUBMISSION_FEATURES_ENABLE
     async statisticConsents(athlete,options){
       await ready(options);if(!statisticsConsentAvailable)throw new MediaError('Statistics consent contract unavailable.');
       return rows(await transport.requestJson(`/v2/statistic-consents?athlete_id=${uuid(athlete)}`,options)).map(row=>{
-        if(!Array.isArray(row.metrics)||row.metrics.some(m=>!['exit_velo','throwing_velo','sprint_time','broad_jump_ratio'].includes(m)))throw new MediaError('Invalid statistic consent.');
+        if(!Array.isArray(row.metrics)||row.metrics.some(m=>!['exit_velo','throwing_velo','sprint_time','broad_jump'].includes(m)))throw new MediaError('Invalid statistic consent.');
         return {id:uuid(row.id),generation:uuid(row.generation),organization_id:uuid(row.organization_id),organization_name:text(row.organization_name),status:text(row.status),share_roster:row.share_roster===true,metrics:[...row.metrics],policy_version:text(row.policy_version)};
       });
     },
     async setStatisticConsent(row,roster,metrics,options){
       await ready(options);if(!statisticsConsentAvailable)throw new MediaError('Statistics consent contract unavailable.');
-      if(typeof roster!=='boolean'||!Array.isArray(metrics)||metrics.length>4||metrics.some(m=>!['exit_velo','throwing_velo','sprint_time','broad_jump_ratio'].includes(m))||new Set(metrics).size!==metrics.length||(!roster&&metrics.length))throw new MediaError('Invalid statistic consent.');
+      if(typeof roster!=='boolean'||!Array.isArray(metrics)||metrics.length>4||metrics.some(m=>!['exit_velo','throwing_velo','sprint_time','broad_jump'].includes(m))||new Set(metrics).size!==metrics.length||(!roster&&metrics.length))throw new MediaError('Invalid statistic consent.');
       return transport.requestJson(`/v2/club-enrollments/${uuid(row.id)}/statistics-consent`,{...options,method:'POST',body:{generation:uuid(row.generation),roster,metrics,policy_version:roster?STATISTICS_CONSENT_POLICY_VERSION:null}});
     },
     hasParentStatistics:()=>Boolean(verified&&auth.isCurrentIdentity(verified)&&parentStatsAvailable),

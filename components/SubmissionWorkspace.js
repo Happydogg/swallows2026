@@ -1,7 +1,8 @@
+import {PerformanceInbox} from './PerformanceInbox.js';
 // No privileged flags are derived from form fields; server capabilities remain required.
 export const SubmissionWorkspace={
-  name:'SubmissionWorkspace',props:{controller:{type:Object,required:true}},
-  setup(props){return {...props.controller};},
+  name:'SubmissionWorkspace',components:{PerformanceInbox},props:{controller:{type:Object,required:true},pilotController:{type:Object,default:null}},
+  setup(props){return {...props.controller,pilot:props.pilotController};},
   template:`
 <section class="my-6 rounded-xl border border-slate-700 bg-slate-800 p-4 space-y-4 no-print" aria-label="Player and video workspace">
   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -86,24 +87,31 @@ export const SubmissionWorkspace={
       <p class="text-sm text-slate-300">Optional. Default is no sharing. Consent lasts throughout this continuous club enrollment, including team transfers, with no annual or per-video renewal. Leaving the club ends consent. Rejoining requires fresh consent. You can withdraw at any time; private videos remain available to authorized family and staff.</p>
       <article v-for="club in clubEnrollments" :key="club.id+club.generation" class="rounded border border-slate-600 p-3 space-y-2">
         <p class="font-semibold">{{ club.organization_name }} · {{ club.status }}</p>
+        <div class="space-y-2 border border-blue-800 p-3 rounded">
+          <p class="text-sm">Approve All shares the approved baseball profile, official throwing/exit velocity, comparable sprint results, absolute broad jump and eligible coach-published single-athlete videos with current teams in this club only. Height, weight, family details and unapproved records stay private. Recording/storage permission is separate.</p>
+          <label class="flex gap-3 text-sm"><input type="checkbox" v-model="allSharingConfirmed[club.id]" :disabled="!enabled||!ready||busy||club.status!=='active'" />I voluntarily approve all eligible Clubhouse sharing for this continuous club enrollment.</label>
+          <div class="flex flex-wrap gap-2"><button @click="shareAll(club,'all')" :disabled="!enabled||!ready||busy||allSharingConfirmed[club.id]!==true||club.status!=='active'" class="p-3 bg-emerald-700 rounded disabled:opacity-50">Approve All Clubhouse Sharing</button><button @click="shareAll(club,'none')" :disabled="!enabled||!ready||busy" class="p-3 bg-slate-700 rounded disabled:opacity-50">Withdraw All Clubhouse Sharing</button></div>
+        </div>
+        <details><summary class="py-3 font-semibold">Advanced Sharing Settings — videos</summary>
         <p class="text-sm">Clubhouse consent: {{ club.consent_active?'Active':'Not active' }}</p>
         <p v-if="club.accepted_at" class="text-xs text-slate-400">Accepted {{ club.accepted_at }} · {{ club.policy_version }}</p>
         <p v-if="club.withdrawn_at" class="text-xs text-slate-400">Withdrawn {{ club.withdrawn_at }}</p>
         <label v-if="!club.consent_active&&club.status==='active'" class="flex gap-3 items-start text-sm py-2"><input type="checkbox" v-model="consentAccepted[club.id]" :disabled="!enabled||!ready||busy" /><span>I am a verified guardian and consent to authorized coaches publishing eligible single-athlete videos to my child's current teams within {{ club.organization_name }} for this continuous enrollment. This does not grant sharing to another club. Policy {{ consentPolicyVersion }}.</span></label>
         <button v-if="!club.consent_active&&club.status==='active'" @click="clubConsent(club,true)" :disabled="!enabled||!ready||busy||consentAccepted[club.id]!==true" class="p-3 bg-blue-700 rounded disabled:opacity-50">Grant club consent</button>
         <button v-if="club.consent_active" @click="clubConsent(club,false)" :disabled="!enabled||!ready||busy" class="p-3 bg-slate-700 rounded">Withdraw club consent</button>
+        </details>
         <details><summary class="py-2">Consent history</summary><ol class="text-xs"><li v-for="(entry,i) in club.history" :key="i">{{ entry.at }} · {{ entry.action }} · {{ entry.policy_version }}</li></ol></details>
       </article>
     </section>
     <section v-if="statisticsEnrollments.length" aria-label="Separate baseball statistics consent" class="space-y-3 rounded-xl border border-blue-800 p-3">
-      <h3 class="font-semibold">Separate baseball profile and leaderboard sharing</h3>
+      <h3 class="font-semibold">Advanced Sharing Settings — baseball profile and leaderboard</h3>
       <p class="text-sm text-slate-300">Optional; default is no sharing. Video consent does not authorize these fields. Share only the selected official metrics, performance dates and rankings with current teams in this club. Family session histories, height, weight and private notes are never included in team listings. Withdrawing preserves private family access.</p>
       <article v-for="club in statisticsEnrollments" :key="club.id+club.generation" class="border-t border-slate-700 pt-3 space-y-2">
         <p class="font-semibold">{{ club.organization_name }} · {{ club.status }}</p>
         <template v-if="statisticsChoices[club.id]">
           <label class="flex gap-3 py-2 items-start text-sm"><input type="checkbox" v-model="statisticsChoices[club.id].roster" :disabled="!enabled||!ready||busy||club.status!=='active'" /><span>I consent to sharing my child's preferred name, jersey, position and throws/bats with current club teams.</span></label>
           <fieldset class="grid grid-cols-1 sm:grid-cols-2 gap-2" :disabled="!statisticsChoices[club.id].roster||!enabled||!ready||busy||club.status!=='active'">
-            <label v-for="metric in ['exit_velo','throwing_velo','sprint_time','broad_jump_ratio']" :key="metric" class="flex gap-3 py-2 text-sm"><input type="checkbox" :value="metric" v-model="statisticsChoices[club.id].metrics" /><span>{{ {exit_velo:'Official exit velocity',throwing_velo:'Official throwing velocity',sprint_time:'Official sprint time',broad_jump_ratio:'Official jump/height ratio (no raw height)'}[metric] }}</span></label>
+            <label v-for="metric in ['exit_velo','throwing_velo','sprint_time','broad_jump']" :key="metric" class="flex gap-3 py-2 text-sm"><input type="checkbox" :value="metric" v-model="statisticsChoices[club.id].metrics" /><span>{{ {exit_velo:'Official exit velocity',throwing_velo:'Official throwing velocity',sprint_time:'Official sprint time',broad_jump:'Official standing broad jump (cm)'}[metric] }}</span></label>
           </fieldset>
           <p class="text-xs text-slate-400">Separate policy {{ statisticsPolicyVersion }}. Coach approval is also required for every official statistic. This does not grant sharing in another club.</p>
           <button @click="saveStatisticConsent(club)" :disabled="!enabled||!ready||busy||club.status!=='active'" class="w-full sm:w-auto rounded bg-blue-700 p-3 disabled:opacity-50">Save separate sharing choices</button>
@@ -123,6 +131,7 @@ export const SubmissionWorkspace={
   <div v-if="tab==='review'||tab==='clubhouse'" class="space-y-4">
     <label class="block">Authorized team<select :value="teamId" @change="selectTeam($event.target.value,tab)" class="mt-1 block w-full bg-slate-900 p-3 rounded"><option value="">Select a team</option><option v-for="team in teams" :key="team.id" :value="team.id">{{ team.name }}</option></select></label>
     <template v-if="tab==='review'">
+      <performance-inbox v-if="pilot" :controller="pilot" :team-id="teamId"></performance-inbox>
       <p class="text-sm text-slate-400">{{ ready?'Pending among the displayed submissions: '+pendingCount:'Review counts await the authorized backend.' }} Up to 50 items are displayed.</p>
       <select v-model="reviewFilter" @change="refreshQueue" :disabled="!enabled||!ready||busy" class="p-3 bg-slate-900 rounded"><option value="pending">Pending</option><option value="all">All statuses</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select>
       <button @click="refreshQueue" :disabled="!enabled||!ready||!teamId||busy" class="p-3 ml-2 bg-slate-700 rounded disabled:opacity-50">Refresh reviews</button>
@@ -197,23 +206,8 @@ export const SubmissionWorkspace={
             <p class="text-xs text-slate-300">{{ clubhouseLeaderboardNotice || 'The dedicated parent-safe Clubhouse leaderboard endpoint (/v2/clubhouse/leaderboard) awaits backend deployment and verification. Unverified or raw session records are never used to populate team leaderboards.' }}</p>
           </div>
           <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div v-for="board in [{key:'exit_velo',title:'Top Exit Velo',unit:'km/h',accent:'text-blue-400'},{key:'throwing_velo',title:'Throwing Velo',unit:'km/h',accent:'text-emerald-400'},{key:'broad_jump_ratio',title:'Lower-Body Power (Jump Ratio)',unit:'x',accent:'text-purple-400'},{key:'sprint_time',title:'Sprint (18.29m)',unit:'s',accent:'text-amber-300'}]" :key="board.key" class="rounded-lg border border-slate-700 bg-slate-800/80 p-3.5 space-y-2">
-              <div class="flex items-center justify-between">
-                <h5 class="text-xs font-bold uppercase tracking-wider" :class="board.accent">{{ board.title }}</h5>
-                <span class="text-[11px] text-slate-400 font-mono">{{ board.unit }}</span>
-              </div>
-              <p v-if="!clubhouseLeaderboardByMetric[board.key].length" class="text-xs text-slate-400 py-2">No approved leaderboard entries for this metric.</p>
-              <ol v-else class="space-y-1.5">
-                <li v-for="(item, idx) in clubhouseLeaderboardByMetric[board.key]" :key="item.id" class="flex items-center justify-between rounded bg-slate-900/80 px-3 py-2 text-xs">
-                  <div class="flex items-center gap-2">
-                    <span class="font-bold font-mono text-slate-300">#{{ idx + 1 }}</span>
-                    <span class="font-semibold text-white">{{ item.preferred_name }}</span>
-                    <span class="font-mono text-slate-400">#{{ item.jersey }}</span>
-                  </div>
-                  <span class="font-mono font-bold" :class="board.accent">{{ item.value }} {{ item.unit }}</span>
-                </li>
-              </ol>
-            </div>
+            <p v-if="!clubhouseBoards.length" class="text-sm text-slate-400">No approved leaderboard entries.</p>
+            <article v-for="board in clubhouseBoards" :key="board.key" class="rounded-lg border border-slate-700 bg-slate-900 p-3 space-y-2"><h5 class="font-semibold">{{ board.title }}</h5><p class="text-xs text-slate-400">Latest valid official measurement per athlete in this protocol</p><ol><li v-for="item in board.items" :key="item.id" class="py-2 text-sm">#{{ item.rank || '—' }} {{ item.preferred_name }} · #{{ item.jersey }} · {{ item.value }} {{ item.unit }}<span class="block text-xs text-slate-400">{{ item.recorded_at }}</span></li></ol></article>
           </div>
         </section>
 

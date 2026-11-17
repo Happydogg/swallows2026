@@ -137,6 +137,7 @@
           <input v-model="loginPassword" type="password" autocomplete="current-password" required class="mt-1 w-full rounded-lg bg-slate-900 border border-slate-600 p-3 text-base text-white focus:border-emerald-500 outline-none" />
         </label>
         <button type="submit" :disabled="authBusy" class="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 p-3.5 rounded-lg font-semibold text-white transition">{{ authBusy ? 'Signing in…' : 'Sign in' }}</button>
+        <button type="button" @click="registerEmail" :disabled="authBusy" class="w-full rounded-lg border border-slate-600 p-3">Create email account for a club invitation</button>
       </form>
 
       <!-- Method 2: Phone-Number Login Interface (Prepared) -->
@@ -168,12 +169,12 @@
           <p>Parent-to-child links are verified on the server from club-issued invitations. Client-only linking is never permitted.</p>
         </div>
         <label class="block text-sm font-medium text-slate-200">Club invitation code
-          <input v-model="inviteCode" type="text" autocomplete="off" placeholder="SWALLOWS-INV-XXXX" class="mt-1 w-full rounded-lg bg-slate-900 border border-slate-600 p-3 font-mono text-sm text-white focus:border-purple-500 outline-none" />
+          <input v-model="inviteCode" type="text" autocomplete="off" maxlength="64" placeholder="Token from your private club invitation link" class="mt-1 w-full rounded-lg bg-slate-900 border border-slate-600 p-3 font-mono text-sm text-white focus:border-purple-500 outline-none" />
         </label>
-        <label class="block text-sm font-medium text-slate-200">Guardian email (optional)
+        <label class="block text-sm font-medium text-slate-200">Invited guardian email
           <input v-model="inviteEmail" type="email" inputmode="email" autocomplete="email" placeholder="parent@example.com" class="mt-1 w-full rounded-lg bg-slate-900 border border-slate-600 p-3 text-sm text-white focus:border-purple-500 outline-none" />
         </label>
-        <button type="submit" :disabled="authBusy" class="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-50 p-3.5 rounded-lg font-semibold text-white transition">Verify club invitation</button>
+        <button type="submit" :disabled="authBusy" class="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-50 p-3.5 rounded-lg font-semibold text-white transition">Continue with email authentication</button>
       </form>
 
       <p v-if="authNotice" role="status" class="text-amber-300 text-xs sm:text-sm bg-amber-950/40 border border-amber-800/60 rounded-lg p-3">{{ authNotice }}</p>
@@ -197,7 +198,8 @@
       @add-player="openAddPlayerModal" @lock-coach="lockCoachMode"
       @unlock-coach="unlockCoachMode"></app-header>
 
-    <submission-workspace :controller="submissionController"></submission-workspace>
+    <pilot-workspace :controller="pilotController"></pilot-workspace>
+    <submission-workspace :controller="submissionController" :pilot-controller="pilotController"></submission-workspace>
     <club-enrollment-admin :controller="enrollmentAdminController"></club-enrollment-admin>
     <private-media-panel :controller="privateMediaController"></private-media-panel>
 

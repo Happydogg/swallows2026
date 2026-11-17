@@ -1,6 +1,6 @@
 // Explicit projections only: no legal names, family contact, DOB or registrations.
 export const CLUBHOUSE_ROSTER_FIELDS=Object.freeze(['id','team_id','team_name','preferred_name','jersey','position','throws','bats']);
-export const CLUBHOUSE_LEADERBOARD_FIELDS=Object.freeze(['id','player_id','team_id','team_name','metric','preferred_name','jersey','value','unit','rank','recorded_at']);
+export const CLUBHOUSE_LEADERBOARD_FIELDS=Object.freeze(['id','player_id','team_id','team_name','metric','preferred_name','jersey','value','unit','rank','recorded_at','protocol_id','protocol_label','distance_m']);
 
 export function filterLinkedPlayers(players, guardianLinks) {
   const linked=new Set((guardianLinks||[]).filter(g=>g?.status==='verified'&&g?.athlete_id).map(g=>g.athlete_id));
@@ -51,7 +51,7 @@ export function projectClubhouseRoster(items=[], teamId='') {
 
 export function projectClubhouseLeaderboard(items=[], teamId='') {
   if(!Array.isArray(items))return [];
-  const allowedMetrics=new Set(['exit_velo','throwing_velo','broad_jump_ratio','sprint_time']);
+  const allowedMetrics=new Set(['exit_velo','throwing_velo','broad_jump','sprint_time']);
   const result=[];
   for(const row of items) {
     if(!row||typeof row!=='object'||!row.team_id||!allowedMetrics.has(row.metric))continue;
@@ -68,8 +68,9 @@ export function projectClubhouseLeaderboard(items=[], teamId='') {
       preferred_name:typeof row.preferred_name==='string'&&row.preferred_name.trim()?row.preferred_name.trim():'Team player',
       jersey:row.jersey!=null&&String(row.jersey).trim()!==''?String(row.jersey).trim():'--',
       value:numericValue,
-      unit:typeof row.unit==='string'&&row.unit.trim()?row.unit.trim():(row.metric==='sprint_time'?'s':row.metric==='broad_jump_ratio'?'x':'km/h'),
+      unit:typeof row.unit==='string'&&row.unit.trim()?row.unit.trim():(row.metric==='sprint_time'?'s':row.metric==='broad_jump'?'cm':'km/h'),
       rank:Number.isInteger(row.rank)&&row.rank>0?row.rank:null,
+      ...(typeof row.protocol_id==='string'?{protocol_id:row.protocol_id,protocol_label:typeof row.protocol_label==='string'?row.protocol_label:'',distance_m:row.distance_m==null?null:Number(row.distance_m)}:{}),
       recorded_at:typeof row.recorded_at==='string'?row.recorded_at:''
     });
   }

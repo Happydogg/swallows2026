@@ -37,6 +37,7 @@ export async function harness(t, initialUser = null, options = {}) {
         if (h.emitLogin) h.emit('SIGNED_IN', h.user);
         return { error: null };
       },
+      async signUp(credentials){h.signupCredentials=credentials;return {data:{user:null},error:h.signupError??null};},
       async signOut() {
         if (h.logoutError) return { error: h.logoutError };
         h.emit('SIGNED_OUT', null);
@@ -81,8 +82,12 @@ export async function harness(t, initialUser = null, options = {}) {
     onMounted: fn => { h.mount = fn; }, onUnmounted: fn => { h.unmount = fn; },
     createApp: options => ({ mount() { h.options = options; h.app = options.setup(); } })
   };
+  class BrowserURL extends URL{}
+  BrowserURL.createObjectURL=()=> 'blob:synthetic';BrowserURL.revokeObjectURL=url=>h.revoked.push(url);
   const context = vm.createContext({ Vue, AbortController, DOMException, Blob, crypto:webcrypto, window: {
     supabase: { createClient: () => db },
+    location:{href:'https://synthetic.invalid/',pathname:'/',search:'',hash:options.invitationHash??''},
+    history:{replaceState(_a,_b,url){h.replacedUrl=url;}},
     initMediaPipe: async () => {
       h.poseCalls++;
       return result('tracker', { close() { h.closedTrackers++; }, detectForVideo: () => ({ landmarks: [] }) });
@@ -90,7 +95,7 @@ export async function harness(t, initialUser = null, options = {}) {
   }, localStorage: { getItem: () => null, setItem() {} }, navigator: { language: 'en' },
   document: { getElementById: () => h.chartCanvas ?? null },
   Chart: class { constructor(_ctx, config) { h.chartConfig = config; } destroy() { h.chartDestroyed = (h.chartDestroyed ?? 0) + 1; } },
-  URL: { createObjectURL: () => 'blob:synthetic', revokeObjectURL: url => h.revoked.push(url) },
+  URL: BrowserURL,
   console: { error() {}, warn() {}, log() {} },
   setTimeout, clearTimeout, setInterval, clearInterval, performance, requestAnimationFrame: fn => h.frames.push(fn), cancelAnimationFrame: id => { h.cancelledFrame = id; },
   alert() {}, fetch(...args) {

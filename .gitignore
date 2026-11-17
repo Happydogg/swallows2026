@@ -13,3 +13,6 @@ work/
 *.dump
 *.backup
 backend/release/backups/
+
+# Allowlisted local Cloudflare Pages build
+dist-staging/

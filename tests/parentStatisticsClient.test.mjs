@@ -4,13 +4,15 @@ import assert from 'node:assert/strict';
 import {harness,user,deferred,until} from './helpers/appHarness.mjs';
 const P='11111111-1111-4111-8111-111111111111',A='22222222-2222-4222-8222-222222222222',S='33333333-3333-4333-8333-333333333333';
 const stats={id:S,player_id:P,session_date:'2026-11-01',exit_velo:62,throwing_velo:68,height_cm:140,weight_kg:35};
-const capabilities={revision:'sdl004-club-enrollment-v2',submissions:true,review:true,clubhouse:true,clubConsent:true,parentStatistics:true};
+const capabilities={revision:'sdl004-club-enrollment-v2',submissions:true,review:true,clubhouse:true,clubConsent:true,parentStatistics:true,pilotWorkflow:'sdl004-final-pilot-v1'};
 async function app(t,{coach=false,response=async()=>Response.json({items:[stats]})}={}){
  const h=await harness(t,null,{submissionsEnabled:true});h.rows.athlete_guardians=[{athlete_id:A,status:'verified'}];
  h.rows.players=[{id:P,athlete_id:A,preferred_name:'Synthetic child',jersey:'7',dob:'PRIVATE',parent_phone:'PRIVATE'}];
  h.rows.sessions=[{...stats,exit_velo:999,shoulder_check:'PRIVATE'}];h.rows.team_memberships=coach?[{role:'coach',status:'active'}]:[];
  const requests=[];h.fetchImpl=async url=>{
   requests.push(url);if(url.endsWith('/v2/capabilities'))return Response.json(capabilities);
+  if(url.endsWith('/v2/pilot/workspace'))return Response.json({players:[],protocols:[],invitation_organizations:[],staff_scopes:[]});
+  if(url.endsWith(`/v2/players/${P}/coach-statistics`))return Response.json({items:[{...stats,exit_velo:77}]});
   if(url.endsWith('/v2/workspace'))return Response.json({items:[]});
   if(url.endsWith(`/v2/players/${P}/statistics`))return response();
   throw Error('Unexpected synthetic request');
@@ -25,12 +27,12 @@ test('parent history/card/profile/chart reads use only scoped API rows and never
  h.chartCanvas={getContext:()=>({})};h.app.renderPlayerChart();assert.equal(h.chartConfig.data.datasets[0].data[0],62);
  h.app.setChartMode('growth');await until(()=>h.chartConfig?.data.datasets[0]?.data[0]===140);assert.equal(h.chartConfig.data.datasets[0].data[0],140);
 });
-test('dual-role coach retains coach sessions while family cards and profile use narrow guardian history',async t=>{
- const {h,login}=await app(t,{coach:true});await login;assert.equal(h.app.sessions.value[0].exit_velo,999);
+test('dual-role coach uses narrow coach history on navigation and separate guardian history for family cards',async t=>{
+ const {h,login}=await app(t,{coach:true});await login;assert.equal(h.app.sessions.value.length,0);assert.equal(h.calls.some(c=>c.table==='sessions'),false);
  const c=h.app.submissionController;assert.equal(c.cards.value[0].profiles[0].latestExitVelo,62);
  await c.showProfile(P);assert.equal(h.app.getLatestMetric(P,'exit_velo'),62);assert.equal(h.app.selectedPlayer.value.dob,undefined);
- h.app.currentView.value='overview';assert.equal(h.app.getLatestMetric(P,'exit_velo'),999,'Existing coach analytics preserved');
- h.app.selectPlayer(h.app.players.value[0]);assert.equal(h.app.getLatestMetric(P,'exit_velo'),999,'Explicit coach profile navigation restores coach context');
+ h.app.currentView.value='overview';assert.equal(h.app.getLatestMetric(P,'exit_velo'),null,'Coach history is loaded only through the assigned-athlete API');
+ await h.app.selectPlayer(h.app.players.value[0]);assert.equal(h.app.getLatestMetric(P,'exit_velo'),77,'Explicit coach profile navigation uses scoped history');
 });
 test('late parent statistics responses cannot restore data after logout',async t=>{
  const pending=deferred(),{h,login}=await app(t,{response:()=>pending.promise});
@@ -41,7 +43,7 @@ test('late parent statistics responses cannot restore data after logout',async t
 test('parent API permission denial clears family history and never falls back to coach/raw records',async t=>{
  let denied=false;const {h,login}=await app(t,{coach:true,response:async()=>denied?new Response(null,{status:403}):Response.json({items:[stats]})});await login;
  const c=h.app.submissionController;await c.showProfile(P);denied=true;await c.refreshFamilyStatistics();
- assert.equal(Object.keys(c.familyStatistics.value).length,0);assert.equal(h.app.selectedPlayer.value,null);assert.equal(c.statsAvailable.value,false);assert.equal(c.ready.value,false);assert.equal(h.app.sessions.value[0].exit_velo,999);
+ assert.equal(Object.keys(c.familyStatistics.value).length,0);assert.equal(h.app.selectedPlayer.value,null);assert.equal(c.statsAvailable.value,false);assert.equal(c.ready.value,false);assert.equal(h.app.sessions.value.length,0);assert.equal(h.calls.some(c=>c.table==='sessions'),false);
 });
 test('unrelated profile selection makes no statistics request; feature gates remain closed by default',async t=>{
  const {h,login,requests}=await app(t);await login;const n=requests.length;await h.app.submissionController.showProfile(A);assert.equal(requests.length,n);

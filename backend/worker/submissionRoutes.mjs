@@ -1,3 +1,4 @@
+import {pilotWorkflowRoute} from './pilotWorkflowRoutes.mjs';
 // Staging release candidate. Not deployed.
 export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedBytes, configOk, validId, json, ORIGINS }) {
   async function rpc(env, bearer, name, body) {
@@ -6,7 +7,7 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
         method: 'POST', redirect: 'manual', headers: { apikey: env.SUPABASE_PUBLISHABLE_KEY,
           Authorization: bearer, 'Content-Type': 'application/json' }, body: JSON.stringify(body)
       });
-      if (!response.ok) return { error: true, status: [400,401,403,404,409,413,415].includes(response.status) ? response.status : 503 };
+      if (!response.ok) return { error: true, status: [400,401,403,404,409,410,413,415].includes(response.status) ? response.status : 503 };
       if (response.status === 204) return { value: null };
       return { value: await response.json() };
     } catch { return { error: true, status: 503 }; }
@@ -26,7 +27,9 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
       if (active.value !== true) return json({error:'Session expired or revoked'},401,origin);
       const contract = await call('sdl_004_submission_contract', {});
       if (contract.error || contract.value?.revision !== 'sdl004-club-enrollment-v2') return json({error:'Backend contract unavailable'},503,origin);
-      if (path === '/v2/capabilities' && request.method === 'GET') return json({revision:'sdl004-club-enrollment-v2',submissions:true,review:true,clubhouse:true,clubConsent:true,enrollmentAdmin:contract.value.enrollmentAdmin===true,clubhouseRoster:contract.value.clubhouseRoster===true,clubhouseLeaderboard:contract.value.clubhouseLeaderboard===true,parentStatistics:contract.value.parentStatistics===true,statisticsConsent:contract.value.statisticsConsent===true},200,origin);
+      if (path === '/v2/capabilities' && request.method === 'GET') return json({pilotWorkflow:contract.value.pilotWorkflow??null,revision:'sdl004-club-enrollment-v2',submissions:true,review:true,clubhouse:true,clubConsent:true,enrollmentAdmin:contract.value.enrollmentAdmin===true,clubhouseRoster:contract.value.clubhouseRoster===true,clubhouseLeaderboard:contract.value.clubhouseLeaderboard===true,parentStatistics:contract.value.parentStatistics===true,statisticsConsent:contract.value.statisticsConsent===true},200,origin);
+      const pilotResult=await pilotWorkflowRoute({request,url,path,contract:contract.value,call,validId,json,origin});
+      if(pilotResult)return pilotResult;
       // Narrow caller-JWT RPCs: authorization and column restrictions live in PostgreSQL.
       const statisticsPlayer=path.match(/^\/v2\/players\/([^/]+)\/statistics$/);
       const statisticsRead=statisticsPlayer||['/v2/clubhouse/roster','/v2/clubhouse/leaderboard'].includes(path);
@@ -42,8 +45,8 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
         if(result.error)return json({error:'Statistics access denied or unavailable'},result.status,origin);
         const fields=statisticsPlayer?['id','player_id','session_date','exit_velo','throwing_velo','sprint_time','broad_jump','control_exit_velo','attack_angle','height_cm','weight_kg']:
           kind==='clubhouseRoster'?['id','team_id','team_name','preferred_name','jersey','position','throws','bats']:
-          ['id','player_id','team_id','team_name','metric','preferred_name','jersey','value','unit','rank','recorded_at'];
-        const max=statisticsPlayer?200:kind==='clubhouseRoster'?100:12;
+          ['id','player_id','team_id','team_name','metric','preferred_name','jersey','value','unit','rank','recorded_at',...(contract.value.pilotWorkflow?['protocol_id','protocol_label','distance_m']:[])];
+        const max=statisticsPlayer?200:kind==='clubhouseRoster'?100:24;
         if(!Array.isArray(result.value)||result.value.length>max||result.value.some(row=>!row||typeof row!=='object'||!validId(row.id)||
           (statisticsPlayer?row.player_id!==player:row.team_id!==team)))return json({error:'Invalid statistics response'},503,origin);
         return json({items:result.value.map(row=>Object.fromEntries(fields.map(k=>[k,row[k]??null]))),...(statisticsPlayer?{historyLimit:200}:{})},200,origin);
@@ -66,7 +69,7 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
           const bytes=new Uint8Array(size);let offset=0;for(const part of parts){bytes.set(part,offset);offset+=part.byteLength;}body=JSON.parse(new TextDecoder().decode(bytes));
         }catch{return json({error:'Invalid JSON'},400,origin);}
         if(!validId(body?.generation)||typeof body.roster!=='boolean'||!Array.isArray(body.metrics)||body.metrics.length>4||
-          body.metrics.some(m=>!['exit_velo','throwing_velo','sprint_time','broad_jump_ratio'].includes(m))||new Set(body.metrics).size!==body.metrics.length||
+          body.metrics.some(m=>!(contract.value.pilotWorkflow?['exit_velo','throwing_velo','sprint_time','broad_jump']:['exit_velo','throwing_velo','sprint_time','broad_jump_ratio']).includes(m))||new Set(body.metrics).size!==body.metrics.length||
           (!body.roster&&body.metrics.length)||(body.roster&&body.policy_version!=='sdl004-baseball-statistics-v1'))return json({error:'Explicit separate statistics consent required'},400,origin);
         const result=await call('sdl_004_set_statistic_consent',{p_enrollment:statisticsConsent[1],p_generation:body.generation,p_roster:body.roster,p_metrics:body.metrics,p_policy_version:body.roster?body.policy_version:null});
         return result.error?json({error:'Statistics consent denied or changed'},result.status,origin):json({updated:true},200,origin);

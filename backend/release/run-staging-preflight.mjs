@@ -19,7 +19,7 @@ export function planPreflight({confirmation,manifest,databaseUrl,caFile,env={}})
  const quote=value=>"'"+value.replaceAll("'","''")+"'";
  return {args:['-X','--no-password','--set=ON_ERROR_STOP=1','--file=-'],env:{...safeEnv,PGHOST:url.hostname,PGPORT:url.port||'5432',PGUSER:'postgres',PGPASSWORD:decodeURIComponent(url.password),PGDATABASE:'postgres',PGSSLMODE:'verify-full',PGSSLROOTCERT:caFile},
   input:`SET sdl004.confirmed_project_ref=${quote(confirmation)};\nSET sdl004.expected_migration_history=${quote(JSON.stringify({exists:history.exists,versions:[...history.versions].sort()}))};\n`+
-   fs.readFileSync(new URL('./staging-preflight.sql',import.meta.url),'utf8')};
+   fs.readFileSync(new URL('./staging-preflight.sql',import.meta.url),'utf8')+'\n'+fs.readFileSync(new URL('./final-pilot-preflight.sql',import.meta.url),'utf8')};
 }
 if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url) {
  try {

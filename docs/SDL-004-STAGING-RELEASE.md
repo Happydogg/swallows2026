@@ -1,5 +1,7 @@
 # SDL-004 staging release candidate — NOT DEPLOYED
 
+The current final-pilot migration stack, invitation/growth/review APIs, protocol-aware rankings and permanent **Cloudflare Pages Git integration from `staging`** are documented in [SDL-004-FINAL-PILOT.md](SDL-004-FINAL-PILOT.md). Its sequence supersedes the earlier single-migration and Direct Upload preparation below. Both migration files must be reviewed; no deployment is assumed.
+
 The current business rule and API are documented in
 [SDL-004-CLUB-CONSENT.md](SDL-004-CLUB-CONSENT.md). Standing optional Clubhouse consent belongs to
 one athlete/club/continuous enrollment, survives internal team transfers and has no annual or

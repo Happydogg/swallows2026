@@ -1,9 +1,9 @@
 // SDL-004-005: staging authentication/read-only workspace.
 // Server RLS, not this client state, determines data access.
-import { supabaseClient } from '../js/config.js';
+import { SUBMISSION_FEATURES_ENABLED, supabaseClient } from '../js/config.js';
 const { ref, computed } = Vue;
 
-export function useAuthSession({ onIdentityChange = () => {}, onAuthenticated = async () => {} } = {}) {
+export function useAuthSession({ onIdentityChange = () => {}, onAuthenticated = async () => {}, onInvitation=()=>{} } = {}) {
   const authReady = ref(false);
   const authUser = ref(null);
   const authError = ref('');
@@ -39,6 +39,7 @@ export function useAuthSession({ onIdentityChange = () => {}, onAuthenticated = 
     identity.version === sessionVersion && identity.userId === authUser.value?.id;
 
   function invalidateIdentity() {
+    const previousId=authUser.value?.id;
     sessionVersion++;
     clearTimeout(refreshTimer);
     refreshTimer = null;
@@ -54,7 +55,7 @@ export function useAuthSession({ onIdentityChange = () => {}, onAuthenticated = 
     inviteEmail.value = '';
     authError.value = '';
     authNotice.value = '';
-    onIdentityChange();
+    onIdentityChange({userId:previousId});
     return sessionVersion;
   }
 
@@ -98,10 +99,15 @@ export function useAuthSession({ onIdentityChange = () => {}, onAuthenticated = 
       authError.value = 'Enter a valid club invitation code provided by your team administrator.';
       return;
     }
+    if(SUBMISSION_FEATURES_ENABLED){
+      if(!/^[a-f0-9]{64}$/.test(code)){authError.value='Enter the complete secure invitation token from your club link.';return;}
+      onInvitation(code);if(inviteEmail.value.trim())loginEmail.value=inviteEmail.value.trim();setAuthMethod('email');
+      authNotice.value='Sign in with your invited verified email, then accept the invitation in the family workspace.';return;
+    }
     authNotice.value = 'Invitation-based guardian onboarding awaits backend redemption endpoint (/v2/onboarding/invitations/redeem). Client-side parent-to-child linking is disabled for security.';
   }
 
-  async function refreshIdentity(version) {
+  async function refreshIdentity(version,notify=true) {
     const current = () => !disposed && version === sessionVersion;
     try {
       // getUser verifies the JWT with the authentication server.
@@ -122,7 +128,7 @@ export function useAuthSession({ onIdentityChange = () => {}, onAuthenticated = 
         guardianLinks.value = results[2].data || [];
       }
       authReady.value = true;
-      await onAuthenticated();
+      if(notify)await onAuthenticated();
     } catch (error) {
       if (current()) authError.value = error.message || 'Authentication could not be verified';
     } finally {
@@ -175,6 +181,19 @@ export function useAuthSession({ onIdentityChange = () => {}, onAuthenticated = 
     }
   }
 
+  async function registerEmail() {
+    if(disposed||authBusy.value)return;
+    if(!SUBMISSION_FEATURES_ENABLED){authNotice.value='Account registration awaits approved pilot deployment. Existing email sign-in remains available.';return;}
+    const credentials={email:loginEmail.value.trim(),password:loginPassword.value};
+    if(!credentials.email||credentials.password.length<12){authError.value='Enter your invited email and a password of at least 12 characters.';return;}
+    const version=sessionVersion;authBusy.value=true;authError.value='';
+    try{const {error}=await supabaseClient.auth.signUp(credentials);if(error)throw error;
+      if(!disposed&&version===sessionVersion)authNotice.value='Check your email to confirm your account, then sign in and accept the club invitation.';
+    }catch(error){if(!disposed&&version===sessionVersion)authError.value=error.message||'Registration failed';}
+    finally{if(!disposed&&version===sessionVersion){loginPassword.value='';authBusy.value=false;}}
+  }
+  const reloadMemberships=()=>refreshIdentity(sessionVersion,false);
+
   async function signOut() {
     if (disposed) return;
     const action = ++actionVersion;
@@ -209,7 +228,7 @@ export function useAuthSession({ onIdentityChange = () => {}, onAuthenticated = 
     requestPhoneOtp, verifyOtpCode, redeemInvitation,
     orgMemberships, teamMemberships, guardianLinks,
     isTeamCoach, isOrgAdmin, isVerifiedGuardian, isParentOnly,
-    initializeAuth, signIn, signOut,
+    initializeAuth, signIn, signOut, registerEmail,reloadMemberships,
     captureIdentity, isCurrentIdentity, disposeAuth
   };
 }

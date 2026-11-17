@@ -150,10 +150,18 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   h.app.currentView.value = 'player'; await Vue.nextTick();
   assert.match(flatten(host), /Synthetic Player/);
   assert.doesNotMatch(flatten(host), /2015-01-01|HKLL-777|Secret, Name/);
+  const pilot=h.app.pilotController;
+  pilot.ready.value=true;
+  pilot.workspace.value={players:[{id:'pilot-child',is_guardian:true,is_coach:true,preferred_name:'Pilot child'}],protocols:[{id:'throw-radar-v1',label:'Radar throwing',unit:'km/h'}],invitation_organizations:[{id:'pilot-org',name:'Pilot club'}],staff_scopes:[{team_id:'pilot-team',team_name:'Pilot team',permission:'family_contacts'}]};
+  pilot.playerId.value='pilot-child';pilot.baseballProfile.value={player_id:'pilot-child',preferred_name:'Pilot child',approved:false};pilot.growth.value=[{id:'growth',measurement_date:'2026-01-01',height_cm:140,weight_kg:40,revision:1,history:[{revision:1,reason:'scale',recorded_by:'actor'}]}];
+  pilot.performance.value=[{id:'performance',status:'correction_requested',protocol_label:'Radar throwing',value:90,unit:'km/h',history:[]}];
+  pilot.family.value={given_names:'Own family visible marker'};pilot.administration.value={members:[{id:'member-id',name:'Scoped staff'}],teams:[{id:'pilot-team',name:'Pilot team'}],permissions:[]};
+  await Vue.nextTick();assert.match(flatten(host),/Private growth measurements|Own family visible marker|Approve All Clubhouse Sharing/);
+  assert.match(flatten(host),/Approve baseball profile/);assert.match(flatten(host),/Correct submission/);assert.match(flatten(host),/Scoped staff/);
   h.app.openAnalyzer({ id: 'local', video_url: 'blob:synthetic', category: 'pitching', fps_mode: 60 });
   await Vue.nextTick(); assert.match(flatten(host), /Back to Profile/);
   await h.app.signOutAndClear(); await Vue.nextTick();
-  assert.doesNotMatch(flatten(host), /Synthetic Player|Play privately|Back to Profile|case-123|Admin athlete/);
+  assert.doesNotMatch(flatten(host), /Synthetic Player|Play privately|Back to Profile|case-123|Admin athlete|Own family visible marker|Scoped staff/);
   // Verify mobile authentication UI tabs on signed-out screen
   assert.match(flatten(host), /Email & Password/);
   assert.match(flatten(host), /Phone Sign-In/);

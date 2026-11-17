@@ -1,3 +1,5 @@
+> Final pilot update: [SDL-004-FINAL-PILOT.md](SDL-004-FINAL-PILOT.md) is authoritative for the additive migration, invitation/growth/performance workflows, latest-result/protocol leaderboards, atomic sharing and Git-integrated staging hosting. Earlier base-only SQL tests intentionally retain the pre-extension contract.
+
 # SDL-004 parent statistics and Clubhouse API integration — NOT DEPLOYED
 
 Integration branch: `codex-SDL-004-parent-integration`.
@@ -63,21 +65,9 @@ approved merely because it exists or a coach can read it. The pending migration 
   verified guardian, policy version, acceptance, withdrawal and permanent invalidation timestamps.
   The existing immutable event store records grants/changes/withdrawals and invalidations.
 
-`sdl_004_approve_statistics(p_session uuid,p_metrics text[])` is the prepared staff-only RPC.
-It verifies a current session and coach authority for that player, or administrator authority for
-that organization, with active enrollment. It reads existing source measurements; it cannot edit a
-raw session or accept client-supplied metric values. A nonempty list explicitly approves only those
-metrics; [] revokes that session's approvals. A player-row lock serializes conflicting approval writes.
-It has no new browser write-mode/PIN toggle and no coach approval UI in this task. Review this narrow
-approval workflow before live QA. Guardians without the corresponding staff role cannot approve.
+The final-pilot assigned-coach workflow accepts explicit protocol, measurement, evidence and recording date, with immutable review history. Parent proposals require approval; coaches may enter official results directly with attribution. Generic administrator status does not grant performance access. The old `sdl_004_approve_statistics` signature remains for explicit revocation (`[]`); nonempty approvals use the new protocol-aware workflow.
 
-Allowed official metrics reuse SDL's definitions: best/max exit/throw velocity in km/h, best/min
-18.29 m sprint in seconds, best rounded-to-two-decimal broad-jump/height ratio. Approval computes the
-ratio with the source height or the latest available height for the same player, matching the existing
-fallback. The resulting ratio is an explicit approved snapshot; underlying height/jump measurements
-are not returned on the leaderboard. Later reference-height changes do not silently recompute that
-snapshot. Changing the approved source session makes its fingerprint stale. Ties use player UUID for
-a deterministic top-three order. Unapproved raw values and video submissions never enter rankings.
+Final team metrics are latest valid official exit/throw velocity (km/h), sprint time (s) separately ranked by distance and protocol, and absolute standing broad jump (cm). Jump/height ratio remains private. Legacy source sessions and old protocol-free approvals are not automatically ranked. Ranking never publishes growth, family fields or unapproved measurements.
 
 Separate policy: `sdl004-baseball-statistics-v1`. Defaults: no roster sharing, no metrics. The prepared
 parent controls explicitly select minimal baseball profile sharing and individual official metrics,

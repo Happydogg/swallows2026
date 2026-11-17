@@ -22,3 +22,14 @@ CROSS JOIN (VALUES ('public.sdl_statistic_consents'),('public.sdl_official_stati
 SELECT public.sdl_004_submission_contract() AS authenticated_contract_must_include_safe_statistics;
 -- With an owner connection the contract is null. Verify flags with synthetic authenticated users.
 COMMIT;
+-- Additional final-pilot inspection after BOTH migrations. These are metadata only.
+BEGIN READ ONLY;
+SELECT role_name,relation,
+ has_table_privilege(role_name,relation,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE') AS browser_access_must_be_false
+FROM (VALUES ('anon'),('authenticated')) roles(role_name)
+CROSS JOIN (VALUES ('public.sdl_guardian_invitations'),('public.sdl_growth_events'),('public.sdl_performance_submissions'),('public.sdl_staff_permissions'),('public.sdl_pilot_events'),('public.sdl_measurement_protocols')) tables(relation);
+SELECT relname,relrowsecurity FROM pg_class WHERE relname IN('sdl_guardian_invitations','sdl_growth_events','sdl_performance_submissions','sdl_staff_permissions','sdl_pilot_events','sdl_measurement_protocols') AND relnamespace='public'::regnamespace;
+SELECT p.proname,pg_get_function_identity_arguments(p.oid) AS signature,p.prosecdef,p.proconfig,
+ has_function_privilege('anon',p.oid,'EXECUTE') AS anonymous_execute_must_be_false
+ FROM pg_proc p WHERE p.pronamespace='public'::regnamespace AND p.proname LIKE 'sdl_004_pilot_%' ORDER BY p.proname;
+COMMIT;
