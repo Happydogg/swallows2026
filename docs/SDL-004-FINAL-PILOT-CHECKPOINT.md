@@ -50,14 +50,35 @@ Implementation, deployment prerequisites and limitations: [SDL-004-FINAL-PILOT.m
 | `tests/vueBindings.test.mjs` | Compile/render new ready-state forms and verify sensitive state disappears on logout. |
 | `utils/dashboardUtils.js` | Safe absolute-jump and explicit protocol projection; no private team fields. |
 
+## Recovery status
+
+All 38 implementation files survived. Recovery checkpoint: `f6fcc2f10762016b95aa4e37e12b10b87ee7acf7`. No product code was changed during recovery.
+
+Completed locally: email-bound guardian invitations and audited linking/revocation; parent/assigned-coach growth corrections; private performance submission/review and official entries; explicit profile approval and protocol-separated rankings; atomic Clubhouse consent/withdrawal; single-athlete video restrictions; scoped staff contacts; disabled-gate Git-integrated staging export and release guards. Worker-to-database verification is implemented and passes against actual isolated PGlite RPCs.
+
+Incomplete: deployment and live staging validation only. No migration, email delivery, hosted origin, backup recoverability or real-device authorization is claimed verified.
+
+New migration: `supabase/migrations/20261117064603_sdl004_final_pilot.sql`, following the unchanged base migration `20261116184847_sdl004_submission_workflows.sql`. Neither was applied by this task.
+
 ## Validation
 
 - Baseline: 285 passing tests before edits.
-- Final results will be recorded after the complete final run; no local test represents live staging authorization.
-- Local Worker build/package checks must pass with both v2 gates disabled. The release guard still intentionally blocks deployment without a current reviewed Worker baseline/version receipt.
+- Recovery-focused validation: **50 passed, 0 failed, 0 skipped**, including Worker-to-database authorization.
+- Final recovery run: **346 passed, 0 failed, 0 skipped** (`npm test`). No local test represents live staging authorization.
+- Syntax: **87 ES modules passed**. Staging export: **46 allowlisted frontend files**, both gates disabled. `git diff --check` and the secret/environment/backup artifact scan passed.
+- `npm run check:worker`: **PASS** for the local build/package, with both v2 gates disabled. The release guard still intentionally blocks deployment without a current reviewed Worker baseline/version receipt.
 - ES modules, Vue compilation/rendering and the root static export are checked locally; real mobile devices and live provider behavior remain unverified.
 - No Supabase or Cloudflare mutation, SQL execution against a service, backup/restore, remote Git update or production operation occurred.
 
+## Critical staging blockers
+
+- Approved staging-only connection, trusted TLS CA and current schema/migration/permission preflight; verify confirmed-email Auth behavior and actual delivery.
+- Successful staging export plus isolated restore validation before migration; no recoverable backup is claimed.
+- Separate database/Worker deployment approvals, a current Worker preservation/rollback baseline, then synthetic live authorization checks.
+- GitHub promotion approval and Pages Git integration for `sdl-staging`; no hosted origin is verified. Verify its actual URL before approving CORS/Auth allowlists. Keep both gates off until approved backend QA, then perform restricted-pilot mobile checks.
+
 ## Next operation requiring approval
 
-Approve live **read-only staging preflight/metadata verification** using the dedicated staging connection, reviewed migration-history manifest and trusted verify-full TLS CA. A separate actual backup plus isolated restore-validation approval is required before any migration. Git synchronization/reviewed staging merge, Pages creation/first deployment, Worker deployment, Auth/CORS changes and gate enablement remain separate approvals.
+Authorize a **normal, non-forced push of `codex-SDL-004-final-pilot`** for review. This does not authorize a merge or deployment.
+
+After review: separately approve promotion to `staging` and Git-integrated Pages creation/first frontend deployment with gates off; perform approved read-only staging preflight and backup/isolated restore; approve the two migrations and preserved Worker deployment separately; verify exact CORS/Auth origins and synthetic authorization before any gate enablement or restricted-parent access. Production readiness is a separate release, not a prerequisite for this staging pilot.
