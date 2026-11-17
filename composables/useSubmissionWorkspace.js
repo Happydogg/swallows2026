@@ -1,19 +1,43 @@
 import { createSubmissionService,CLUB_CONSENT_POLICY_VERSION } from '../js/submissionService.js';
 import { validateMediaFile } from '../js/privateMediaService.js';
-import { groupMyPlayers,coachTeams } from '../utils/dashboardUtils.js';
+import { groupMyPlayers,coachTeams,projectClubhouseRoster,projectClubhouseLeaderboard } from '../utils/dashboardUtils.js';
 const {ref,computed}=Vue;
-export function useSubmissionWorkspace({auth,players,coachRoster,onProfile=()=>{},service=createSubmissionService({auth}),
+export function useSubmissionWorkspace({auth,players,coachRoster,sessions=ref([]),onProfile=()=>{},onPrivateVideos=()=>{},service=createSubmissionService({auth}),
   urls=URL,newKey=()=>crypto.randomUUID(),pollMs=5000,timeoutMs=65000}) {
-  const tab=ref('players'),workspace=ref([]),playerId=ref(''),teamId=ref('');
+  const tab=ref('players'),clubhouseSection=ref('roster'),workspace=ref([]),playerId=ref(''),teamId=ref('');
   const clubEnrollments=ref([]),consentAccepted=ref({}),subjectConfirmed=ref({});
   const category=ref('pitching'),share=ref(false),file=ref(null),previewUrl=ref(''),playbackUrl=ref('');
-  const items=ref([]),queue=ref([]),shared=ref([]),filter=ref('all'),reviewFilter=ref('pending'),notes=ref({});
+  const items=ref([]),queue=ref([]),shared=ref([]),clubhouseRoster=ref([]),clubhouseLeaderboard=ref([]);
+  const clubhouseRosterReady=ref(false),clubhouseLeaderboardReady=ref(false),clubhouseRosterNotice=ref(''),clubhouseLeaderboardNotice=ref('');
+  const filter=ref('all'),reviewFilter=ref('pending'),notes=ref({});
   const busy=ref(false),progress=ref(0),error=ref(''),errorStatus=ref(0),notice=ref(''),ready=ref(false);
   const enabled=service.enabled===true;
-  const cards=computed(()=>groupMyPlayers(players.value,auth.guardianLinks.value,workspace.value));
+  const isTeamCoach=computed(()=>Boolean(auth.isTeamCoach?.value));
+  const isVerifiedGuardian=computed(()=>Boolean(auth.isVerifiedGuardian?.value));
+  const cards=computed(()=>{
+    const raw=groupMyPlayers(players.value,auth.guardianLinks.value,workspace.value);
+    const sessionList=Array.isArray(sessions?.value)?sessions.value:[];
+    return raw.map(card=>({
+      ...card,
+      profiles:card.profiles.map(prof=>{
+        const pSessions=sessionList.filter(s=>s&&s.player_id===prof.id);
+        const latest=key=>{const found=pSessions.find(s=>s[key]!==null&&s[key]!==undefined&&s[key]!=='');return found?found[key]:null;};
+        return {
+          ...prof,
+          sessionCount:pSessions.length,
+          latestExitVelo:latest('exit_velo'),
+          latestThrowingVelo:latest('throwing_velo'),
+          latestSprintTime:latest('sprint_time'),
+          latestBroadJump:latest('broad_jump')
+        };
+      })
+    }));
+  });
   const teams=computed(()=>{
     const result=new Map(coachTeams(coachRoster.value,workspace.value).map(t=>[t.id,t]));
-    if(tab.value==='clubhouse')for(const row of workspace.value)if(row.can_clubhouse&&row.team_id)result.set(row.team_id,{id:row.team_id,name:row.team_name||'Team'});
+    if(tab.value==='clubhouse'){
+      for(const row of workspace.value)if(row.can_clubhouse&&row.team_id)result.set(row.team_id,{id:row.team_id,name:row.team_name||'Team'});
+    }
     return [...result.values()];
   });
   const choices=computed(()=>{
@@ -21,7 +45,23 @@ export function useSubmissionWorkspace({auth,players,coachRoster,onProfile=()=>{
     for(const p of coachRoster.value)if(!map.has(p.id))map.set(p.id,{id:p.id,name:(p.preferred_name||'Player')+' · '+(p.team_name||'Team')});
     return [...map.values()];
   });
+  const clubhouseLeaderboardByMetric=computed(()=>{
+    const projected=projectClubhouseLeaderboard(clubhouseLeaderboard.value,teamId.value);
+    const group=(metric,asc=false)=>projected.filter(r=>r.metric===metric).sort((a,b)=>asc?a.value-b.value:b.value-a.value).slice(0,3);
+    return {
+      exit_velo:group('exit_velo',false),
+      throwing_velo:group('throwing_velo',false),
+      broad_jump_ratio:group('broad_jump_ratio',false),
+      sprint_time:group('sprint_time',true)
+    };
+  });
+  const clubhouseRosterSafe=computed(()=>projectClubhouseRoster(clubhouseRoster.value,teamId.value));
   function clearSharing(){share.value=false;consentAccepted.value={};subjectConfirmed.value={};}
+  function clearClubhouseData(){
+    clubhouseRoster.value=[];clubhouseLeaderboard.value=[];
+    clubhouseRosterReady.value=false;clubhouseLeaderboardReady.value=false;
+    clubhouseRosterNotice.value='';clubhouseLeaderboardNotice.value='';
+  }
   const consentPolicyVersion=CLUB_CONSENT_POLICY_VERSION;
   const shownItems=computed(()=>items.value.filter(row=>filter.value==='all'||row.status===filter.value));
   const pendingCount=computed(()=>queue.value.filter(row=>row.status==='pending').length);
@@ -30,7 +70,7 @@ export function useSubmissionWorkspace({auth,players,coachRoster,onProfile=()=>{
   function clearPlayback(){playbackEpoch++;playingId='';playingScope='';if(playbackUrl.value)urls.revokeObjectURL(playbackUrl.value);playbackUrl.value='';}
   function clearFile(){clearSharing();if(previewUrl.value)urls.revokeObjectURL(previewUrl.value);previewUrl.value='';file.value=null;key='';descriptor='';progress.value=0;}
   function invalidate(){epoch++;for(const request of pending)request.abort();pending.clear();clearPlayback();clearInterval(poll);poll=null;busy.value=false;}
-  function reset(){invalidate();clearFile();workspace.value=[];clubEnrollments.value=[];consentAccepted.value={};subjectConfirmed.value={};items.value=[];queue.value=[];shared.value=[];playerId.value='';teamId.value='';notes.value={};category.value='pitching';share.value=false;error.value='';notice.value='';ready.value=false;tab.value='players';filter.value='all';reviewFilter.value='pending';}
+  function reset(){invalidate();clearFile();clearClubhouseData();workspace.value=[];clubEnrollments.value=[];consentAccepted.value={};subjectConfirmed.value={};items.value=[];queue.value=[];shared.value=[];playerId.value='';teamId.value='';notes.value={};category.value='pitching';share.value=false;error.value='';notice.value='';ready.value=false;tab.value='players';clubhouseSection.value='roster';filter.value='all';reviewFilter.value='pending';}
   async function run(work,apply=()=>{}) {
     if(!enabled){error.value='This feature awaits verified staging backend deployment.';return;}
     const currentEpoch=epoch,identity=auth.captureIdentity(),controller=new AbortController();
@@ -40,7 +80,7 @@ export function useSubmissionWorkspace({auth,players,coachRoster,onProfile=()=>{
     const timeout=setTimeout(()=>controller.abort(),timeoutMs);
     try{const result=await work(controller.signal);if(current()&&!controller.signal.aborted){apply(result);return result;}}
     catch(e){if(current()){
-      if(e.status===401||e.status===403){invalidate();clearFile();consentAccepted.value={};subjectConfirmed.value={};workspace.value=[];clubEnrollments.value=[];items.value=[];queue.value=[];shared.value=[];ready.value=false;}
+      if(e.status===401||e.status===403){invalidate();clearFile();clearClubhouseData();consentAccepted.value={};subjectConfirmed.value={};workspace.value=[];clubEnrollments.value=[];items.value=[];queue.value=[];shared.value=[];ready.value=false;}
       errorStatus.value=e.status||0;
       error.value=e.name==='AbortError'?'Request interrupted. Refresh or retry safely.':e.message||'Request failed.';
     }}finally{clearTimeout(timeout);pending.delete(controller);if(current())busy.value=false;}
@@ -63,9 +103,9 @@ export function useSubmissionWorkspace({auth,players,coachRoster,onProfile=()=>{
       onProgress:n=>{if(currentEpoch===epoch&&auth.isCurrentIdentity(identity)&&!signal.aborted)progress.value=n;}}));
     if(receipt){clearFile();notice.value=receipt.status==='pending'?'Submitted for coach review.':'Submission already saved ('+receipt.status+').';await refreshItems();}
   }
-  async function selectTeam(id,view=tab.value){invalidate();clearFile();queue.value=[];shared.value=[];notes.value={};error.value='';tab.value=view;
+  async function selectTeam(id,view=tab.value){invalidate();clearFile();clearClubhouseData();queue.value=[];shared.value=[];notes.value={};error.value='';tab.value=view;
     teamId.value=teams.value.some(t=>t.id===id)?id:'';if(!teamId.value)return;
-    if(view==='review')await refreshQueue();else if(view==='clubhouse'){await refreshShared();if(enabled)poll=setInterval(()=>{
+    if(view==='review')await refreshQueue();else if(view==='clubhouse'){await refreshShared();await refreshClubhouseSections();if(enabled)poll=setInterval(()=>{
       if(tab.value==='clubhouse'&&!busy.value&&globalThis.document?.visibilityState!=='hidden')void refreshShared(true);
     },pollMs);}
   }
@@ -79,6 +119,41 @@ export function useSubmissionWorkspace({auth,players,coachRoster,onProfile=()=>{
       shared.value=rows;
     });
     if(!rows&&silent){if(playingScope==='clubhouse')clearPlayback();shared.value=[];}
+  }
+  async function refreshClubhouseSections(){
+    clearClubhouseData();
+    if(!teamId.value||!enabled||!ready.value)return;
+    if(typeof service.clubhouseRoster==='function'&&(service.hasClubhouseRoster?service.hasClubhouseRoster():true)){
+      try{
+        const currentEpoch=epoch,identity=auth.captureIdentity();
+        const rows=await service.clubhouseRoster(teamId.value,{});
+        if(currentEpoch===epoch&&auth.isCurrentIdentity(identity)){
+          clubhouseRoster.value=projectClubhouseRoster(rows,teamId.value);
+          clubhouseRosterReady.value=true;
+        }
+      }catch(e){
+        clubhouseRosterNotice.value=e.message||'Parent-safe Clubhouse team roster endpoint awaits backend implementation.';
+      }
+    }else{
+      clubhouseRosterNotice.value='Parent-safe Clubhouse team roster endpoint (/v2/clubhouse/roster) awaits backend implementation.';
+    }
+    if(typeof service.clubhouseLeaderboard==='function'&&(service.hasClubhouseLeaderboard?service.hasClubhouseLeaderboard():true)){
+      try{
+        const currentEpoch=epoch,identity=auth.captureIdentity();
+        const rows=await service.clubhouseLeaderboard(teamId.value,{});
+        if(currentEpoch===epoch&&auth.isCurrentIdentity(identity)){
+          clubhouseLeaderboard.value=projectClubhouseLeaderboard(rows,teamId.value);
+          clubhouseLeaderboardReady.value=true;
+        }
+      }catch(e){
+        clubhouseLeaderboardNotice.value=e.message||'Parent-safe Clubhouse leaderboard endpoint awaits backend implementation.';
+      }
+    }else{
+      clubhouseLeaderboardNotice.value='Parent-safe Clubhouse leaderboard endpoint (/v2/clubhouse/leaderboard) awaits backend implementation.';
+    }
+  }
+  function changeClubhouseSection(section){
+    if(['roster','leaderboard','stats','videos'].includes(section))clubhouseSection.value=section;
   }
   async function review(row,decision){if(busy.value||row.status!=='pending'||row.can_review!==true||!queue.value.some(item=>item.id===row.id))return;
     notice.value='';
@@ -96,7 +171,7 @@ export function useSubmissionWorkspace({auth,players,coachRoster,onProfile=()=>{
   async function clubConsent(row,accept){
     if(busy.value||!enabled||!ready.value||!clubEnrollments.value.some(e=>e.id===row.id&&e.generation===row.generation))return;
     if(accept&&(row.status!=='active'||consentAccepted.value[row.id]!==true)){error.value='Explicitly accept the club consent policy first.';return;}
-    clearPlayback();shared.value=[];notice.value='';
+    clearPlayback();shared.value=[];clearClubhouseData();notice.value='';
     const result=await run(signal=>service.clubConsent(row,accept,{signal}));
     if(result){notice.value=accept?'Standing consent saved for this continuous club enrollment.':'Clubhouse consent withdrawn. Private videos are preserved.';await refreshClubs();await refreshItems();}
     else if(errorStatus.value===409){const message=error.value;await refreshClubs();error.value=message;}
@@ -116,11 +191,14 @@ export function useSubmissionWorkspace({auth,players,coachRoster,onProfile=()=>{
   function previewError(){clearFile();error.value='The browser could not decode this MP4. Try H.264 MP4.';}
   function playbackError(){clearPlayback();error.value='Video playback failed. Refresh and try again.';}
   function showProfile(id){const p=players.value.find(p=>p.id===id&&auth.guardianLinks.value.some(g=>g.athlete_id===p.athlete_id&&g.status==='verified'));if(p)onProfile(p);}
-  function changeTab(value){invalidate();error.value='';notice.value='';notes.value={};consentAccepted.value={};subjectConfirmed.value={};tab.value=value;clubEnrollments.value=[];items.value=[];queue.value=[];shared.value=[];playerId.value='';teamId.value='';clearFile();}
+  function openPrivateVideos(id){const p=players.value.find(p=>p.id===id&&auth.guardianLinks.value.some(g=>g.athlete_id===p.athlete_id&&g.status==='verified'));if(p)onPrivateVideos(p.id);}
+  function changeTab(value){invalidate();clearClubhouseData();error.value='';notice.value='';notes.value={};consentAccepted.value={};subjectConfirmed.value={};tab.value=value;clubEnrollments.value=[];items.value=[];queue.value=[];shared.value=[];playerId.value='';teamId.value='';clearFile();}
   const focus=()=>{if(enabled&&tab.value==='clubhouse'&&teamId.value&&!busy.value)void refreshShared(true);};
   globalThis.window?.addEventListener?.('focus',focus);
   function dispose(){reset();globalThis.window?.removeEventListener?.('focus',focus);}
-  return{enabled,ready,tab,workspace,cards,teams,choices,clubEnrollments,consentAccepted,subjectConfirmed,consentPolicyVersion,playerId,teamId,category,share,file,previewUrl,playbackUrl,
-    items,queue,shared,filter,reviewFilter,notes,shownItems,pendingCount,busy,progress,error,notice,
-    refreshClubs,clubConsent,publish,previewError,playbackError,load,selectPlayer,selectTeam,enterReview,refreshItems,refreshQueue,refreshShared,pickFile,submit,review,play,showProfile,changeTab,reset,dispose};
+  return{enabled,ready,tab,clubhouseSection,workspace,cards,teams,choices,clubEnrollments,consentAccepted,subjectConfirmed,consentPolicyVersion,playerId,teamId,category,share,file,previewUrl,playbackUrl,
+    items,queue,shared,clubhouseRoster,clubhouseRosterSafe,clubhouseLeaderboard,clubhouseLeaderboardByMetric,clubhouseRosterReady,clubhouseLeaderboardReady,clubhouseRosterNotice,clubhouseLeaderboardNotice,
+    filter,reviewFilter,notes,shownItems,pendingCount,busy,progress,error,notice,isTeamCoach,isVerifiedGuardian,
+    refreshClubs,clubConsent,publish,previewError,playbackError,load,selectPlayer,selectTeam,enterReview,refreshItems,refreshQueue,refreshShared,refreshClubhouseSections,changeClubhouseSection,
+    pickFile,submit,review,play,showProfile,openPrivateVideos,changeTab,reset,dispose};
 }

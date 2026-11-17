@@ -269,3 +269,53 @@ test('logout cancels the animation-frame fallback', async t => {
   await h.app.signOutAndClear(); assert.equal(h.cancelledFrame, 1);
   h.frames[0](); assert.equal(h.frames.length, 1);
 });
+
+test('verified parent lands on My Players tab and does not trigger coach roster RPC', async t => {
+  const h = await harness(t);
+  h.rows.athlete_guardians = [{ athlete_id: 'child-1', relationship: 'guardian', status: 'verified' }];
+  h.rows.players = [{ id: 'p-1', athlete_id: 'child-1', preferred_name: 'Maya', jersey: '11' }];
+  h.app.submissionController.changeTab('clubhouse');
+  h.app.loginEmail.value = 'parent@example.invalid';
+  h.app.loginPassword.value = 'synthetic';
+  await h.app.signInAndLoad();
+  assert.equal(h.app.isVerifiedGuardian.value, true);
+  assert.equal(h.app.isTeamCoach.value, false);
+  assert.equal(h.app.isParentOnly.value, true);
+  assert.equal(h.app.currentView.value, 'overview');
+  assert.equal(h.app.submissionController.tab.value, 'players');
+  assert.equal(h.calls.some(c => c.rpc === 'sdl_004_coach_roster'), false);
+});
+
+test('prepared phone OTP and invitation onboarding interfaces validate inputs and never forge guardian links', async t => {
+  const h = await harness(t);
+  assert.equal(h.app.authMethod.value, 'email');
+  h.app.setAuthMethod('phone');
+  assert.equal(h.app.authMethod.value, 'phone');
+  h.app.loginPhone.value = 'bad';
+  h.app.requestPhoneOtp();
+  assert.match(h.app.authError.value, /valid mobile phone/i);
+  h.app.loginPhone.value = '+852 9123 4567';
+  h.app.requestPhoneOtp();
+  assert.equal(h.app.authError.value, '');
+  assert.match(h.app.authNotice.value, /awaits SMS\/WhatsApp provider/i);
+
+  h.app.setAuthMethod('otp');
+  h.app.loginOtpCode.value = '123';
+  h.app.verifyOtpCode();
+  assert.match(h.app.authError.value, /6-digit/i);
+  h.app.loginOtpCode.value = '123456';
+  h.app.verifyOtpCode();
+  assert.equal(h.app.authError.value, '');
+  assert.match(h.app.authNotice.value, /awaits backend OTP provider/i);
+
+  h.app.setAuthMethod('invite');
+  h.app.inviteCode.value = 'short';
+  h.app.redeemInvitation();
+  assert.match(h.app.authError.value, /valid club invitation/i);
+  h.app.inviteCode.value = 'SWALLOWS-INV-2026';
+  h.app.redeemInvitation();
+  assert.equal(h.app.authError.value, '');
+  assert.match(h.app.authNotice.value, /Client-side parent-to-child linking is disabled/i);
+  assert.equal(h.app.guardianLinks.value.length, 0);
+  assert.equal(h.calls.length, 0);
+});

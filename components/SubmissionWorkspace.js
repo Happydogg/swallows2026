@@ -4,27 +4,64 @@ export const SubmissionWorkspace={
   setup(props){return {...props.controller};},
   template:`
 <section class="my-6 rounded-xl border border-slate-700 bg-slate-800 p-4 space-y-4 no-print" aria-label="Player and video workspace">
-  <h2 class="font-bold text-xl">My Players and team videos</h2>
-  <nav class="flex flex-wrap gap-2" aria-label="Player workspace views">
-    <button v-for="view in ['players','submissions','review','clubhouse']" :key="view" @click="changeTab(view)" :aria-pressed="tab===view" class="px-3 py-3 rounded bg-slate-700" :class="tab===view?'ring-2 ring-blue-400':''">{{ {players:'My Players',submissions:'Video submissions',review:'Coach review',clubhouse:'Team Clubhouse'}[view] }}</button>
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+    <div>
+      <h2 class="font-bold text-xl text-white">My Players and team videos</h2>
+      <p class="text-xs text-slate-400">Mobile-first family dashboard, video submissions, and read-only Team Clubhouse.</p>
+    </div>
+    <span v-if="isVerifiedGuardian" class="self-start sm:self-auto text-xs px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-700/60 text-emerald-300 font-semibold">Verified Guardian Access</span>
+  </div>
+  <nav class="grid grid-cols-2 sm:flex sm:flex-wrap gap-2" aria-label="Player workspace views">
+    <button v-for="view in ['players','submissions','review','clubhouse']" :key="view" @click="changeTab(view)" :aria-pressed="tab===view" class="px-3 py-3 rounded-lg bg-slate-700 text-sm font-medium text-left sm:text-center transition" :class="tab===view?'ring-2 ring-blue-400 bg-slate-700/90 text-white font-semibold':'text-slate-200 hover:bg-slate-600'">{{ {players:'My Players',submissions:'Video submissions',review:'Coach review',clubhouse:'Team Clubhouse'}[view] }}</button>
   </nav>
-  <p v-if="!enabled" class="text-sm text-amber-300" role="status">Submission, review and team-sharing operations await backend deployment and verification. You can prepare a local video preview. The working private-media pilot remains available below.</p>
-  <button v-if="enabled&&!ready" @click="load" :disabled="busy" class="p-3 rounded bg-blue-600">Load authorized workspace</button>
+  <p v-if="!enabled" class="text-sm text-amber-300 bg-amber-950/30 border border-amber-800/50 rounded-lg p-3" role="status">Submission, review and team-sharing operations await backend deployment and verification. You can prepare a local video preview. The working private-media pilot remains available below.</p>
+  <button v-if="enabled&&!ready" @click="load" :disabled="busy" class="w-full sm:w-auto p-3 rounded-lg bg-blue-600 font-semibold text-sm">Load authorized workspace</button>
   <p v-if="busy" role="status" class="text-sm text-slate-300">Working securely…</p>
-  <p v-if="error" role="alert" class="text-sm text-rose-300">{{ error }}</p>
-  <p v-if="notice" role="status" class="text-sm text-emerald-300">{{ notice }}</p>
-  <div v-if="tab==='players'" class="grid gap-3 md:grid-cols-2">
-    <p v-if="!cards.length" class="text-slate-400">No verified children are linked to this account. Coach accounts can use the team roster and review center.</p>
-    <article v-for="card in cards" :key="card.athlete_id" class="bg-slate-900 rounded-xl p-4 space-y-3">
-      <h3 class="font-bold text-lg">{{ card.name }}</h3>
+  <p v-if="error" role="alert" class="text-sm text-rose-300 bg-rose-950/40 border border-rose-800/60 rounded-lg p-3">{{ error }}</p>
+  <p v-if="notice" role="status" class="text-sm text-emerald-300 bg-emerald-950/40 border border-emerald-800/60 rounded-lg p-3">{{ notice }}</p>
+  <div v-if="tab==='players'" class="grid gap-4 md:grid-cols-2" aria-label="My Players">
+    <div v-if="!cards.length" class="md:col-span-2 rounded-xl border border-slate-700 bg-slate-900/70 p-6 text-center space-y-2">
+      <p class="text-slate-300 font-semibold">No verified children are linked to this account. Coach accounts can use the team roster and review center.</p>
+      <p class="text-xs text-slate-400">Family accounts only display athletes with an active server-verified guardian link. Contact your club administrator if your invitation or athlete link is pending verification.</p>
+    </div>
+    <article v-for="card in cards" :key="card.athlete_id" class="bg-slate-900 border border-slate-700/80 rounded-xl p-4 space-y-4 shadow-sm">
+      <div class="flex items-start justify-between gap-2">
+        <div>
+          <h3 class="font-bold text-lg text-white">{{ card.name }}</h3>
+          <p class="text-xs text-slate-400">Linked athlete · Approved baseball profile only</p>
+        </div>
+        <span class="text-xs font-mono px-2 py-0.5 rounded bg-blue-950/80 border border-blue-800/60 text-blue-300">{{ card.profiles.length }} {{ card.profiles.length===1?'profile':'profiles' }}</span>
+      </div>
       <p v-if="!card.memberships.length" class="text-sm text-slate-400">Organization and team details await the authorized workspace service.</p>
-      <ul class="text-sm text-slate-300"><li v-for="membership in card.memberships" :key="membership.organization_id+':'+membership.team_id">{{ membership.organization_name }} · {{ membership.team_name }}</li></ul>
-      <div v-for="profile in card.profiles" :key="profile.id" class="space-y-2 border-t border-slate-700 pt-2">
-        <p class="text-sm font-semibold">{{ profile.clubLabel }}</p>
-        <p class="text-sm">#{{ profile.jersey }} · {{ profile.position }} · Throws {{ profile.throws }} / Bats {{ profile.bats }}</p>
-        <div class="flex flex-wrap gap-2">
-          <button @click="showProfile(profile.id)" class="p-3 bg-slate-700 rounded">Baseball profile and permitted statistics</button>
-          <button @click="changeTab('submissions');selectPlayer(profile.id)" class="p-3 bg-blue-700 rounded">Video submissions</button>
+      <ul v-else class="text-sm text-slate-300 space-y-1"><li v-for="membership in card.memberships" :key="membership.organization_id+':'+membership.team_id" class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span><span>{{ membership.organization_name }} · {{ membership.team_name }}</span></li></ul>
+      <div v-for="profile in card.profiles" :key="profile.id" class="space-y-3 border-t border-slate-800 pt-3">
+        <div class="flex items-center justify-between gap-2">
+          <p class="text-sm font-semibold text-blue-300">{{ profile.clubLabel }}</p>
+          <span class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-200">#{{ profile.jersey }}</span>
+        </div>
+        <p class="text-sm text-slate-200">#{{ profile.jersey }} · {{ profile.position }} · Throws {{ profile.throws }} / Bats {{ profile.bats }}</p>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-950/70 p-2.5 rounded-lg border border-slate-800 text-xs font-mono">
+          <div>
+            <span class="text-slate-400 text-[10px] block">Exit Velo</span>
+            <span class="text-blue-400 font-bold">{{ profile.latestExitVelo ? profile.latestExitVelo + ' km/h' : '--' }}</span>
+          </div>
+          <div>
+            <span class="text-slate-400 text-[10px] block">Throw Velo</span>
+            <span class="text-emerald-400 font-bold">{{ profile.latestThrowingVelo ? profile.latestThrowingVelo + ' km/h' : '--' }}</span>
+          </div>
+          <div>
+            <span class="text-slate-400 text-[10px] block">Sprint 18.29m</span>
+            <span class="text-amber-300 font-bold">{{ profile.latestSprintTime ? profile.latestSprintTime + 's' : '--' }}</span>
+          </div>
+          <div>
+            <span class="text-slate-400 text-[10px] block">Sessions</span>
+            <span class="text-slate-200 font-bold">{{ profile.sessionCount ?? 0 }}</span>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <button @click="showProfile(profile.id)" class="p-3 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium text-white transition">Baseball profile and permitted statistics</button>
+          <button @click="changeTab('submissions');selectPlayer(profile.id)" class="p-3 bg-blue-700 hover:bg-blue-600 rounded-lg text-sm font-medium text-white transition">Video submissions</button>
+          <button @click="openPrivateVideos(profile.id)" class="p-3 bg-purple-800/80 hover:bg-purple-700 rounded-lg text-sm font-medium text-white transition">Private videos</button>
         </div>
       </div>
     </article>
@@ -89,10 +126,128 @@ export const SubmissionWorkspace={
       </article>
     </template>
     <template v-else>
-      <p class="text-sm text-slate-400">Coach-published videos with current standing club consent only. Authorization is rechecked for every request; the list refreshes while this view is active.</p>
-      <button @click="refreshShared" :disabled="!enabled||!ready||!teamId||busy" class="p-3 rounded bg-slate-700 disabled:opacity-50">Refresh team videos</button>
-      <p v-if="!shared.length" class="text-sm text-slate-400">No approved, shareable videos loaded.</p>
-      <article v-for="item in shared" :key="item.id" class="rounded bg-slate-900 p-3 flex flex-wrap items-center justify-between gap-3"><span>{{ item.preferred_name }} · {{ item.category }}</span><button @click="play(item,'clubhouse')" :disabled="!enabled||!ready||busy" class="p-3 bg-blue-700 rounded">Play approved video</button></article>
+      <div class="rounded-xl border border-slate-700 bg-slate-900/60 p-4 space-y-4" aria-label="Team Clubhouse read-only workspace">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-800 pb-3">
+          <div>
+            <h3 class="font-bold text-lg text-white">Team Clubhouse</h3>
+            <p class="text-xs text-slate-400">Read-only team space · Only approved, consented team data is shown. No family contacts, DOB, or registration numbers.</p>
+          </div>
+          <span class="self-start sm:self-auto text-xs px-2.5 py-1 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono">Read-Only View</span>
+        </div>
+
+        <nav class="grid grid-cols-2 sm:grid-cols-4 gap-2" aria-label="Team Clubhouse sections">
+          <button v-for="sec in [{id:'roster',label:'1. Team Roster'},{id:'leaderboard',label:'2. Leaderboard'},{id:'stats',label:'3. Player Statistics'},{id:'videos',label:'4. Approved Videos'}]"
+            :key="sec.id" @click="changeClubhouseSection(sec.id)" :aria-pressed="clubhouseSection===sec.id"
+            class="px-3 py-2.5 rounded-lg text-xs sm:text-sm font-medium transition"
+            :class="clubhouseSection===sec.id?'bg-blue-600 text-white font-semibold shadow':'bg-slate-800 text-slate-300 hover:bg-slate-700'">
+            {{ sec.label }}
+          </button>
+        </nav>
+
+        <!-- Section 1: Team Roster (Parent-Safe Read-Only) -->
+        <section v-if="clubhouseSection==='roster'" class="space-y-3" aria-label="Clubhouse Team Roster">
+          <div class="flex items-center justify-between">
+            <h4 class="font-semibold text-sm text-white">Team Roster (Approved Baseball Fields Only)</h4>
+            <span class="text-xs text-slate-400">{{ clubhouseRosterSafe.length }} players</span>
+          </div>
+          <div v-if="!clubhouseRosterReady" class="rounded-lg border border-amber-800/50 bg-amber-950/20 p-4 space-y-1" role="status">
+            <p class="text-sm font-semibold text-amber-300">Parent-safe Team Roster service coming soon</p>
+            <p class="text-xs text-slate-300">{{ clubhouseRosterNotice || 'The dedicated parent-safe Clubhouse roster endpoint (/v2/clubhouse/roster) awaits backend deployment and verification. Unrestricted coach rosters and raw player records are never reused here.' }}</p>
+          </div>
+          <div v-else-if="!clubhouseRosterSafe.length" class="rounded-lg border border-slate-800 bg-slate-900 p-4 text-sm text-slate-400">
+            No approved, consented team roster entries are available for the selected team yet.
+          </div>
+          <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <article v-for="member in clubhouseRosterSafe" :key="member.team_id+':'+member.id" class="rounded-lg border border-slate-700 bg-slate-800/80 p-3.5 space-y-1.5">
+              <div class="flex items-center justify-between gap-2">
+                <p class="font-semibold text-white">{{ member.preferred_name }}</p>
+                <span class="text-xs font-mono px-2 py-0.5 rounded bg-slate-900 text-blue-300">#{{ member.jersey }}</span>
+              </div>
+              <p class="text-xs text-slate-400">{{ member.team_name }}</p>
+              <p class="text-xs text-slate-200">Position: {{ member.position }} · Throws {{ member.throws }} / Bats {{ member.bats }}</p>
+            </article>
+          </div>
+        </section>
+
+        <!-- Section 2: Leaderboard (Parent-Safe Read-Only) -->
+        <section v-if="clubhouseSection==='leaderboard'" class="space-y-3" aria-label="Clubhouse Leaderboard">
+          <div class="flex items-center justify-between">
+            <h4 class="font-semibold text-sm text-white">Team Leaderboard (Top 3 Approved Metrics)</h4>
+            <span class="text-xs text-slate-400">Consented team members only</span>
+          </div>
+          <div v-if="!clubhouseLeaderboardReady" class="rounded-lg border border-amber-800/50 bg-amber-950/20 p-4 space-y-1" role="status">
+            <p class="text-sm font-semibold text-amber-300">Parent-safe Team Leaderboard service coming soon</p>
+            <p class="text-xs text-slate-300">{{ clubhouseLeaderboardNotice || 'The dedicated parent-safe Clubhouse leaderboard endpoint (/v2/clubhouse/leaderboard) awaits backend deployment and verification. Unverified or raw session records are never used to populate team leaderboards.' }}</p>
+          </div>
+          <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div v-for="board in [{key:'exit_velo',title:'Top Exit Velo',unit:'km/h',accent:'text-blue-400'},{key:'throwing_velo',title:'Throwing Velo',unit:'km/h',accent:'text-emerald-400'},{key:'broad_jump_ratio',title:'Lower-Body Power (Jump Ratio)',unit:'x',accent:'text-purple-400'},{key:'sprint_time',title:'Sprint (18.29m)',unit:'s',accent:'text-amber-300'}]" :key="board.key" class="rounded-lg border border-slate-700 bg-slate-800/80 p-3.5 space-y-2">
+              <div class="flex items-center justify-between">
+                <h5 class="text-xs font-bold uppercase tracking-wider" :class="board.accent">{{ board.title }}</h5>
+                <span class="text-[11px] text-slate-400 font-mono">{{ board.unit }}</span>
+              </div>
+              <p v-if="!clubhouseLeaderboardByMetric[board.key].length" class="text-xs text-slate-400 py-2">No approved leaderboard entries for this metric.</p>
+              <ol v-else class="space-y-1.5">
+                <li v-for="(item, idx) in clubhouseLeaderboardByMetric[board.key]" :key="item.id" class="flex items-center justify-between rounded bg-slate-900/80 px-3 py-2 text-xs">
+                  <div class="flex items-center gap-2">
+                    <span class="font-bold font-mono text-slate-300">#{{ idx + 1 }}</span>
+                    <span class="font-semibold text-white">{{ item.preferred_name }}</span>
+                    <span class="font-mono text-slate-400">#{{ item.jersey }}</span>
+                  </div>
+                  <span class="font-mono font-bold" :class="board.accent">{{ item.value }} {{ item.unit }}</span>
+                </li>
+              </ol>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 3: Player Statistics (Permitted Linked Child Access + Teammate Notice) -->
+        <section v-if="clubhouseSection==='stats'" class="space-y-3" aria-label="Clubhouse Player Statistics">
+          <div class="flex items-center justify-between">
+            <h4 class="font-semibold text-sm text-white">Player Statistics</h4>
+            <span class="text-xs text-slate-400">Permitted athlete profiles</span>
+          </div>
+          <div class="rounded-lg border border-slate-700 bg-slate-800/60 p-3.5 text-xs text-slate-300 space-y-1">
+            <p class="font-semibold text-slate-200">Privacy &amp; Authorization Policy</p>
+            <p>Detailed dated session histories and physical growth charts are restricted to your verified linked children. Teammate individual statistics await the parent-safe Clubhouse summary service.</p>
+          </div>
+          <div v-if="!cards.length" class="rounded-lg border border-slate-800 bg-slate-900 p-4 text-sm text-slate-400">
+            No verified linked children are available on this account for individual statistics review.
+          </div>
+          <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <article v-for="card in cards" :key="'stats-'+card.athlete_id" class="rounded-lg border border-slate-700 bg-slate-800/80 p-3.5 space-y-2.5">
+              <h5 class="font-bold text-white">{{ card.name }}</h5>
+              <div v-for="profile in card.profiles" :key="'stat-prof-'+profile.id" class="border-t border-slate-700/70 pt-2 space-y-2">
+                <p class="text-xs font-semibold text-blue-300">{{ profile.clubLabel }} · #{{ profile.jersey }} · {{ profile.position }}</p>
+                <div class="grid grid-cols-3 gap-2 text-xs font-mono bg-slate-900/80 p-2 rounded">
+                  <div><span class="text-[10px] text-slate-400 block">Exit Velo</span><span class="text-blue-400 font-bold">{{ profile.latestExitVelo ? profile.latestExitVelo + ' km/h' : '--' }}</span></div>
+                  <div><span class="text-[10px] text-slate-400 block">Throw Velo</span><span class="text-emerald-400 font-bold">{{ profile.latestThrowingVelo ? profile.latestThrowingVelo + ' km/h' : '--' }}</span></div>
+                  <div><span class="text-[10px] text-slate-400 block">Sprint</span><span class="text-amber-300 font-bold">{{ profile.latestSprintTime ? profile.latestSprintTime + 's' : '--' }}</span></div>
+                </div>
+                <button @click="showProfile(profile.id)" class="w-full sm:w-auto px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded text-xs font-semibold text-white">Open full baseball profile &amp; charts</button>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- Section 4: Approved Videos (Coach-Published & Consented) -->
+        <section class="space-y-3 border-t border-slate-800 pt-3" aria-label="Clubhouse Approved Videos">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h4 class="font-semibold text-sm text-white">Approved Team Videos</h4>
+              <p class="text-xs text-slate-400">Coach-published videos with current standing club consent only. Authorization is rechecked for every request; the list refreshes while this view is active.</p>
+            </div>
+            <button @click="refreshShared" :disabled="!enabled||!ready||!teamId||busy" class="p-3 rounded bg-slate-700 text-sm disabled:opacity-50">Refresh team videos</button>
+          </div>
+          <p v-if="!shared.length" class="text-sm text-slate-400">No approved, shareable videos loaded.</p>
+          <article v-for="item in shared" :key="item.id" class="rounded bg-slate-900 p-3 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <span class="font-semibold text-white">{{ item.preferred_name }} · {{ item.category }}</span>
+              <p v-if="item.created_at" class="text-xs text-slate-400">{{ item.created_at }}</p>
+            </div>
+            <button @click="play(item,'clubhouse')" :disabled="!enabled||!ready||busy" class="p-3 bg-blue-700 rounded text-sm">Play approved video</button>
+          </article>
+        </section>
+      </div>
     </template>
   </div>
   <video v-if="playbackUrl" :key="playbackUrl" :src="playbackUrl" @error="playbackError" controls playsinline class="w-full max-h-96 bg-black rounded"></video>

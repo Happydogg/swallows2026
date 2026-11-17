@@ -84,13 +84,13 @@ export const PlayerProfile = {
           </span>
         </div>
         <h2 class="text-2xl font-bold">{{ getPlayerDisplayName(selectedPlayer) }}</h2>
-        <p class="text-xs text-slate-400 font-mono mt-0.5">
+        <p v-if="isCoach" class="text-xs text-slate-400 font-mono mt-0.5">
           {{ t('officialName') }}: <span class="text-slate-200">{{ formatLegalName(selectedPlayer) }}</span>
           <span v-if="selectedPlayer.hkll_reg_no"> • HKLL: <span class="text-blue-300">{{ selectedPlayer.hkll_reg_no }}</span></span>
         </p>
         <p class="text-sm text-slate-400 mt-1">
           {{ t('throws') }}: {{ selectedPlayer.throws }} | {{ t('bats') }}: {{ selectedPlayer.bats }}
-          <span v-if="selectedPlayer.dob"> | {{ t('dob') }}: {{ selectedPlayer.dob }} ({{ calculateAge(selectedPlayer.dob) }})</span>
+          <span v-if="isCoach && selectedPlayer.dob"> | {{ t('dob') }}: {{ selectedPlayer.dob }} ({{ calculateAge(selectedPlayer.dob) }})</span>
         </p>
         <p class="text-sm text-blue-400 mt-1 font-mono font-medium">
           {{ t('latestMeasurements') }}: {{ formatHeightWeight(selectedPlayer.id) }}

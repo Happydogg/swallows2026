@@ -17,7 +17,7 @@ async function setup(t,overrides={},options={}){
  list:async()=>[{...row}],queue:async()=>[{...row}],clubhouse:async()=>[{id:V,player_id:P,category:'pitching',preferred_name:'Child'}],
  submit:async(...args)=>{calls.push(['submit',...args]);args[3].onProgress(100);return row;},review:async(...args)=>{calls.push(['review',...args]);return {updated:true};},
  enrollments:async()=>[{...club}],clubConsent:async(...args)=>{calls.push(['clubConsent',...args]);return {updated:true};},publish:async(...args)=>{calls.push(['publish',...args]);return {updated:true};},playback:async()=>new Blob(['private'],{type:'video/mp4'}),...overrides};
- const c=h.module('composables/useSubmissionWorkspace.js').useSubmissionWorkspace({auth:h.app,players:h.app.players,coachRoster:h.app.coachRoster,
+ const c=h.module('composables/useSubmissionWorkspace.js').useSubmissionWorkspace({auth:h.app,players:h.app.players,coachRoster:h.app.coachRoster,sessions:h.app.sessions,
  onProfile:p=>calls.push(['profile',p.id]),service:api,urls:{createObjectURL:()=>`blob:${calls.length}`,revokeObjectURL:u=>revoked.push(u)},newKey:()=>V,pollMs:1000000,...options});
  t.after(()=>c.dispose());return{h,c,api,calls,revoked};
 }
@@ -145,4 +145,77 @@ test('late club consent responses cannot restore an account switched workspace',
 test('consent conflict refreshes enrollment generation before another acceptance',async t=>{
  let n=0;const {c}=await setup(t,{enrollments:async()=>[{...club,generation:++n>1?O:G}],clubConsent:async()=>{throw Object.assign(Error('Enrollment changed'),{status:409});}});await c.load();await c.selectPlayer(P);c.consentAccepted.value[E]=true;await c.clubConsent(c.clubEnrollments.value[0],true);
  assert.equal(c.clubEnrollments.value[0].generation,O);assert.equal(Object.keys(c.consentAccepted.value).length,0);assert.match(c.error.value,/Enrollment changed/);
+});
+
+test('My Players cards include permitted session summary and private video shortcut without exposing PII',async t=>{
+ const privateCalled=[];
+ const {h,c}=await setup(t,{},{onPrivateVideos:id=>privateCalled.push(id)});
+ h.app.sessions.value=[{id:'s1',player_id:P,exit_velo:62,throwing_velo:68,sprint_time:3.45,broad_jump:155}];
+ const [card]=c.cards.value;
+ assert.equal(card.profiles[0].sessionCount,1);
+ assert.equal(card.profiles[0].latestExitVelo,62);
+ assert.equal(card.profiles[0].latestThrowingVelo,68);
+ assert.equal(card.profiles[0].latestSprintTime,3.45);
+ assert.equal(card.profiles[0].dob,undefined);
+ assert.equal(card.profiles[0].hkll_reg_no,undefined);
+ assert.equal(card.profiles[0].parent_phone,undefined);
+ c.openPrivateVideos('unrelated');
+ assert.equal(privateCalled.length,0);
+ c.openPrivateVideos(P);
+ assert.deepEqual(privateCalled,[P]);
+});
+
+test('Team Clubhouse defaults to clear unavailable state for roster and leaderboard when backend capability is absent',async t=>{
+ const {c}=await setup(t);
+ await c.load();
+ await c.selectTeam(T,'clubhouse');
+ assert.equal(c.clubhouseRosterReady.value,false);
+ assert.equal(c.clubhouseLeaderboardReady.value,false);
+ assert.equal(c.clubhouseRosterSafe.value.length,0);
+ assert.match(c.clubhouseRosterNotice.value,/roster endpoint/i);
+ assert.match(c.clubhouseLeaderboardNotice.value,/leaderboard endpoint/i);
+});
+
+test('Team Clubhouse projects authorized roster and leaderboard fixtures while stripping private player fields and unconsented rows',async t=>{
+ const {c}=await setup(t,{
+   hasClubhouseRoster:()=>true,
+   hasClubhouseLeaderboard:()=>true,
+   clubhouseRoster:async()=>[
+     {id:P,team_id:T,team_name:'Swallows U12',preferred_name:'Leo',jersey:'07',position:'SS, P',throws:'R',bats:'L',dob:'2014-05-01',hkll_reg_no:'HKLL-999',parent_phone:'+85290000000',last_name:'Secret',given_names:'Legal',consent_active:true,approved:true},
+     {id:P2,team_id:T,team_name:'Swallows U12',preferred_name:'Hidden Child',jersey:'12',consent_active:false}
+   ],
+   clubhouseLeaderboard:async()=>[
+     {id:V,player_id:P,team_id:T,team_name:'Swallows U12',metric:'exit_velo',preferred_name:'Leo',jersey:'07',value:64.5,unit:'km/h',dob:'2014-05-01',parent_phone:'secret',consent_active:true},
+     {id:E,player_id:P2,team_id:T,team_name:'Swallows U12',metric:'exit_velo',preferred_name:'Unconsented',jersey:'12',value:99.9,consent_active:false},
+     {id:G,player_id:P,team_id:T,team_name:'Swallows U12',metric:'sprint_time',preferred_name:'Leo',jersey:'07',value:3.32,unit:'s',consent_active:true}
+   ]
+ });
+ await c.load();
+ await c.selectTeam(T,'clubhouse');
+ assert.equal(c.clubhouseRosterReady.value,true);
+ assert.equal(c.clubhouseRosterSafe.value.length,1);
+ const [member]=c.clubhouseRosterSafe.value;
+ assert.equal(member.preferred_name,'Leo');
+ assert.equal(member.jersey,'07');
+ assert.equal(member.dob,undefined);
+ assert.equal(member.hkll_reg_no,undefined);
+ assert.equal(member.parent_phone,undefined);
+ assert.equal(member.last_name,undefined);
+ assert.equal(member.given_names,undefined);
+
+ assert.equal(c.clubhouseLeaderboardReady.value,true);
+ assert.equal(c.clubhouseLeaderboardByMetric.value.exit_velo.length,1);
+ assert.equal(c.clubhouseLeaderboardByMetric.value.exit_velo[0].preferred_name,'Leo');
+ assert.equal(c.clubhouseLeaderboardByMetric.value.exit_velo[0].value,64.5);
+ assert.equal(c.clubhouseLeaderboardByMetric.value.exit_velo[0].dob,undefined);
+ assert.equal(c.clubhouseLeaderboardByMetric.value.exit_velo[0].parent_phone,undefined);
+ assert.equal(c.clubhouseLeaderboardByMetric.value.sprint_time.length,1);
+ assert.equal(c.clubhouseLeaderboardByMetric.value.sprint_time[0].value,3.32);
+
+ c.changeClubhouseSection('leaderboard');
+ assert.equal(c.clubhouseSection.value,'leaderboard');
+ c.changeClubhouseSection('stats');
+ assert.equal(c.clubhouseSection.value,'stats');
+ c.changeClubhouseSection('videos');
+ assert.equal(c.clubhouseSection.value,'videos');
 });

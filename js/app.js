@@ -57,6 +57,10 @@ createApp({
     const auth = useAuthSession({
       onIdentityChange: () => clearSensitiveState(),
       onAuthenticated: async () => {
+        if (auth.isVerifiedGuardian.value && !auth.isTeamCoach.value) {
+          submissionWorkspace.changeTab('players');
+          currentView.value = 'overview';
+        }
         void arAnalyzer.initPoseTracker();
         await fetchAllData();
         await submissionWorkspace.load();
@@ -84,8 +88,15 @@ createApp({
     });
     const arAnalyzer = createArAnalyzerController({ selectedPlayer });
     const privateMedia = usePrivateMedia({ auth, players, coachRoster, analyzer: arAnalyzer });
-    const submissionWorkspace=useSubmissionWorkspace({auth,players,coachRoster,onProfile:playerFeature.selectPlayer});
-    const enrollmentAdmin=useEnrollmentAdmin({auth});
+    const submissionWorkspace = useSubmissionWorkspace({
+      auth,
+      players,
+      coachRoster,
+      sessions,
+      onProfile: playerFeature.selectPlayer,
+      onPrivateVideos: playerId => { void privateMedia.selectMediaPlayer(playerId); }
+    });
+    const enrollmentAdmin = useEnrollmentAdmin({ auth });
     const emptyPlayerForm = { ...playerFeature.newPlayer.value };
     const emptySessionForm = { ...sessionFeature.newSession.value };
     const emptyVideoForm = { ...videoFeature.newDrillVideo.value };

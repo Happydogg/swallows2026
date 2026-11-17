@@ -58,6 +58,77 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   await Vue.nextTick();assert.match(flatten(host),/Approve/);
   submissions.changeTab('clubhouse');submissions.shared.value=[{id:'s',preferred_name:'Test teammate',category:'batting'}];
   await Vue.nextTick();assert.match(flatten(host),/Play approved video/);
+  assert.match(flatten(host),/1\. Team Roster/);
+  assert.match(flatten(host),/2\. Leaderboard/);
+  assert.match(flatten(host),/3\. Player Statistics/);
+  assert.match(flatten(host),/4\. Approved Videos/);
+  assert.match(flatten(host),/Parent-safe Team Roster service coming soon/);
+  // Populate Clubhouse roster and leaderboard with authorized fixtures containing extra private fields to verify PII is stripped
+  submissions.teamId.value='55555555-5555-4555-8555-555555555555';
+  submissions.clubhouseRosterReady.value=true;
+  submissions.clubhouseRoster.value=[{
+    id:'11111111-1111-4111-8111-111111111111',
+    team_id:'55555555-5555-4555-8555-555555555555',
+    team_name:'Swallows U12',
+    preferred_name:'Safe Roster Kid',
+    jersey:'24',
+    position:'CF',
+    throws:'L',
+    bats:'L',
+    dob:'2014-01-01',
+    hkll_reg_no:'HKLL-SECRET-99',
+    parent_phone:'+85299998888',
+    last_name:'PrivateSurname'
+  }];
+  await Vue.nextTick();
+  assert.match(flatten(host),/Safe Roster Kid/);
+  assert.doesNotMatch(flatten(host),/2014-01-01|HKLL-SECRET-99|\+85299998888|PrivateSurname/);
+
+  submissions.changeClubhouseSection('leaderboard');
+  submissions.clubhouseLeaderboardReady.value=true;
+  submissions.clubhouseLeaderboard.value=[{
+    id:'lb-1',
+    player_id:'11111111-1111-4111-8111-111111111111',
+    team_id:'55555555-5555-4555-8555-555555555555',
+    metric:'exit_velo',
+    preferred_name:'Safe Leaderboard Kid',
+    jersey:'24',
+    value:66.2,
+    unit:'km/h',
+    dob:'2014-01-01',
+    hkll_reg_no:'HKLL-SECRET-99'
+  }];
+  await Vue.nextTick();
+  assert.match(flatten(host),/Safe Leaderboard Kid/);
+  assert.match(flatten(host),/66\.2 km\/h/);
+  assert.doesNotMatch(flatten(host),/2014-01-01|HKLL-SECRET-99/);
+
+  submissions.changeClubhouseSection('stats');
+  await Vue.nextTick();
+  assert.match(flatten(host),/Privacy & Authorization Policy/);
+
+  // Verify parent landing does not render legacy Coach Overview (Active Roster / Arm Safety Flags)
+  submissions.changeTab('players');
+  h.app.guardianLinks.value=[{athlete_id:'athlete-1',status:'verified'}];
+  h.app.players.value=[{
+    id:'11111111-1111-4111-8111-111111111111',
+    athlete_id:'athlete-1',
+    preferred_name:'Linked Child',
+    jersey:'07',
+    position:'P, SS',
+    throws:'R',
+    bats:'R',
+    dob:'2015-06-15',
+    hkll_reg_no:'HKLL-PRIVATE-007',
+    parent_phone:'+85291234567',
+    last_name:'HiddenLast',
+    given_names:'HiddenGiven'
+  }];
+  await Vue.nextTick();
+  assert.match(flatten(host),/Linked Child/);
+  assert.match(flatten(host),/Verified Guardian Access/);
+  assert.doesNotMatch(flatten(host),/Active Roster|Arm Safety Flags|2015-06-15|HKLL-PRIVATE-007|\+85291234567|HiddenLast/);
+
   const admin=h.app.enrollmentAdminController;
   h.app.orgMemberships.value=[{role:'admin',status:'active'}];
   admin.organizations.value=[{id:'club',name:'Admin club'}];admin.organizationId.value='club';
@@ -69,13 +140,26 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   h.app.privateMediaController.mediaPlayerId.value = '11111111-1111-4111-8111-111111111111';
   h.app.privateMediaController.mediaItems.value = [{ id: '33333333-3333-4333-8333-333333333333', byte_size: 12 }];
   await Vue.nextTick(); assert.match(flatten(host), /Play privately/);
-  h.app.selectedPlayer.value = { id: 'player', preferred_name: 'Synthetic Player', jersey: '07' };
+  h.app.selectedPlayer.value = { id: 'player', preferred_name: 'Synthetic Player', jersey: '07', dob: '2015-01-01', hkll_reg_no: 'HKLL-777', last_name: 'Secret', given_names: 'Name' };
   h.app.currentView.value = 'player'; await Vue.nextTick();
   assert.match(flatten(host), /Synthetic Player/);
+  assert.doesNotMatch(flatten(host), /2015-01-01|HKLL-777|Secret, Name/);
   h.app.openAnalyzer({ id: 'local', video_url: 'blob:synthetic', category: 'pitching', fps_mode: 60 });
   await Vue.nextTick(); assert.match(flatten(host), /Back to Profile/);
   await h.app.signOutAndClear(); await Vue.nextTick();
   assert.doesNotMatch(flatten(host), /Synthetic Player|Play privately|Back to Profile|case-123|Admin athlete/);
+  // Verify mobile authentication UI tabs on signed-out screen
+  assert.match(flatten(host), /Email & Password/);
+  assert.match(flatten(host), /Phone Sign-In/);
+  assert.match(flatten(host), /One-Time Code/);
+  assert.match(flatten(host), /Club Invitation/);
+  h.app.setAuthMethod('phone'); await Vue.nextTick();
+  assert.match(flatten(host), /SMS and WhatsApp delivery require a configured messaging provider/);
+  h.app.setAuthMethod('otp'); await Vue.nextTick();
+  assert.match(flatten(host), /6-digit verification code/);
+  h.app.setAuthMethod('invite'); await Vue.nextTick();
+  assert.match(flatten(host), /Parent-to-child links are verified on the server/);
+  h.app.setAuthMethod('email'); await Vue.nextTick();
   assert.equal(errors.length, 0, errors.map(String).join('\n'));
   assert.equal(warnings.length, 0, warnings.join('\n'));
 });

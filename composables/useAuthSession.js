@@ -7,15 +7,24 @@ export function useAuthSession({ onIdentityChange = () => {}, onAuthenticated = 
   const authReady = ref(false);
   const authUser = ref(null);
   const authError = ref('');
+  const authNotice = ref('');
   const authBusy = ref(false);
+  const authMethod = ref('email');
   const loginEmail = ref('');
   const loginPassword = ref('');
+  const loginPhone = ref('');
+  const loginOtpCode = ref('');
+  const otpSent = ref(false);
+  const inviteCode = ref('');
+  const inviteEmail = ref('');
   const orgMemberships = ref([]);
   const teamMemberships = ref([]);
   const guardianLinks = ref([]);
 
   const isTeamCoach = computed(() => teamMemberships.value.some(m => m.role === 'coach' && m.status === 'active'));
+  const isOrgAdmin = computed(() => orgMemberships.value.some(m => m.role === 'admin' && m.status === 'active'));
   const isVerifiedGuardian = computed(() => guardianLinks.value.some(m => m.status === 'verified'));
+  const isParentOnly = computed(() => !isTeamCoach.value && !isOrgAdmin.value && isVerifiedGuardian.value);
 
   // Every session transition invalidates work started by the previous session,
   // even when a user signs out and back in with the same account.
@@ -38,9 +47,55 @@ export function useAuthSession({ onIdentityChange = () => {}, onAuthenticated = 
     teamMemberships.value = [];
     guardianLinks.value = [];
     loginPassword.value = '';
+    loginOtpCode.value = '';
+    otpSent.value = false;
     authError.value = '';
+    authNotice.value = '';
     onIdentityChange();
     return sessionVersion;
+  }
+
+  function setAuthMethod(method) {
+    if (!['email', 'phone', 'otp', 'invite'].includes(method)) return;
+    authMethod.value = method;
+    authError.value = '';
+    authNotice.value = '';
+  }
+
+  function requestPhoneOtp() {
+    if (disposed || authBusy.value) return;
+    authError.value = '';
+    authNotice.value = '';
+    const phone = loginPhone.value.trim();
+    if (!/^\+?[0-9\s()-]{8,20}$/.test(phone)) {
+      authError.value = 'Enter a valid mobile phone number including country code (e.g. +852 9000 0000).';
+      return;
+    }
+    authNotice.value = 'Phone OTP sign-in awaits SMS/WhatsApp provider configuration and backend verification. Please use email and password during staging.';
+  }
+
+  function verifyOtpCode() {
+    if (disposed || authBusy.value) return;
+    authError.value = '';
+    authNotice.value = '';
+    const code = loginOtpCode.value.trim();
+    if (!/^[0-9]{6}$/.test(code)) {
+      authError.value = 'Enter the 6-digit verification code.';
+      return;
+    }
+    authNotice.value = 'One-time code verification awaits backend OTP provider integration. Please sign in with email and password.';
+  }
+
+  function redeemInvitation() {
+    if (disposed || authBusy.value) return;
+    authError.value = '';
+    authNotice.value = '';
+    const code = inviteCode.value.trim();
+    if (!code || code.length < 6) {
+      authError.value = 'Enter a valid club invitation code provided by your team administrator.';
+      return;
+    }
+    authNotice.value = 'Invitation-based guardian onboarding awaits backend redemption endpoint (/v2/onboarding/invitations/redeem). Client-side parent-to-child linking is disabled for security.';
   }
 
   async function refreshIdentity(version) {
@@ -144,9 +199,14 @@ export function useAuthSession({ onIdentityChange = () => {}, onAuthenticated = 
   }
 
   return {
-    authReady, authUser, authError, authBusy, loginEmail, loginPassword,
+    authReady, authUser, authError, authNotice, authBusy,
+    authMethod, setAuthMethod,
+    loginEmail, loginPassword, loginPhone, loginOtpCode, otpSent,
+    inviteCode, inviteEmail,
+    requestPhoneOtp, verifyOtpCode, redeemInvitation,
     orgMemberships, teamMemberships, guardianLinks,
-    isTeamCoach, isVerifiedGuardian, initializeAuth, signIn, signOut,
+    isTeamCoach, isOrgAdmin, isVerifiedGuardian, isParentOnly,
+    initializeAuth, signIn, signOut,
     captureIdentity, isCurrentIdentity, disposeAuth
   };
 }
