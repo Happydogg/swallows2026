@@ -115,16 +115,29 @@ createApp({
         if (auth.isCurrentIdentity(identity)) coachRosterLoading.value = false;
       }
     };
-    // Guardian-scoped sessions: any account with guardian links (verified or not) and no
-    // coach/admin role. These must never use the legacy unrestricted loader.
-    const isGuardianScopedSession = () => !auth.isTeamCoach.value && !auth.isOrgAdmin.value &&
-      auth.guardianLinks.value.length > 0;
     const fetchAllData = async () => {
       const identity = auth.captureIdentity();
       if (!auth.isCurrentIdentity(identity)) return;
       loading.value = true;
       try {
-        if (isGuardianScopedSession()) {
+        // Default-deny: failed membership lookups or accounts with no active coach or
+        // verified guardian role never fall through to the legacy unrestricted loader.
+        if (auth.authError.value) {
+          players.value = [];
+          sessions.value = [];
+          drillVideos.value = [];
+          return;
+        }
+        if (auth.isTeamCoach.value) {
+          const data = await fetchAllCloudData();
+          if (!auth.isCurrentIdentity(identity)) return;
+          players.value = data.players.sort(compareJerseys);
+          sessions.value = data.sessions;
+          drillVideos.value = data.drillVideos;
+          await fetchSafeCoachRoster(identity);
+          return;
+        }
+        if (auth.isVerifiedGuardian.value) {
           // No parent-safe statistics API exists: sessions are never requested here.
           const linked = await fetchVerifiedGuardianPlayers(auth.guardianLinks.value);
           if (!auth.isCurrentIdentity(identity)) return;
@@ -133,12 +146,11 @@ createApp({
           drillVideos.value = [];
           return;
         }
-        const data = await fetchAllCloudData();
-        if (!auth.isCurrentIdentity(identity)) return;
-        players.value = data.players.sort(compareJerseys);
-        sessions.value = data.sessions;
-        drillVideos.value = data.drillVideos;
-        if (auth.isTeamCoach.value) await fetchSafeCoachRoster(identity);
+        // Unlinked users, pending/revoked guardians, and admin-only accounts:
+        // no raw player or session queries (enrollmentAdmin.load() handles org admins).
+        players.value = [];
+        sessions.value = [];
+        drillVideos.value = [];
       } catch (err) {
         if (!auth.isCurrentIdentity(identity)) return;
         auth.authError.value = err.message || 'Data request failed';

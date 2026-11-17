@@ -164,3 +164,67 @@ test('supabaseService guardian loader makes zero requests without verified links
   assert.equal((await svc.fetchVerifiedGuardianPlayers([])).length, 0);
   assert.equal(h.calls.length, before);
 });
+
+test('Fix 4: newly registered unlinked user makes zero players, sessions, or coach roster requests', async t => {
+  const h = await harness(t);
+  h.rows.players = [{ id: 'p-1', athlete_id: 'child-1', jersey: '11' }];
+  h.rows.sessions = [{ id: 's-1', player_id: 'p-1', exit_velo: 65 }];
+  h.app.loginEmail.value = 'newuser@example.invalid';
+  h.app.loginPassword.value = 'synthetic';
+  await h.app.signInAndLoad();
+  await until(() => !h.app.loading.value);
+  assert.equal(playerCalls(h).length, 0);
+  assert.equal(sessionCalls(h).length, 0);
+  assert.equal(h.calls.some(c => c.rpc === 'sdl_004_coach_roster'), false);
+  assert.equal(h.app.players.value.length, 0);
+  assert.equal(h.app.sessions.value.length, 0);
+});
+
+test('Fix 4: failed membership lookup fails closed with zero player or session queries', async t => {
+  const h = await harness(t);
+  h.rows.players = [{ id: 'p-1', athlete_id: 'child-1', jersey: '11' }];
+  h.queue('team_memberships', { data: null, error: { message: 'membership lookup failed' } });
+  h.app.loginEmail.value = 'user@example.invalid';
+  h.app.loginPassword.value = 'synthetic';
+  await h.app.signInAndLoad();
+  await until(() => !h.app.loading.value);
+  assert.match(h.app.authError.value, /membership lookup failed/);
+  assert.equal(playerCalls(h).length, 0);
+  assert.equal(sessionCalls(h).length, 0);
+  assert.equal(h.calls.some(c => c.rpc === 'sdl_004_coach_roster'), false);
+  assert.equal(h.app.players.value.length, 0);
+});
+
+test('Fix 4: administrator-only account retains admin role without receiving unrestricted player or session data', async t => {
+  const h = await harness(t);
+  h.rows.organization_memberships = [{ organization_id: 'org-1', role: 'admin', status: 'active' }];
+  h.rows.players = [{ id: 'p-1', athlete_id: 'child-1', jersey: '11' }];
+  h.rows.sessions = [{ id: 's-1', player_id: 'p-1', exit_velo: 65 }];
+  h.app.loginEmail.value = 'admin@example.invalid';
+  h.app.loginPassword.value = 'synthetic';
+  await h.app.signInAndLoad();
+  await until(() => !h.app.loading.value);
+  assert.equal(h.app.isOrgAdmin.value, true);
+  assert.equal(h.app.isTeamCoach.value, false);
+  assert.equal(playerCalls(h).length, 0);
+  assert.equal(sessionCalls(h).length, 0);
+  assert.equal(h.app.players.value.length, 0);
+  assert.equal(h.app.sessions.value.length, 0);
+});
+
+test('Fix 4: admin + verified guardian account loads only narrow guardian projection and never sessions', async t => {
+  const h = await harness(t);
+  h.rows.organization_memberships = [{ organization_id: 'org-1', role: 'admin', status: 'active' }];
+  h.rows.athlete_guardians = [{ athlete_id: 'child-1', status: 'verified' }];
+  h.rows.players = [{ id: 'p-1', athlete_id: 'child-1', preferred_name: 'Maya', jersey: '11', dob: '2015-01-01' }];
+  h.rows.sessions = [{ id: 's-1', player_id: 'p-1', exit_velo: 65 }];
+  h.app.loginEmail.value = 'adminguardian@example.invalid';
+  h.app.loginPassword.value = 'synthetic';
+  await h.app.signInAndLoad();
+  await until(() => !h.app.loading.value);
+  assert.equal(h.app.isOrgAdmin.value, true);
+  assert.equal(h.app.isVerifiedGuardian.value, true);
+  assertNoLegacyLoad(h);
+  assert.equal(h.app.players.value.length, 1);
+  assert.equal(h.app.players.value[0].dob, undefined);
+});

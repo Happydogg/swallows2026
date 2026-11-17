@@ -17,7 +17,8 @@ function assertCleared(a) {
 
 test('password login verifies user, loads data and starts pose tracking', async t => {
   const h = await harness(t);
-  h.rows.players = [{ id: 'child', jersey: '07' }];
+  h.rows.athlete_guardians = [{ athlete_id: 'a1', status: 'verified' }];
+  h.rows.players = [{ id: 'child', athlete_id: 'a1', jersey: '07' }];
   h.app.loginEmail.value = ' parent@example.invalid ';
   h.app.loginPassword.value = 'synthetic-only';
   await h.app.signInAndLoad();
@@ -31,6 +32,7 @@ test('password login verifies user, loads data and starts pose tracking', async 
 
 test('login with Supabase SIGNED_IN event loads once outside auth lock', async t => {
   const h = await harness(t); h.emitLogin = true;
+  h.rows.athlete_guardians = [{ athlete_id: 'a1', status: 'verified' }];
   await h.app.signInAndLoad();
   await until(() => h.app.authUser.value && !h.app.loading.value);
   assert.equal(h.calls.filter(c => c.table === 'players').length, 1);
@@ -45,8 +47,9 @@ test('restored session loads data and initializes tracker', async t => {
 
 test('external login and token refresh verify and reload identity', async t => {
   const h = await harness(t);
+  h.rows.athlete_guardians = [{ athlete_id: 'a1', status: 'verified' }];
   for (const event of ['INITIAL_SESSION', 'SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED']) {
-    h.rows.players = [{ id: event, jersey: '1' }];
+    h.rows.players = [{ id: event, athlete_id: 'a1', jersey: '1' }];
     h.emit(event, user('external'));
     assert.equal(h.app.authUser.value, null);
     assert.equal(h.app.authReady.value, false);
@@ -93,6 +96,7 @@ test('late memberships cannot overwrite another account or restore guardian link
 for (const transition of ['logout', 'account switch', 'same-account relogin']) {
   test(`late players, sessions and videos are ignored after ${transition}`, async t => {
     const h = await harness(t); const pending = deferred(); h.queue('players', pending.promise);
+    h.rows.team_memberships = [{ team_id: 't', role: 'coach', status: 'active' }];
     h.rows.sessions = [{ id: 'old-session' }]; h.rows.drill_videos = [{ id: 'old-video' }];
     const login = h.app.signInAndLoad();
     await until(() => h.calls.some(c => c.table === 'players'));
@@ -230,16 +234,17 @@ test('logout destroys the chart containing private measurement data', async t =>
 
 test('old data completion does not stop the new account loading indicator', async t => {
   const h = await harness(t); const old = deferred(), current = deferred();
+  h.rows.athlete_guardians = [{ athlete_id: 'a1', status: 'verified' }];
   h.queue('players', old.promise);
   const login = h.app.signInAndLoad();
   await until(() => h.calls.some(c => c.table === 'players'));
   h.queue('players', current.promise);
   h.emit('SIGNED_IN', user('new'));
   await until(() => h.calls.filter(c => c.table === 'players').length === 2);
-  old.resolve(ok([{ id: 'old', jersey: '1' }])); await login;
+  old.resolve(ok([{ id: 'old', athlete_id: 'a1', jersey: '1' }])); await login;
   assert.equal(h.app.loading.value, true);
   assert.equal(h.app.players.value.length, 0);
-  current.resolve(ok([{ id: 'new', jersey: '2' }]));
+  current.resolve(ok([{ id: 'new', athlete_id: 'a1', jersey: '2' }]));
   await until(() => !h.app.loading.value);
   assert.equal(h.app.players.value[0].id, 'new');
 });
@@ -318,4 +323,34 @@ test('prepared phone OTP and invitation onboarding interfaces validate inputs an
   assert.match(h.app.authNotice.value, /Client-side parent-to-child linking is disabled/i);
   assert.equal(h.app.guardianLinks.value.length, 0);
   assert.equal(h.calls.length, 0);
+});
+
+test('Fix 5: logout and identity invalidation clear phone, OTP, invitation code and invitation email', async t => {
+  const h = await harness(t, user('parent'));
+  h.app.loginPhone.value = '+852 9123 4567';
+  h.app.loginOtpCode.value = '123456';
+  h.app.otpSent.value = true;
+  h.app.inviteCode.value = 'SWALLOWS-INV-2026';
+  h.app.inviteEmail.value = 'parent@example.invalid';
+  h.app.loginPassword.value = 'secret';
+
+  await h.app.signOutAndClear();
+  assert.equal(h.app.loginPhone.value, '');
+  assert.equal(h.app.loginOtpCode.value, '');
+  assert.equal(h.app.otpSent.value, false);
+  assert.equal(h.app.inviteCode.value, '');
+  assert.equal(h.app.inviteEmail.value, '');
+  assert.equal(h.app.loginPassword.value, '');
+
+  h.app.loginPhone.value = '+852 9876 5432';
+  h.app.loginOtpCode.value = '654321';
+  h.app.otpSent.value = true;
+  h.app.inviteCode.value = 'SWALLOWS-INV-2027';
+  h.app.inviteEmail.value = 'other@example.invalid';
+  h.emit('SIGNED_OUT', null);
+  assert.equal(h.app.loginPhone.value, '');
+  assert.equal(h.app.loginOtpCode.value, '');
+  assert.equal(h.app.otpSent.value, false);
+  assert.equal(h.app.inviteCode.value, '');
+  assert.equal(h.app.inviteEmail.value, '');
 });

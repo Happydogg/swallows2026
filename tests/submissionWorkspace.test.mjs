@@ -219,3 +219,103 @@ test('Team Clubhouse projects authorized roster and leaderboard fixtures while s
  c.changeClubhouseSection('videos');
  assert.equal(c.clubhouseSection.value,'videos');
 });
+
+for (const status of [401, 403]) {
+  test(`Fix 1: HTTP ${status} on Clubhouse roster or leaderboard clears all Clubhouse state and active playback`, async t => {
+    let rosterCalls = 0, leaderboardCalls = 0;
+    const { c, revoked } = await setup(t, {
+      hasClubhouseRoster: () => true,
+      hasClubhouseLeaderboard: () => true,
+      clubhouseRoster: async () => {
+        if (++rosterCalls === 1) return [{ id: P, team_id: T, team_name: 'Swallows U12', preferred_name: 'Leo', jersey: '07', consent_active: true }];
+        throw Object.assign(Error('Unauthorized'), { status });
+      },
+      clubhouseLeaderboard: async () => {
+        leaderboardCalls++;
+        return [{ id: V, player_id: P, team_id: T, metric: 'exit_velo', preferred_name: 'Leo', jersey: '07', value: 64.5, consent_active: true }];
+      }
+    });
+    await c.load();
+    await c.selectTeam(T, 'clubhouse');
+    await c.play(c.shared.value[0], 'clubhouse');
+    const url = c.playbackUrl.value;
+    assert.ok(url);
+    assert.equal(c.clubhouseRosterSafe.value.length, 1);
+    assert.equal(c.clubhouseLeaderboardByMetric.value.exit_velo.length, 1);
+
+    await c.refreshClubhouseSections(true);
+    assert.equal(c.clubhouseRoster.value.length, 0);
+    assert.equal(c.clubhouseLeaderboard.value.length, 0);
+    assert.equal(c.clubhouseRosterReady.value, false);
+    assert.equal(c.clubhouseLeaderboardReady.value, false);
+    assert.equal(c.shared.value.length, 0);
+    assert.equal(c.playbackUrl.value, '');
+    assert.equal(c.ready.value, false);
+    assert.equal(revoked.includes(url), true);
+    assert.equal(leaderboardCalls, 1, 'leaderboard must not be requested after roster auth failure');
+  });
+}
+
+test('Fix 2: delayed Clubhouse roster/leaderboard errors and responses after reset or logout are ignored and aborted', async t => {
+  const pendingRoster = deferred();
+  const signals = [];
+  let leaderboardCalled = 0;
+  const { c, h } = await setup(t, {
+    hasClubhouseRoster: () => true,
+    hasClubhouseLeaderboard: () => true,
+    clubhouseRoster: (_team, opt) => { signals.push(opt.signal); return pendingRoster.promise; },
+    clubhouseLeaderboard: async () => { leaderboardCalled++; return []; }
+  });
+  await c.load();
+  const selecting = c.selectTeam(T, 'clubhouse');
+  await new Promise(r => setTimeout(r, 5));
+  assert.equal(signals.length, 1);
+  assert.equal(signals[0].aborted, false);
+
+  await h.app.signOutAndClear();
+  c.reset();
+  assert.equal(signals[0].aborted, true);
+
+  pendingRoster.reject(new Error('delayed roster failure'));
+  await selecting;
+  assert.equal(c.clubhouseRosterNotice.value, '');
+  assert.equal(c.clubhouseLeaderboardNotice.value, '');
+  assert.equal(c.clubhouseRoster.value.length, 0);
+  assert.equal(leaderboardCalled, 0);
+});
+
+test('Fix 3: Clubhouse poll and focus revalidate videos, roster and leaderboard and revoke playback when consent is withdrawn', async t => {
+  let allowed = true, rosterCalls = 0, leaderboardCalls = 0, videoCalls = 0;
+  const { c, revoked } = await setup(t, {
+    hasClubhouseRoster: () => true,
+    hasClubhouseLeaderboard: () => true,
+    clubhouse: async () => { videoCalls++; return allowed ? [row] : []; },
+    clubhouseRoster: async () => {
+      rosterCalls++;
+      return allowed ? [{ id: P, team_id: T, team_name: 'Swallows U12', preferred_name: 'Leo', jersey: '07', consent_active: true }] : [];
+    },
+    clubhouseLeaderboard: async () => {
+      leaderboardCalls++;
+      return allowed ? [{ id: V, player_id: P, team_id: T, metric: 'exit_velo', preferred_name: 'Leo', jersey: '07', value: 64.5, consent_active: true }] : [];
+    }
+  }, { pollMs: 15 });
+  await c.load();
+  await c.selectTeam(T, 'clubhouse');
+  await c.play(c.shared.value[0], 'clubhouse');
+  const url = c.playbackUrl.value;
+  assert.ok(url);
+  assert.equal(c.clubhouseRosterSafe.value.length, 1);
+  assert.equal(c.clubhouseLeaderboardByMetric.value.exit_velo.length, 1);
+
+  allowed = false;
+  await new Promise(r => setTimeout(r, 40));
+  assert.ok(videoCalls >= 2);
+  assert.ok(rosterCalls >= 2);
+  assert.ok(leaderboardCalls >= 2);
+  assert.equal(c.shared.value.length, 0);
+  assert.equal(c.clubhouseRosterSafe.value.length, 0);
+  assert.equal(c.clubhouseLeaderboardByMetric.value.exit_velo.length, 0);
+  assert.equal(c.playbackUrl.value, '');
+  assert.equal(revoked.includes(url), true);
+  c.reset();
+});

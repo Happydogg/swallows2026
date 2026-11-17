@@ -47,8 +47,11 @@ export function useAuthSession({ onIdentityChange = () => {}, onAuthenticated = 
     teamMemberships.value = [];
     guardianLinks.value = [];
     loginPassword.value = '';
+    loginPhone.value = '';
     loginOtpCode.value = '';
     otpSent.value = false;
+    inviteCode.value = '';
+    inviteEmail.value = '';
     authError.value = '';
     authNotice.value = '';
     onIdentityChange();
