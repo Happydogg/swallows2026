@@ -8,6 +8,12 @@ export default defineConfig({
     name: 'sdl-r2-staging-gate',
     entrypoint: './index.mjs',
     compatibilityDate: '2026-11-16',
+    workersDev: true,
+    previewUrls: false,
+    compatibilityFlags: [],
+    logpush: false,
+    tailConsumers: [],
+    // Leave domains/triggers/routes UNSET: preserve existing unmanaged routes.
     env: {
       MEDIA_BUCKET: bindings.r2({ name: 'sdl-media-staging' }),
       SUPABASE_URL: bindings.json('https://wvurolqbjhuckkkjiiiv.supabase.co'),

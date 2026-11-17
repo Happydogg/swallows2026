@@ -8,3 +8,8 @@ work/
 
 # Local reviewed provider metadata; never commit credentials.
 *.local.json
+
+# Database exports (Auth/user data). Never stage them, even outside work/.
+*.dump
+*.backup
+backend/release/backups/

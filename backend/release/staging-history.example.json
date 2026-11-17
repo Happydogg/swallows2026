@@ -1,0 +1,5 @@
+{
+  "project_ref": "wvurolqbjhuckkkjiiiv",
+  "history": null,
+  "instruction": "Fill history only from an approved read-only review: {exists: boolean, versions: [14-digit version strings]}. At 2026-11-17T00:41:27Z the history table was observed absent. Do not infer absence from a failed query."
+}

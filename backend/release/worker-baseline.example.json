@@ -6,10 +6,38 @@
   "compatibilityDate": "2026-11-16",
   "otherSettingsReviewed": false,
   "env": {
-    "MEDIA_BUCKET": {"type": "r2", "name": "sdl-media-staging"},
-    "SUPABASE_URL": {"type": "json", "value": "https://wvurolqbjhuckkkjiiiv.supabase.co"},
-    "SUPABASE_PUBLISHABLE_KEY": {"type": "secret"},
-    "SUPABASE_SECRET_KEY": {"type": "secret"}
+    "MEDIA_BUCKET": {
+      "type": "r2",
+      "name": "sdl-media-staging"
+    },
+    "SUPABASE_URL": {
+      "type": "json",
+      "value": "https://wvurolqbjhuckkkjiiiv.supabase.co"
+    },
+    "SUPABASE_PUBLISHABLE_KEY": {
+      "type": "secret"
+    },
+    "SUPABASE_SECRET_KEY": {
+      "type": "secret"
+    }
   },
-  "observability": null
+  "observability": null,
+  "workerSettings": {
+    "workersDev": true,
+    "previewUrls": false,
+    "compatibilityFlags": [],
+    "logpush": false,
+    "tailConsumers": [],
+    "tags": [],
+    "usageModel": "standard",
+    "placement": null,
+    "limits": null
+  },
+  "routeHandling": "preserve-unmanaged",
+  "unmanagedRoutesReviewed": false,
+  "rollback": {
+    "deploymentId": null,
+    "versionId": null,
+    "percentage": 100
+  }
 }

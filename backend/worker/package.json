@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "SDL004_LOCAL_BUILD_ONLY=1 cf build",
+    "build": "node build-local.mjs",
     "check:package": "node check-package.mjs",
     "check:release": "node check-package.mjs --release"
   },

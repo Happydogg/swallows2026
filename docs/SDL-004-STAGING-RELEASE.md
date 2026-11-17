@@ -8,6 +8,9 @@ The earlier per-video/per-team pending design is superseded.
 The approved manual administration interface and current file/test report are in
 [SDL-004-ENROLLMENT-ADMIN.md](SDL-004-ENROLLMENT-ADMIN.md). Registration automation is deferred.
 
+Windows backup/preflight setup, current nonsecret Worker preservation evidence and remaining blockers:
+[SDL-004-WINDOWS-RELEASE.md](SDL-004-WINDOWS-RELEASE.md). No backup or restore is yet verified.
+
 Both flags remain disabled:
 
 - `js/config.js`: `SUBMISSION_FEATURES_ENABLED=false`.
@@ -54,7 +57,7 @@ npm test
 
 Root dependencies are test-only pinned Vue/PGlite; the browser remains Vue global build and ES
 modules without a bundler. The Worker build has its own locked dependencies. Current full result:
-**208 passed, 0 failed, 0 skipped**, including existing v1/authentication/analyzer/statistics regression
+**221 passed, 0 failed, 0 skipped**, including existing v1/authentication/analyzer/statistics regression
 cases, real isolated SQL, actual Vue compilation/rendering, and local workerd with outbound traffic
 forbidden. Mocked authorization/R2 tests are labeled; they do not prove deployed policies.
 Native mobile testing, actual PostgreSQL contention, Supabase/PostgREST responses and live v2
@@ -89,14 +92,17 @@ storage/authorization remain staging checks. Previously supplied live pilot resu
    consent. Verify the new scoped admin read RPCs and `enrollmentAdmin` capability before enabling
    the administrator interface. New read RPCs are in the same pending migration.
 4. Read/review the current staging Worker version, all binding metadata and exact observability
-   settings. Never export secret values. Use the unconfirmed baseline example and save a reviewed
+   settings. Never export secret values. Refresh the sanitized `staging-worker-baseline.json` observation
+   or use the unconfirmed baseline example and save a reviewed
    `.local.json` outside Git. Review additional settings (routes, compatibility flags, placement,
    limits, logpush, tails); `otherSettingsReviewed` is an operator attestation, not an automated live
    diff. Stop on unrepresented settings drift. Recheck the remote version immediately before release.
 
    ```sh
    SDL004_WORKER_BASELINE=/approved/path/staging-worker.local.json npm run check:worker
-   SDL004_WORKER_BASELINE=/approved/path/staging-worker.local.json npm run check:release --prefix backend/worker
+   SDL004_WORKER_BASELINE=/approved/path/staging-worker.local.json \
+   SDL004_CURRENT_WORKER_VERSION=INDEPENDENTLY_RECHECKED_ACTIVE_VERSION \
+     npm run check:release --prefix backend/worker
    ```
 
    The release check intentionally fails without this baseline. `SDL004_LOCAL_BUILD_ONLY=1` is for

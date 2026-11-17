@@ -17,6 +17,13 @@ export function reviewedBaseline(baseline) {
  assert.ok(isDeepStrictEqual(baseline.env,expected),'Binding drift: preserve all existing bindings; secret values are forbidden');
  assert.ok(Object.hasOwn(baseline,'observability'),'Explicit existing observability settings required, including null if absent');
  assert.ok(baseline.observability===null||typeof baseline.observability==='object'&&!Array.isArray(baseline.observability),'Invalid observability baseline');
+ const settings=baseline.workerSettings;
+ assert.ok(isDeepStrictEqual(settings,{workersDev:true,previewUrls:false,compatibilityFlags:[],logpush:false,tailConsumers:[],tags:[],usageModel:'standard',placement:null,limits:null}),'Unsupported or unreviewed deployed Worker settings; stop on drift');
+ assert.equal(baseline.routeHandling,'preserve-unmanaged','Do not take ownership of existing routes');
+ assert.equal(baseline.unmanagedRoutesReviewed,true,'Pinned route preservation review required');
+ assert.equal(baseline.rollback?.versionId,baseline.versionId,'Rollback version must be the observed deployed version');
+ assert.equal(baseline.rollback?.percentage,100,'Split deployments require separate review');
+ assert.match(baseline.rollback?.deploymentId||'',/^[a-zA-Z0-9-]+$/,'Original deployment identifier required');
  return baseline;
 }
 export function readBaseline(path=process.env.SDL004_WORKER_BASELINE) {
@@ -34,5 +41,12 @@ export function verifyPreservation(config,baseline) {
  reviewedBaseline(baseline);
  assert.equal(config.name,baseline.name);assert.equal(config.compatibilityDate,baseline.compatibilityDate);
  assert.ok(isDeepStrictEqual(config.env,{...baseline.env,SUBMISSIONS_ENABLED:{type:'json',value:'false'}}),'Generated binding metadata drift');
+ for(const key of ['workersDev','previewUrls','compatibilityFlags','logpush','tailConsumers'])assert.ok(isDeepStrictEqual(config[key],baseline.workerSettings[key]),'Worker setting drift: '+key);
+ for(const key of ['domains','routes','triggers','placement','limits','tags'])assert.equal(config[key],undefined,'Unexpected managed setting: '+key);
  assert.deepEqual(config.observability??null,baseline.observability,'Observability drift: rebuild with the reviewed baseline');
+}
+
+export function verifyCurrentVersion(baseline,currentVersionId){
+ reviewedBaseline(baseline);
+ assert.ok(currentVersionId&&currentVersionId===baseline.versionId,'Release blocked: independently recheck active staging version; stale/missing version receipt');
 }

@@ -1,0 +1,69 @@
+{
+  "confirmed": true,
+  "accountId": "702be60427145f59fa040e5250602bd7",
+  "name": "sdl-r2-staging-gate",
+  "versionId": "891b26a8-bd75-4f2c-b6af-b0244cc699f7",
+  "compatibilityDate": "2026-11-16",
+  "otherSettingsReviewed": true,
+  "env": {
+    "MEDIA_BUCKET": {
+      "type": "r2",
+      "name": "sdl-media-staging"
+    },
+    "SUPABASE_URL": {
+      "type": "json",
+      "value": "https://wvurolqbjhuckkkjiiiv.supabase.co"
+    },
+    "SUPABASE_PUBLISHABLE_KEY": {
+      "type": "secret"
+    },
+    "SUPABASE_SECRET_KEY": {
+      "type": "secret"
+    }
+  },
+  "observability": {
+    "enabled": true,
+    "headSamplingRate": 1,
+    "redactQueryString": false,
+    "logs": {
+      "enabled": true,
+      "headSamplingRate": 1,
+      "persist": true,
+      "invocationLogs": true
+    },
+    "traces": {
+      "enabled": false,
+      "persist": true,
+      "headSamplingRate": 1
+    }
+  },
+  "observedAtUtc": "2026-11-17T00:56:44.834Z",
+  "normalizationNotes": [
+    "Cloudflare plain_text SUPABASE_URL maps to the cf config's JSON primitive wrapper. Inspected pinned config adapter maps binding.value to vars; deploy adapter emits strings as plain_text.",
+    "secret_text maps to secret binding declarations only. No secret values were requested, retrieved or saved.",
+    "SUBMISSIONS_ENABLED is absent in the deployed v1 Worker; adding the candidate's false value is the existing intentional default-off rollout change."
+  ],
+  "workerSettings": {
+    "workersDev": true,
+    "previewUrls": false,
+    "compatibilityFlags": [],
+    "logpush": false,
+    "tailConsumers": [],
+    "tags": [],
+    "usageModel": "standard",
+    "placement": null,
+    "limits": null
+  },
+  "routeHandling": "preserve-unmanaged",
+  "unmanagedRoutesReviewed": true,
+  "routeReview": {
+    "zoneRouteInventoryVerified": false,
+    "method": "Candidate leaves domains/triggers/routes unset. Reviewed pinned cf 1.0.0-rc.0 only invokes route/domain mutations for configured nonempty route lists. Preserve unmanaged existing routes; never invent a route inventory."
+  },
+  "rollback": {
+    "deploymentId": "58789ec0-88db-4006-8d1c-603d2691f041",
+    "versionId": "891b26a8-bd75-4f2c-b6af-b0244cc699f7",
+    "percentage": 100,
+    "createdOn": "2026-11-16T15:11:40.663916Z"
+  }
+}
