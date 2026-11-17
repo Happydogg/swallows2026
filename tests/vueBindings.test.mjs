@@ -58,6 +58,13 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   await Vue.nextTick();assert.match(flatten(host),/Approve/);
   submissions.changeTab('clubhouse');submissions.shared.value=[{id:'s',preferred_name:'Test teammate',category:'batting'}];
   await Vue.nextTick();assert.match(flatten(host),/Play approved video/);
+  const admin=h.app.enrollmentAdminController;
+  h.app.orgMemberships.value=[{role:'admin',status:'active'}];
+  admin.organizations.value=[{id:'club',name:'Admin club'}];admin.organizationId.value='club';
+  admin.athletes.value=[{athlete_id:'test-athlete',organization_id:'club',preferred_name:'Admin athlete',enrollment_id:'enrollment',generation:'g',status:'active',recording_storage_authorized:true,recording_active:true,recording_permission_ref:'case-123',consent_active:false}];
+  await Vue.nextTick();assert.match(flatten(host),/Club enrollment administration/);assert.match(flatten(host),/case-123/);assert.match(flatten(host),/Optional parental Clubhouse-sharing consent/);assert.match(flatten(host),/All v2 operations remain disabled/);
+  admin.pendingChange.value={kind:'enrollment',row:admin.athletes.value[0],nextStatus:'ended',organizationName:'Admin club'};
+  await Vue.nextTick();assert.match(flatten(host),/Do not use this for an internal team transfer/);admin.pendingChange.value=null;
   h.app.privateMediaController.mediaReadAllowed.value = true;
   h.app.privateMediaController.mediaPlayerId.value = '11111111-1111-4111-8111-111111111111';
   h.app.privateMediaController.mediaItems.value = [{ id: '33333333-3333-4333-8333-333333333333', byte_size: 12 }];
@@ -68,7 +75,7 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   h.app.openAnalyzer({ id: 'local', video_url: 'blob:synthetic', category: 'pitching', fps_mode: 60 });
   await Vue.nextTick(); assert.match(flatten(host), /Back to Profile/);
   await h.app.signOutAndClear(); await Vue.nextTick();
-  assert.doesNotMatch(flatten(host), /Synthetic Player|Play privately|Back to Profile/);
+  assert.doesNotMatch(flatten(host), /Synthetic Player|Play privately|Back to Profile|case-123|Admin athlete/);
   assert.equal(errors.length, 0, errors.map(String).join('\n'));
   assert.equal(warnings.length, 0, warnings.join('\n'));
 });

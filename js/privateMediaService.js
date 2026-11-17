@@ -134,7 +134,7 @@ export function createPrivateMediaService({ auth, client = supabaseClient, baseU
     playback(mediaId, options) { return request(`/v1/media/${id(mediaId)}`, { ...options, blob: true }); },
     upload(playerId,file,options) { return uploadRoute(playerId,file,options); },
     requestJson(route,options) {
-      if(!/^\/v2\/[a-z0-9/?=&_-]+$/i.test(route)) throw new MediaError('Invalid submission route.');
+      if(!/^\/v2\/[a-z0-9/_-]+(?:\?(?:[a-z0-9=&_+.-]|%[0-9a-f]{2})*)?$/i.test(route)) throw new MediaError('Invalid submission route.');
       return request(route,options);
     },
     submissionPlayback(mediaId,options) { return request(`/v2/submissions/${id(mediaId)}/playback`,{...options,blob:true}); },

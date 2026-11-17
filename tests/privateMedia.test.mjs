@@ -263,3 +263,13 @@ test('v2 transport rejects attempts to attach per-video consent before a network
  let requests=0;const {service}=await serviceHarness(t,{xhrFactory:()=>{requests++;}});
  assert.throws(()=>service.submit(PLAYER,file,{category:'pitching',key:VIDEO,share:true,teamIds:[OTHER]}),/Invalid submission/);assert.equal(requests,0);
 });
+
+test('v2 JSON transport accepts percent-encoded administrator search only in query parameters',async t=>{
+ const {service,requests}=await serviceHarness(t);const route=`/v2/admin/enrollments?organization_id=${PLAYER}&q=%E5%B0%8F%E6%98%8E%20O%27Neil%20%25`;
+ await service.requestJson(route);assert.equal(requests[0].url,'https://sdl-r2-staging-gate.sampson-ho.workers.dev'+route);assert.equal(requests[0].init.headers.Authorization,'Bearer synthetic-token');
+});
+test('v2 JSON query support does not permit absolute URLs, encoded path traversal or malformed escapes',async t=>{
+ const {service,requests}=await serviceHarness(t);
+ for(const route of['https://example.invalid','//example.invalid','/v2/%2e%2e/v1/media','/v2/admin/organizations#fragment','/v2/admin/enrollments?q=%ZZ'])assert.throws(()=>service.requestJson(route),/Invalid submission route/);
+ assert.equal(requests.length,0);
+});

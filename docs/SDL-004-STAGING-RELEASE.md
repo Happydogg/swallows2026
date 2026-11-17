@@ -5,6 +5,8 @@ The current business rule and API are documented in
 one athlete/club/continuous enrollment, survives internal team transfers and has no annual or
 per-video renewal. A club departure/rejoin or withdrawal cannot revive an obsolete consent receipt.
 The earlier per-video/per-team pending design is superseded.
+The approved manual administration interface and current file/test report are in
+[SDL-004-ENROLLMENT-ADMIN.md](SDL-004-ENROLLMENT-ADMIN.md). Registration automation is deferred.
 
 Both flags remain disabled:
 
@@ -33,10 +35,10 @@ media URLs, secrets in browser code, extra paid resources or new deployment bind
   incompatible dependency types and unreconciled migration history raise errors.
 - `backend/proposals/*` are compatibility pointers to canonical source. Do not apply old proposal SQL.
 
-The enrollment ledger requires a verified club registration/enrollment process before enablement.
-It must receive explicit ends/inactivations/rejoins; team roster changes do not define club departure.
-Prepared administrator APIs can maintain it, but upstream registration synchronization/backfill has
-not been implemented or verified. New coach uploads require separate recording/storage evidence,
+The approved pilot uses the prepared manual Club Enrollment Administration interface. Authorized
+organization administrators must populate/maintain verified enrollment records, including explicit
+ends/inactivations/rejoins; team roster changes do not define club departure. Registration
+automation is deferred and is not required for this pilot. New coach uploads require separate recording/storage evidence,
 default false. Neither membership nor Clubhouse consent supplies that evidence automatically.
 Unknown/multi-child clips stay private; coaches must perform the documented single-subject safety
 review before publication. All-subject/redaction authorization is a separate future design.
@@ -52,7 +54,7 @@ npm test
 
 Root dependencies are test-only pinned Vue/PGlite; the browser remains Vue global build and ES
 modules without a bundler. The Worker build has its own locked dependencies. Current full result:
-**173 passed, 0 failed, 0 skipped**, including existing v1/authentication/analyzer/statistics regression
+**208 passed, 0 failed, 0 skipped**, including existing v1/authentication/analyzer/statistics regression
 cases, real isolated SQL, actual Vue compilation/rendering, and local workerd with outbound traffic
 forbidden. Mocked authorization/R2 tests are labeled; they do not prove deployed policies.
 Native mobile testing, actual PostgreSQL contention, Supabase/PostgREST responses and live v2
@@ -83,7 +85,9 @@ storage/authorization remain staging checks. Previously supplied live pilot resu
    existing table counts/pilot grants before new QA writes. Verify RLS, denied direct writes (including
    service-role consent/audit writes), immutable audit and internal function EXECUTE restrictions.
    Exercise authenticated RPCs as synthetic users, not only SQL owner. Record required enrollment
-   and recording evidence through approved administrator operations; do not invent historic consent.
+   and recording evidence through approved manual administrator operations; do not invent historic
+   consent. Verify the new scoped admin read RPCs and `enrollmentAdmin` capability before enabling
+   the administrator interface. New read RPCs are in the same pending migration.
 4. Read/review the current staging Worker version, all binding metadata and exact observability
    settings. Never export secret values. Use the unconfirmed baseline example and save a reviewed
    `.local.json` outside Git. Review additional settings (routes, compatibility flags, placement,

@@ -26,7 +26,19 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
       if (active.value !== true) return json({error:'Session expired or revoked'},401,origin);
       const contract = await call('sdl_004_submission_contract', {});
       if (contract.error || contract.value?.revision !== 'sdl004-club-enrollment-v2') return json({error:'Backend contract unavailable'},503,origin);
-      if (path === '/v2/capabilities' && request.method === 'GET') return json({revision:'sdl004-club-enrollment-v2',submissions:true,review:true,clubhouse:true,clubConsent:true},200,origin);
+      if (path === '/v2/capabilities' && request.method === 'GET') return json({revision:'sdl004-club-enrollment-v2',submissions:true,review:true,clubhouse:true,clubConsent:true,enrollmentAdmin:contract.value.enrollmentAdmin===true},200,origin);
+      if(path.startsWith('/v2/admin/')) {
+        if(contract.value.enrollmentAdmin!==true)return json({error:'Enrollment administration backend unavailable'},503,origin);
+        if(request.method!=='GET')return json({error:'Method not allowed'},405,origin);
+        let result;
+        if(path==='/v2/admin/organizations')result=await call('sdl_004_admin_organizations',{});
+        else if(path==='/v2/admin/enrollments'){
+          const organization=url.searchParams.get('organization_id'),query=url.searchParams.get('q')||'';
+          if(!validId(organization)||query.length>100)return json({error:'Invalid organization or search'},400,origin);
+          result=await call('sdl_004_admin_enrollments',{p_organization:organization,p_query:query});
+        }else return json({error:'Not found'},404,origin);
+        return result.error?json({error:'Administrator access denied or unavailable'},result.status,origin):json({items:result.value},200,origin);
+      }
       if(path==='/v2/club-consents'&&request.method==='GET') {
         const athlete=url.searchParams.get('athlete_id');if(!validId(athlete))return json({error:'Invalid athlete_id'},400,origin);
         const result=await call('sdl_004_list_club_consents',{p_athlete:athlete});

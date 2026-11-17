@@ -8,7 +8,7 @@ const text=value=>typeof value==='string'?value:'';
 const rows=data=>{if(!Array.isArray(data?.items))throw new MediaError('Invalid server response.');return data.items;};
 const status=value=>{if(!['pending','approved','rejected'].includes(value))throw new MediaError('Invalid submission status.');return value;};
 export function createSubmissionService({auth,enabled=SUBMISSION_FEATURES_ENABLED,transport=createPrivateMediaService({auth})}) {
-  let verified=null;
+  let verified=null,adminAvailable=false;
   async function ready(options) {
     if(!enabled)throw new MediaError('Submissions, reviews and Clubhouse await verified backend deployment.');
     if(verified&&auth.isCurrentIdentity(verified))return;
@@ -16,14 +16,32 @@ export function createSubmissionService({auth,enabled=SUBMISSION_FEATURES_ENABLE
     const caps=await transport.requestJson('/v2/capabilities',options);
     if(!auth.isCurrentIdentity(identity))throw new MediaError('Session changed.',401);
     if(caps.revision!==SUBMISSION_REVISION||caps.submissions!==true||caps.review!==true||caps.clubhouse!==true||caps.clubConsent!==true)throw new MediaError('The required backend contract is unavailable.');
+    adminAvailable=caps.enrollmentAdmin===true;
     verified=identity;
   }
+  async function readyAdmin(options){await ready(options);if(!adminAvailable)throw new MediaError('Enrollment administration backend awaits deployment and verification.');}
   const project=item=>({id:uuid(item.id),player_id:uuid(item.player_id),category:categoryValue(item.category),status:status(item.status),
     athlete_id:item.athlete_id?uuid(item.athlete_id):null,source_kind:text(item.source_kind),publication_team_ids:Array.isArray(item.publication_team_ids)?item.publication_team_ids.map(uuid):[],can_publish:item.can_publish===true,can_review:item.can_review===true,created_at:text(item.created_at),review_note:String(item.review_note??''),
     history:Array.isArray(item.history)?item.history.map(h=>({action:String(h.action??''),at:text(h.at),note:typeof h.note==='string'?h.note:''})):[],
     preferred_name:typeof item.preferred_name==='string'?item.preferred_name:'Player',team_id:item.team_id?uuid(item.team_id):null,team_name:text(item.team_name)});
   return {
     enabled,
+    async adminOrganizations(options){await readyAdmin(options);return rows(await transport.requestJson('/v2/admin/organizations',options)).map(o=>({id:uuid(o.id),name:text(o.name)}));},
+    async adminEnrollments(organization,query='',options){await readyAdmin(options);uuid(organization);
+      if(typeof query!=='string'||query.length>100)throw new MediaError('Search is limited to 100 characters.');
+      const encoded=encodeURIComponent(query.trim()).replace(/[!'()*]/g,c=>'%'+c.charCodeAt(0).toString(16));
+      return rows(await transport.requestJson(`/v2/admin/enrollments?organization_id=${organization}&q=${encoded}`,options)).map(e=>{
+        if(e.organization_id!==organization||!['active','inactive','ended','not_enrolled'].includes(e.status))throw new MediaError('Invalid organization enrollment response.');
+        if(e.status==='not_enrolled'?(e.enrollment_id!=null||e.generation!=null):(!e.enrollment_id||!e.generation))throw new MediaError('Invalid enrollment identity.');
+        return {athlete_id:uuid(e.athlete_id),preferred_name:text(e.preferred_name),organization_id:uuid(e.organization_id),enrollment_id:e.enrollment_id?uuid(e.enrollment_id):null,
+          generation:e.generation?uuid(e.generation):null,status:e.status,started_at:text(e.started_at),ended_at:text(e.ended_at),recording_storage_authorized:e.recording_storage_authorized===true,
+          recording_active:e.recording_active===true,recording_permission_ref:text(e.recording_permission_ref),consent_active:e.consent_active===true,consent_policy_version:text(e.consent_policy_version)};
+      });},
+    async setEnrollment(row,nextStatus,options){await readyAdmin(options);if(!['active','inactive','ended'].includes(nextStatus))throw new MediaError('Invalid enrollment status.');
+      return transport.requestJson('/v2/club-enrollments',{...options,method:'POST',body:{athlete_id:uuid(row.athlete_id),organization_id:uuid(row.organization_id),status:nextStatus,enrollment_id:row.enrollment_id?uuid(row.enrollment_id):null}});},
+    async setRecordingPermission(row,allowed,evidence,options){await readyAdmin(options);
+      if(typeof allowed!=='boolean'||typeof evidence!=='string'||!evidence.trim()||evidence.trim().length>500)throw new MediaError('A reviewed evidence reference is required (up to 500 characters).');
+      return transport.requestJson(`/v2/club-enrollments/${uuid(row.enrollment_id)}/recording`,{...options,method:'POST',body:{allowed,permission_ref:evidence.trim()}});},
     async workspace(options) {await ready(options);return rows(await transport.requestJson('/v2/workspace',options)).map(p=>({
       id:uuid(p.id),athlete_id:p.athlete_id?uuid(p.athlete_id):null,preferred_name:String(p.preferred_name??'Player'),
       organization_id:p.organization_id?uuid(p.organization_id):null,organization_name:text(p.organization_name),team_id:p.team_id?uuid(p.team_id):null,team_name:text(p.team_name),

@@ -447,9 +447,43 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
  JOIN public.players p ON p.id=s.player_id WHERE public.sdl_004_clubhouse_visible(s.id,p_team_id)
  ORDER BY s.created_at DESC LIMIT 30;
 $$;
+-- Minimal organization-scoped read model for the manual administrator pilot.
+CREATE FUNCTION public.sdl_004_admin_organizations()
+RETURNS TABLE(id uuid,name text)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+ SELECT o.id,o.name FROM public.organizations o WHERE public.sdl_004_club_admin(o.id) ORDER BY o.name,o.id;
+$$;
+CREATE FUNCTION public.sdl_004_admin_enrollments(p_organization uuid,p_query text DEFAULT '')
+RETURNS TABLE(athlete_id uuid,preferred_name text,organization_id uuid,enrollment_id uuid,generation uuid,status text,
+ started_at timestamptz,ended_at timestamptz,recording_storage_authorized boolean,recording_active boolean,
+ recording_permission_ref text,consent_active boolean,consent_policy_version text)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS $$
+BEGIN
+ IF NOT public.sdl_004_club_admin(p_organization) THEN RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501'; END IF;
+ IF p_query IS NULL OR char_length(p_query)>100 THEN RAISE EXCEPTION 'Invalid search' USING ERRCODE='22023'; END IF;
+ RETURN QUERY
+ WITH athletes AS(
+  SELECT p.athlete_id,min(p.preferred_name) AS label FROM public.players p
+  WHERE p.organization_id=p_organization AND p.athlete_id IS NOT NULL
+  GROUP BY p.athlete_id
+ )
+ SELECT a.athlete_id,a.label,p_organization,e.id,e.generation,coalesce(e.status,'not_enrolled'),
+ e.started_at,e.ended_at,coalesce(e.recording_storage_authorized,false),
+ coalesce(e.status='active' AND e.ended_at IS NULL AND e.started_at<=now() AND e.recording_storage_authorized,false),
+ coalesce(e.recording_permission_ref,''),public.sdl_004_active_club_consent(e.id,e.generation) IS NOT NULL,c.policy_version
+ FROM athletes a
+ LEFT JOIN LATERAL(SELECT ce.* FROM public.sdl_club_enrollments ce
+  WHERE ce.athlete_id=a.athlete_id AND ce.organization_id=p_organization
+  ORDER BY (ce.status='active') DESC,ce.started_at DESC,ce.id DESC LIMIT 1)e ON true
+ LEFT JOIN public.sdl_club_consents c ON c.id=public.sdl_004_active_club_consent(e.id,e.generation)
+ WHERE strpos(lower(coalesce(a.label,'')),lower(btrim(p_query)))>0
+ ORDER BY a.label,a.athlete_id LIMIT 100;
+END;
+$$;
+
 CREATE FUNCTION public.sdl_004_submission_contract()
 RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
- SELECT CASE WHEN public.sdl_004_session_active() THEN jsonb_build_object('revision','sdl004-club-enrollment-v2') ELSE NULL END;
+ SELECT CASE WHEN public.sdl_004_session_active() THEN jsonb_build_object('revision','sdl004-club-enrollment-v2','enrollmentAdmin',true) ELSE NULL END;
 $$;
 CREATE FUNCTION public.sdl_004_workspace_players()
 RETURNS TABLE(id uuid,athlete_id uuid,preferred_name text,organization_id uuid,organization_name text,team_id uuid,team_name text,is_guardian boolean,is_coach boolean,can_clubhouse boolean)
@@ -465,7 +499,7 @@ $$;
 
 DO $grants$ DECLARE r record; BEGIN
  FOR r IN SELECT p.oid::regprocedure AS sig,p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
- WHERE n.nspname='public' AND p.proname=ANY(ARRAY['sdl_004_session_active','sdl_004_guardian_for','sdl_004_coach_for','sdl_004_guardian_athlete','sdl_004_club_admin','sdl_004_coach_team','sdl_004_recording_allowed','sdl_004_submission_can_submit','sdl_004_submission_is_guardian','sdl_004_submission_can_review','sdl_004_clubhouse_member','sdl_004_set_club_enrollment','sdl_004_set_recording_permission','sdl_004_active_club_consent','sdl_004_club_consent','sdl_004_list_club_consents','sdl_004_enrollment_lifecycle','sdl_004_immutable_consent_audit','sdl_004_guardian_consent_lifecycle','sdl_004_reserve_submission','sdl_004_finish_submission','sdl_004_review_submission','sdl_004_submission_can_publish','sdl_004_publish_submission','sdl_004_clubhouse_visible','sdl_004_submission_can_read','sdl_004_list_submissions','sdl_004_review_queue','sdl_004_clubhouse_videos','sdl_004_submission_contract','sdl_004_workspace_players']) LOOP
+ WHERE n.nspname='public' AND p.proname=ANY(ARRAY['sdl_004_admin_organizations','sdl_004_admin_enrollments','sdl_004_session_active','sdl_004_guardian_for','sdl_004_coach_for','sdl_004_guardian_athlete','sdl_004_club_admin','sdl_004_coach_team','sdl_004_recording_allowed','sdl_004_submission_can_submit','sdl_004_submission_is_guardian','sdl_004_submission_can_review','sdl_004_clubhouse_member','sdl_004_set_club_enrollment','sdl_004_set_recording_permission','sdl_004_active_club_consent','sdl_004_club_consent','sdl_004_list_club_consents','sdl_004_enrollment_lifecycle','sdl_004_immutable_consent_audit','sdl_004_guardian_consent_lifecycle','sdl_004_reserve_submission','sdl_004_finish_submission','sdl_004_review_submission','sdl_004_submission_can_publish','sdl_004_publish_submission','sdl_004_clubhouse_visible','sdl_004_submission_can_read','sdl_004_list_submissions','sdl_004_review_queue','sdl_004_clubhouse_videos','sdl_004_submission_contract','sdl_004_workspace_players']) LOOP
  EXECUTE 'REVOKE ALL ON FUNCTION '||r.sig||' FROM PUBLIC,anon,authenticated,service_role';
  IF r.proname=ANY(ARRAY['sdl_004_guardian_for','sdl_004_guardian_athlete','sdl_004_coach_for','sdl_004_club_admin','sdl_004_coach_team','sdl_004_recording_allowed','sdl_004_active_club_consent','sdl_004_finish_submission','sdl_004_enrollment_lifecycle','sdl_004_immutable_consent_audit','sdl_004_guardian_consent_lifecycle','sdl_004_clubhouse_visible']) THEN
  EXECUTE 'GRANT EXECUTE ON FUNCTION '||r.sig||' TO service_role';

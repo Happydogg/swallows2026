@@ -6,6 +6,10 @@ unapplied and was edited directly. No compatibility migration, remote SQL execut
 push, merge, secret change or production access was performed. Isolated local PGlite SQL tests
 were explicitly authorized by the user; they are not staging tests.
 
+The approved manual administrator pilot is implemented locally; see
+[SDL-004-ENROLLMENT-ADMIN.md](SDL-004-ENROLLMENT-ADMIN.md) for current implementation, file list,
+208-test validation and staging prerequisites. Registration automation is deferred, not required.
+
 ## Business and authorization model
 
 A verified guardian may explicitly grant optional Clubhouse consent once for an athlete's
@@ -121,12 +125,13 @@ Current staging-only targets remain unchanged: project `wvurolqbjhuckkkjiiiv`, W
 `sdl-r2-staging-gate`, bucket `sdl-media-staging`, binding `MEDIA_BUCKET`. No new service binding,
 secret, public URL, paid feature or deployment setting is introduced.
 
-## Validation and changed files
+## Consent-architecture baseline validation and changed files
 
-`npm run check:worker` passes local build/package checks. `npm test` passes **173 tests, 0 failures,
-0 skips**. This includes real local PostgreSQL/WASM, Vue compilation/custom rendering, built Worker
+At checkpoint `6ea53b8`, `npm run check:worker` passed local build/package checks and `npm test`
+passed **173 tests, 0 failures, 0 skips**. The current manual-administration checkpoint passes 208
+tests; see its report above. This includes real local PostgreSQL/WASM, Vue compilation/custom rendering, built Worker
 startup with outbound traffic forbidden, and mocked Worker/client authorization and R2 operations.
-All **64 JavaScript modules** pass syntax checks, and `git diff --check` passes.
+At that baseline, **64 JavaScript modules** passed syntax checks and `git diff --check` passed.
 Tests for superseded per-team/per-video consent were updated to the approved enrollment rule;
 existing v1, statistics-lock, login/logout/session, analyzer and private-media regression cases remain.
 Actual multi-connection database contention and live mobile/backend tests remain deployment checks.
@@ -146,11 +151,11 @@ Actual multi-connection database contention and live mobile/backend tests remain
 
 ## Outstanding staging dependencies
 
-- The repository had no separate continuous club-enrollment source. The prepared ledger/RPCs are
-  authoritative for v2, but before enablement an approved registration/enrollment process must
-  populate and maintain them. An organization administrator can use the prepared API; upstream
-  registration synchronization is not implemented or verified. Never infer a departure/rejoin from
-  a temporary absence of team rows, or silently import consent from registration/payment flags.
+- The ledger/RPCs are authoritative for v2. The approved pilot uses manual management by authorized
+  organization administrators through the prepared interface and API. Verify administrator access,
+  athlete/club mappings and operator-maintained enrollment records before enablement. Registration
+  automation is deferred, not a pilot prerequisite. Never infer departure/rejoin from a temporary
+  absence of team rows or import consent from registration/payment flags.
 - Populate recording/storage authorization only from verified separate evidence. The default false
   state intentionally blocks coach v2 uploads until that evidence is recorded. Neither this ledger
   nor v2 is deployed. Existing v1 private media is not automatically adopted/published by v2.

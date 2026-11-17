@@ -11,6 +11,8 @@ import { useCoachMode } from '../composables/useCoachMode.js';
 import { useAuthSession } from '../composables/useAuthSession.js';
 import { usePlayers } from '../composables/usePlayers.js';
 import { useSessions } from '../composables/useSessions.js';
+import { useEnrollmentAdmin } from '../composables/useEnrollmentAdmin.js';
+import { ClubEnrollmentAdmin } from '../components/ClubEnrollmentAdmin.js';
 import { useSubmissionWorkspace } from '../composables/useSubmissionWorkspace.js';
 import { SubmissionWorkspace } from '../components/SubmissionWorkspace.js';
 import { usePrivateMedia } from '../composables/usePrivateMedia.js';
@@ -31,7 +33,7 @@ const { createApp, ref, onMounted, onUnmounted, markRaw } = Vue;
 
 createApp({
   components: {
-    AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, SubmissionWorkspace,
+    AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
     SessionFormModal, UploadVideoModal, ArAnalyzerModal
   },
   setup() {
@@ -58,6 +60,7 @@ createApp({
         void arAnalyzer.initPoseTracker();
         await fetchAllData();
         await submissionWorkspace.load();
+        await enrollmentAdmin.load();
       }
     });
     const coach = useCoachMode(t);
@@ -82,6 +85,7 @@ createApp({
     const arAnalyzer = createArAnalyzerController({ selectedPlayer });
     const privateMedia = usePrivateMedia({ auth, players, coachRoster, analyzer: arAnalyzer });
     const submissionWorkspace=useSubmissionWorkspace({auth,players,coachRoster,onProfile:playerFeature.selectPlayer});
+    const enrollmentAdmin=useEnrollmentAdmin({auth});
     const emptyPlayerForm = { ...playerFeature.newPlayer.value };
     const emptySessionForm = { ...sessionFeature.newSession.value };
     const emptyVideoForm = { ...videoFeature.newDrillVideo.value };
@@ -138,6 +142,7 @@ createApp({
       coach.lockCoachMode();
       privateMedia.resetMedia();
       submissionWorkspace.reset();
+      enrollmentAdmin.reset();
       clearPlayerChart();
       analytics.expandedSessionIds.clear();
       analytics.hasChartData.value = false;
@@ -159,7 +164,7 @@ createApp({
     const signInAndLoad = () => auth.signIn();
     const signOutAndClear = () => auth.signOut();
     onMounted(() => auth.initializeAuth());
-    onUnmounted(() => { auth.disposeAuth(); submissionWorkspace.dispose(); });
+    onUnmounted(() => { auth.disposeAuth(); submissionWorkspace.dispose(); enrollmentAdmin.dispose(); });
 
     return {
       currentLang, t, saveLanguage, loading, isSaving, currentView, overviewTab, searchQuery,
@@ -170,6 +175,7 @@ createApp({
       ...arAnalyzer,
       // Passing the original refs (not Vue-unwrapped copies) maintains DOM/video ownership.
       submissionController: markRaw(submissionWorkspace),
+      enrollmentAdminController: markRaw(enrollmentAdmin),
       privateMediaController: markRaw(privateMedia),
       analyzerController: markRaw(arAnalyzer)
     };
