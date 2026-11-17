@@ -19,6 +19,7 @@ export const SubmissionWorkspace={
   <p v-if="busy" role="status" class="text-sm text-slate-300">Working securely…</p>
   <p v-if="error" role="alert" class="text-sm text-rose-300 bg-rose-950/40 border border-rose-800/60 rounded-lg p-3">{{ error }}</p>
   <p v-if="notice" role="status" class="text-sm text-emerald-300 bg-emerald-950/40 border border-emerald-800/60 rounded-lg p-3">{{ notice }}</p>
+  <p v-if="statsAvailable" class="text-xs text-slate-400">Family summaries and charts show up to the latest 200 permitted sessions per baseball profile.</p>
   <div v-if="tab==='players'" class="grid gap-4 md:grid-cols-2" aria-label="My Players">
     <div v-if="!cards.length" class="md:col-span-2 rounded-xl border border-slate-700 bg-slate-900/70 p-6 text-center space-y-2">
       <p class="text-slate-300 font-semibold">No verified children are linked to this account. Coach accounts can use the team roster and review center.</p>
@@ -92,6 +93,21 @@ export const SubmissionWorkspace={
         <button v-if="!club.consent_active&&club.status==='active'" @click="clubConsent(club,true)" :disabled="!enabled||!ready||busy||consentAccepted[club.id]!==true" class="p-3 bg-blue-700 rounded disabled:opacity-50">Grant club consent</button>
         <button v-if="club.consent_active" @click="clubConsent(club,false)" :disabled="!enabled||!ready||busy" class="p-3 bg-slate-700 rounded">Withdraw club consent</button>
         <details><summary class="py-2">Consent history</summary><ol class="text-xs"><li v-for="(entry,i) in club.history" :key="i">{{ entry.at }} · {{ entry.action }} · {{ entry.policy_version }}</li></ol></details>
+      </article>
+    </section>
+    <section v-if="statisticsEnrollments.length" aria-label="Separate baseball statistics consent" class="space-y-3 rounded-xl border border-blue-800 p-3">
+      <h3 class="font-semibold">Separate baseball profile and leaderboard sharing</h3>
+      <p class="text-sm text-slate-300">Optional; default is no sharing. Video consent does not authorize these fields. Share only the selected official metrics, performance dates and rankings with current teams in this club. Family session histories, height, weight and private notes are never included in team listings. Withdrawing preserves private family access.</p>
+      <article v-for="club in statisticsEnrollments" :key="club.id+club.generation" class="border-t border-slate-700 pt-3 space-y-2">
+        <p class="font-semibold">{{ club.organization_name }} · {{ club.status }}</p>
+        <template v-if="statisticsChoices[club.id]">
+          <label class="flex gap-3 py-2 items-start text-sm"><input type="checkbox" v-model="statisticsChoices[club.id].roster" :disabled="!enabled||!ready||busy||club.status!=='active'" /><span>I consent to sharing my child's preferred name, jersey, position and throws/bats with current club teams.</span></label>
+          <fieldset class="grid grid-cols-1 sm:grid-cols-2 gap-2" :disabled="!statisticsChoices[club.id].roster||!enabled||!ready||busy||club.status!=='active'">
+            <label v-for="metric in ['exit_velo','throwing_velo','sprint_time','broad_jump_ratio']" :key="metric" class="flex gap-3 py-2 text-sm"><input type="checkbox" :value="metric" v-model="statisticsChoices[club.id].metrics" /><span>{{ {exit_velo:'Official exit velocity',throwing_velo:'Official throwing velocity',sprint_time:'Official sprint time',broad_jump_ratio:'Official jump/height ratio (no raw height)'}[metric] }}</span></label>
+          </fieldset>
+          <p class="text-xs text-slate-400">Separate policy {{ statisticsPolicyVersion }}. Coach approval is also required for every official statistic. This does not grant sharing in another club.</p>
+          <button @click="saveStatisticConsent(club)" :disabled="!enabled||!ready||busy||club.status!=='active'" class="w-full sm:w-auto rounded bg-blue-700 p-3 disabled:opacity-50">Save separate sharing choices</button>
+        </template>
       </article>
     </section>
     <div class="flex flex-wrap gap-2 items-center"><label>Status<select v-model="filter" class="p-3 bg-slate-900 rounded ml-2"><option value="all">All</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select></label><button @click="refreshItems" :disabled="!enabled||!ready||!playerId||busy" class="p-3 bg-slate-700 rounded disabled:opacity-50">Refresh history</button></div>

@@ -52,6 +52,12 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   const checkbox=label.children.find(n=>n.type==='input');assert.equal(checkbox.props['onUpdate:modelValue'] instanceof Function,true);
   checkbox.props['onUpdate:modelValue'](true);await Vue.nextTick();assert.equal(submissions.consentAccepted.value['test-enrollment'],true);
   assert.match(flatten(host),/no annual or per-video renewal/);
+  submissions.statisticsEnrollments.value=[{id:'stat-enrollment',generation:'stat-generation',organization_name:'Synthetic club',status:'active'}];
+  submissions.statisticsChoices.value={'stat-enrollment':{roster:false,metrics:[]}};
+  await Vue.nextTick();assert.match(flatten(host),/Video consent does not authorize these fields/);
+  const statLabel=elements(host).find(n=>n.type==='label'&&flatten(n).includes("I consent to sharing my child's preferred name"));
+  assert.ok(statLabel);statLabel.children.find(n=>n.type==='input').props['onUpdate:modelValue'](true);
+  await Vue.nextTick();assert.equal(submissions.statisticsChoices.value['stat-enrollment'].roster,true);
   submissions.items.value=[{id:'s',category:'throwing',status:'rejected',history:[{at:'now',action:'rejected',note:'Try again'}],can_consent:true}];
   await Vue.nextTick();assert.match(flatten(host),/Submission history/);
   submissions.changeTab('review');submissions.queue.value=[{id:'s',preferred_name:'Test player',team_name:'Team',category:'pitching',status:'pending',history:[],can_review:true}];

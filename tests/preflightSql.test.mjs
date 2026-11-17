@@ -7,7 +7,7 @@ const runtime=process.env.SDL004_PGLITE_RUNTIME;
 const sql=fs.readFileSync(new URL('../backend/release/staging-preflight.sql',import.meta.url),'utf8');
 test('staging preflight fails closed on missing dependencies, partial migrations and history drift',{skip:!runtime},async t=>{
  const db=await pilotDatabase(t,runtime);
- await db.exec(`CREATE TABLE public.sessions(id uuid); CREATE TABLE public.drill_videos(id uuid);
+ await db.exec(`CREATE TABLE public.drill_videos(id uuid);
  ALTER TABLE public.players ENABLE ROW LEVEL SECURITY; ALTER TABLE public.sessions ENABLE ROW LEVEL SECURITY; ALTER TABLE public.drill_videos ENABLE ROW LEVEL SECURITY;
  REVOKE ALL ON FUNCTION public.sdl_004_media_can_access(uuid,text) FROM PUBLIC,anon;
  GRANT EXECUTE ON FUNCTION public.sdl_004_media_can_access(uuid,text) TO authenticated;
@@ -19,8 +19,11 @@ test('staging preflight fails closed on missing dependencies, partial migrations
   ['missing reviewed history',`SET sdl004.expected_migration_history=''`,/migration-history/],
   ['only submissions table exists','CREATE TABLE public.sdl_video_submissions(id uuid)',/all new workflow tables/],
   ['only reservation table exists','CREATE TABLE public.sdl_submission_uploads(id uuid)',/all new workflow tables/],
-  ...['sdl_club_enrollments','sdl_club_consents','sdl_club_consent_events'].map(name=>[name+' already exists','CREATE TABLE public.'+name+'(id uuid)',/all new workflow tables/]),
+  ...['sdl_club_enrollments','sdl_club_consents','sdl_club_consent_events','sdl_statistic_consents','sdl_official_statistics'].map(name=>[name+' already exists','CREATE TABLE public.'+name+'(id uuid)',/all new workflow tables/]),
   ['leftover membership generation','ALTER TABLE public.player_team_memberships ADD COLUMN sdl_consent_epoch uuid',/drift/],
+  ['leftover statistics RPC',"CREATE FUNCTION public.sdl_004_player_statistics() RETURNS integer LANGUAGE sql AS 'SELECT 1'",/drift/],
+  ['missing statistics source key','ALTER TABLE public.sessions DROP CONSTRAINT sessions_pkey',/dependency/],
+  ['missing safe statistic column','ALTER TABLE public.sessions DROP COLUMN attack_angle',/dependency/],
   ['missing pilot dependency','DROP TABLE public.drill_videos',/dependency/],
   ['incompatible dependency column','ALTER TABLE public.sdl_media_objects ALTER COLUMN byte_size TYPE integer',/dependency/],
   ['missing pilot RPC','DROP FUNCTION public.sdl_004_media_can_access(uuid,text)',/RPC contract/],

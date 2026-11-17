@@ -29,7 +29,7 @@ import { SessionFormModal } from '../components/SessionFormModal.js';
 import { UploadVideoModal } from '../components/UploadVideoModal.js';
 import { ArAnalyzerModal } from '../components/ArAnalyzerModal.js';
 
-const { createApp, ref, onMounted, onUnmounted, markRaw } = Vue;
+const { createApp, ref, onMounted, onUnmounted, markRaw, computed } = Vue;
 
 createApp({
   components: {
@@ -50,6 +50,8 @@ createApp({
     const players = ref([]);
     const sessions = ref([]);
     const drillVideos = ref([]);
+    const guardianProfileId=ref(''),guardianProfileSessions=ref([]);
+    const analyticsSessions=computed(()=>currentView.value==='player'&&guardianProfileId.value===selectedPlayer.value?.id?guardianProfileSessions.value:sessions.value);
     const coachRoster = ref([]);
     const coachRosterLoading = ref(false);
     const coachRosterError = ref('');
@@ -68,7 +70,7 @@ createApp({
       }
     });
     const coach = useCoachMode(t);
-    const analytics = useAnalytics({ players, sessions, selectedPlayer, currentView, searchQuery, t });
+    const analytics = useAnalytics({ players, sessions:analyticsSessions, selectedPlayer, currentView, searchQuery, t });
     const playerFeature = usePlayers({
       players, sessions, drillVideos, selectedPlayer, currentView,
       expandedSessionIds: analytics.expandedSessionIds,
@@ -93,7 +95,8 @@ createApp({
       players,
       coachRoster,
       sessions,
-      onProfile: playerFeature.selectPlayer,
+      onProfile: (player,permitted=[])=>{guardianProfileId.value=player.id;guardianProfileSessions.value=permitted;playerFeature.selectPlayer(player);},
+      onFamilyStatistics: (id,rows,denied=false)=>{if(guardianProfileId.value===id){guardianProfileSessions.value=rows;if(denied){guardianProfileId.value='';selectedPlayer.value=null;currentView.value='overview';clearPlayerChart();analytics.hasChartData.value=false;}else analytics.renderPlayerChart();}},
       onPrivateVideos: playerId => { void privateMedia.selectMediaPlayer(playerId); }
     });
     const enrollmentAdmin = useEnrollmentAdmin({ auth });
@@ -138,7 +141,7 @@ createApp({
           return;
         }
         if (auth.isVerifiedGuardian.value) {
-          // No parent-safe statistics API exists: sessions are never requested here.
+          // Family history is loaded only through the narrow Worker RPC in the workspace.
           const linked = await fetchVerifiedGuardianPlayers(auth.guardianLinks.value);
           if (!auth.isCurrentIdentity(identity)) return;
           players.value = linked.sort(compareJerseys);
@@ -170,6 +173,7 @@ createApp({
       drillVideos.value = [];
       coachRoster.value = [];
       coachRosterError.value = '';
+      guardianProfileId.value='';guardianProfileSessions.value=[];
       selectedPlayer.value = null;
       currentView.value = 'overview';
       loading.value = false;
@@ -209,6 +213,7 @@ createApp({
       ...auth, signInAndLoad, signOutAndClear,
       ...coach, ...analytics, ...playerFeature, ...sessionFeature, ...videoFeature, ...csvFeature,
       ...arAnalyzer,
+      selectPlayer: player=>{guardianProfileId.value='';guardianProfileSessions.value=[];playerFeature.selectPlayer(player);},
       // Passing the original refs (not Vue-unwrapped copies) maintains DOM/video ownership.
       submissionController: markRaw(submissionWorkspace),
       enrollmentAdminController: markRaw(enrollmentAdmin),

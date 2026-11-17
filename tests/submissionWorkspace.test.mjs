@@ -149,8 +149,9 @@ test('consent conflict refreshes enrollment generation before another acceptance
 
 test('My Players cards include permitted session summary and private video shortcut without exposing PII',async t=>{
  const privateCalled=[];
- const {h,c}=await setup(t,{},{onPrivateVideos:id=>privateCalled.push(id)});
- h.app.sessions.value=[{id:'s1',player_id:P,exit_velo:62,throwing_velo:68,sprint_time:3.45,broad_jump:155}];
+ const {h,c}=await setup(t,{hasParentStatistics:()=>true,playerStatistics:async id=>id===P?[{id:'s1',player_id:P,exit_velo:62,throwing_velo:68,sprint_time:3.45,broad_jump:155}]:[]},{onPrivateVideos:id=>privateCalled.push(id)});
+ await c.load();
+ h.app.sessions.value=[{id:'raw-coach',player_id:P,exit_velo:999}];
  const [card]=c.cards.value;
  assert.equal(card.profiles[0].sessionCount,1);
  assert.equal(card.profiles[0].latestExitVelo,62);

@@ -30,7 +30,14 @@ export async function workerHarness(role = 'coach') {
       if (rpc === 'sdl_004_media_can_access') return Response.json(body.p_player_id === PLAYER &&
         (h.role === 'coach' || (h.role === 'parent' && body.p_action === 'read')));
       if (rpc === 'sdl_004_session_active') return Response.json(!h.expired&&!h.revoked);
-      if (rpc === 'sdl_004_submission_contract') return Response.json({revision:h.revision??'sdl004-club-enrollment-v2',enrollmentAdmin:h.adminContract!==false});
+      if (rpc === 'sdl_004_submission_contract') return Response.json({revision:h.revision??'sdl004-club-enrollment-v2',enrollmentAdmin:h.adminContract!==false,clubhouseRoster:h.statisticsContract!==false,clubhouseLeaderboard:h.statisticsContract!==false,parentStatistics:h.statisticsContract!==false,statisticsConsent:h.statisticsContract!==false});
+      if(['sdl_004_clubhouse_roster','sdl_004_clubhouse_leaderboard','sdl_004_player_statistics'].includes(rpc)){
+        if(h.statisticsStatus)return new Response(null,{status:h.statisticsStatus});
+        const allowed=rpc==='sdl_004_player_statistics'?h.role==='parent'&&body.p_player_id===PLAYER:['coach','parent','teammate'].includes(h.role)&&body.p_team_id===OTHER;
+        return allowed?Response.json(h.statisticsRows??[]):new Response(null,{status:403});
+      }
+      if(rpc==='sdl_004_set_statistic_consent')return h.role==='parent'?Response.json(null):new Response(null,{status:403});
+      if(rpc==='sdl_004_list_statistic_consents')return Response.json([]);
       if (rpc === 'sdl_004_reserve_submission') {
         if(h.conflict)return new Response(null,{status:409});
         if(h.completed)return Response.json({state:'complete',id:VIDEO,player_id:PLAYER,category:'pitching',status:'pending',share_with_team:false});
@@ -58,7 +65,7 @@ export async function workerHarness(role = 'coach') {
     if (init.method === 'POST') { h.records.push(JSON.parse(init.body)); return new Response(null, { status: 201 }); }
     return Response.json(h.records);
   };
-  const context = vm.createContext({ fetch: fetchMock, Headers, Request, Response, URL, Uint8Array, TextEncoder, crypto: webcrypto });
+  const context = vm.createContext({ fetch: fetchMock, Headers, Request, Response, URL, Uint8Array, TextEncoder, TextDecoder, crypto: webcrypto });
   const source = fs.readFileSync(new URL('../../backend/verified/staging-worker.phase2.mjs', import.meta.url), 'utf8');
   const module = new vm.SourceTextModule(source + '\nexport { verifyIdentity, adminQuery, limitedBytes, configOk, validId, json, ORIGINS };', { context });
   await module.link(() => { throw Error('unexpected dependency'); }); await module.evaluate();

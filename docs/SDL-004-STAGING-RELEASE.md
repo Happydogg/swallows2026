@@ -11,6 +11,9 @@ The approved manual administration interface and current file/test report are in
 Windows backup/preflight setup, current nonsecret Worker preservation evidence and remaining blockers:
 [SDL-004-WINDOWS-RELEASE.md](SDL-004-WINDOWS-RELEASE.md). No backup or restore is yet verified.
 
+Parent-safe roster/leaderboard/history integration, separate statistic consent, approval RPCs and
+updated staging prerequisites: [SDL-004-PARENT-BACKEND.md](SDL-004-PARENT-BACKEND.md).
+
 Both flags remain disabled:
 
 - `js/config.js`: `SUBMISSION_FEATURES_ENABLED=false`.
@@ -25,7 +28,7 @@ media URLs, secrets in browser code, extra paid resources or new deployment bind
 
 - Existing CLI-generated, still-unapplied migration:
   `supabase/migrations/20261116184847_sdl004_submission_workflows.sql`.
-  It creates five tables, narrow RPCs and lifecycle/immutable-audit triggers; there is no compatibility
+  It creates seven tables, narrow RPCs and lifecycle/immutable-audit triggers; there is no compatibility
   migration. Existing player_team_memberships is not altered by this final design.
 - Complete Worker entrypoint: `backend/worker/index.mjs`; preserved v1 `pilot.mjs`; current v2
   implementation `submissionRoutes.mjs` with revision `sdl004-club-enrollment-v2` checked on every call.
@@ -33,8 +36,7 @@ media URLs, secrets in browser code, extra paid resources or new deployment bind
   and `check:release`. Unknown binding/compatibility/settings drift blocks release; the uploader
   retains existing secret values. Local builds without reviewed metadata are not deployable artifacts.
 - Guarded `backend/release/run-staging-preflight.mjs`, read-only pre/postflight SQL and deliberately
-  unconfirmed `worker-baseline.example.json`. Both old workflow tables and all three new consent
-  tables must be absent. Old draft schema/functions, missing pilot prerequisites, grants/RLS drift,
+  unconfirmed `worker-baseline.example.json`. All seven workflow/consent/statistics tables must be absent. Old draft schema/functions, missing pilot prerequisites, grants/RLS drift,
   incompatible dependency types and unreconciled migration history raise errors.
 - `backend/proposals/*` are compatibility pointers to canonical source. Do not apply old proposal SQL.
 
@@ -57,7 +59,7 @@ npm test
 
 Root dependencies are test-only pinned Vue/PGlite; the browser remains Vue global build and ES
 modules without a bundler. The Worker build has its own locked dependencies. Current full result:
-**221 passed, 0 failed, 0 skipped**, including existing v1/authentication/analyzer/statistics regression
+**285 passed, 0 failed, 0 skipped**, including existing v1/authentication/analyzer/statistics regression
 cases, real isolated SQL, actual Vue compilation/rendering, and local workerd with outbound traffic
 forbidden. Mocked authorization/R2 tests are labeled; they do not prove deployed policies.
 Native mobile testing, actual PostgreSQL contention, Supabase/PostgREST responses and live v2

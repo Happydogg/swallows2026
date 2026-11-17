@@ -21,7 +21,7 @@ export async function until(predicate) {
   }
   assert.fail('Timed out waiting for application state');
 }
-export async function harness(t, initialUser = null) {
+export async function harness(t, initialUser = null, options = {}) {
   const h = { inAuthCallback: false, user: initialUser, rows: {}, queues: {}, calls: [], poseCalls: 0,
     closedTrackers: 0, revoked: [], emitLogin: false, unsubscribed: 0, frames: [] };
   const result = (key, fallback) => h.queues[key]?.length ? h.queues[key].shift() : fallback;
@@ -99,7 +99,11 @@ export async function harness(t, initialUser = null) {
   } });
   const modules = new Map();
   function load(file) {
-    if (!modules.has(file)) modules.set(file, new vm.SourceTextModule(fs.readFileSync(file, 'utf8'), { context, identifier: file }));
+    if (!modules.has(file)) {
+      let source=fs.readFileSync(file,'utf8');
+      if(options.submissionsEnabled===true&&file===path.join(root,'js/config.js'))source=source.replace('SUBMISSION_FEATURES_ENABLED = false','SUBMISSION_FEATURES_ENABLED = true');
+      modules.set(file,new vm.SourceTextModule(source,{context,identifier:file}));
+    }
     return modules.get(file);
   }
   const app = load(path.join(root, 'js/app.js'));

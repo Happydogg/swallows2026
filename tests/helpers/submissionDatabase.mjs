@@ -19,7 +19,9 @@ export async function pilotDatabase(t,runtime){
     CREATE TABLE public.profiles(id uuid PRIMARY KEY,status text);
     CREATE TABLE public.organizations(id uuid PRIMARY KEY,status text,name text DEFAULT 'Organization');
     CREATE TABLE public.teams(id uuid PRIMARY KEY,organization_id uuid,status text,name text DEFAULT 'Team');
-    CREATE TABLE public.players(id uuid PRIMARY KEY,athlete_id uuid,organization_id uuid,preferred_name text DEFAULT 'Player');
+    CREATE TABLE public.players(id uuid PRIMARY KEY,athlete_id uuid,organization_id uuid,preferred_name text DEFAULT 'Player',jersey text,position text,throws text,bats text);
+    CREATE TABLE public.sessions(id uuid PRIMARY KEY,player_id uuid REFERENCES public.players(id),session_date date NOT NULL,
+      exit_velo numeric,throwing_velo numeric,sprint_time numeric,broad_jump numeric,height_cm numeric,weight_kg numeric,control_exit_velo numeric,attack_angle numeric,shoulder_check text);
     CREATE TABLE public.athlete_guardians(athlete_id uuid,user_id uuid,status text);
     CREATE TABLE public.player_team_memberships(player_id uuid,team_id uuid,organization_id uuid,status text,end_date date,start_date date DEFAULT CURRENT_DATE,id uuid DEFAULT gen_random_uuid());
     CREATE TABLE public.team_memberships(team_id uuid,user_id uuid,status text,role text);

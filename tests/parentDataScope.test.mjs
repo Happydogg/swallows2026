@@ -139,7 +139,7 @@ test('coach accounts keep the legacy loader and safe roster RPC', async t => {
   assert.equal(sessionCalls(h).length, 1);
   assert.equal(h.calls.some(c => c.rpc === 'sdl_004_coach_roster'), true);
   assert.equal(h.app.sessions.value.length, 1);
-  assert.equal(h.app.submissionController.statsAvailable.value, true);
+  assert.equal(h.app.submissionController.statsAvailable.value, false, 'Coach rows are not a family statistics source');
 });
 
 test('templates render explicit statistics-unavailable states and keep existing bindings', () => {

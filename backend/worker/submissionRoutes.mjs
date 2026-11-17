@@ -3,7 +3,7 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
   async function rpc(env, bearer, name, body) {
     try {
       const response = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/${name}`, {
-        method: 'POST', redirect: 'error', headers: { apikey: env.SUPABASE_PUBLISHABLE_KEY,
+        method: 'POST', redirect: 'manual', headers: { apikey: env.SUPABASE_PUBLISHABLE_KEY,
           Authorization: bearer, 'Content-Type': 'application/json' }, body: JSON.stringify(body)
       });
       if (!response.ok) return { error: true, status: [400,401,403,404,409,413,415].includes(response.status) ? response.status : 503 };
@@ -26,7 +26,51 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
       if (active.value !== true) return json({error:'Session expired or revoked'},401,origin);
       const contract = await call('sdl_004_submission_contract', {});
       if (contract.error || contract.value?.revision !== 'sdl004-club-enrollment-v2') return json({error:'Backend contract unavailable'},503,origin);
-      if (path === '/v2/capabilities' && request.method === 'GET') return json({revision:'sdl004-club-enrollment-v2',submissions:true,review:true,clubhouse:true,clubConsent:true,enrollmentAdmin:contract.value.enrollmentAdmin===true},200,origin);
+      if (path === '/v2/capabilities' && request.method === 'GET') return json({revision:'sdl004-club-enrollment-v2',submissions:true,review:true,clubhouse:true,clubConsent:true,enrollmentAdmin:contract.value.enrollmentAdmin===true,clubhouseRoster:contract.value.clubhouseRoster===true,clubhouseLeaderboard:contract.value.clubhouseLeaderboard===true,parentStatistics:contract.value.parentStatistics===true,statisticsConsent:contract.value.statisticsConsent===true},200,origin);
+      // Narrow caller-JWT RPCs: authorization and column restrictions live in PostgreSQL.
+      const statisticsPlayer=path.match(/^\/v2\/players\/([^/]+)\/statistics$/);
+      const statisticsRead=statisticsPlayer||['/v2/clubhouse/roster','/v2/clubhouse/leaderboard'].includes(path);
+      if(statisticsRead){
+        if(request.method!=='GET')return json({error:'Method not allowed'},405,origin);
+        const player=statisticsPlayer?.[1],team=url.searchParams.get('team_id');
+        if(player?!validId(player):!validId(team))return json({error:'Invalid identifier'},400,origin);
+        if([...url.searchParams.keys()].some(k=>statisticsPlayer||k!=='team_id')||(!statisticsPlayer&&url.searchParams.getAll('team_id').length!==1))return json({error:'Unexpected query'},400,origin);
+        const kind=statisticsPlayer?'parentStatistics':path.endsWith('/roster')?'clubhouseRoster':'clubhouseLeaderboard';
+        if(contract.value[kind]!==true)return json({error:'Safe statistics contract unavailable'},503,origin);
+        const name=statisticsPlayer?'sdl_004_player_statistics':kind==='clubhouseRoster'?'sdl_004_clubhouse_roster':'sdl_004_clubhouse_leaderboard';
+        const result=await call(name,statisticsPlayer?{p_player_id:player}:{p_team_id:team});
+        if(result.error)return json({error:'Statistics access denied or unavailable'},result.status,origin);
+        const fields=statisticsPlayer?['id','player_id','session_date','exit_velo','throwing_velo','sprint_time','broad_jump','control_exit_velo','attack_angle','height_cm','weight_kg']:
+          kind==='clubhouseRoster'?['id','team_id','team_name','preferred_name','jersey','position','throws','bats']:
+          ['id','player_id','team_id','team_name','metric','preferred_name','jersey','value','unit','rank','recorded_at'];
+        const max=statisticsPlayer?200:kind==='clubhouseRoster'?100:12;
+        if(!Array.isArray(result.value)||result.value.length>max||result.value.some(row=>!row||typeof row!=='object'||!validId(row.id)||
+          (statisticsPlayer?row.player_id!==player:row.team_id!==team)))return json({error:'Invalid statistics response'},503,origin);
+        return json({items:result.value.map(row=>Object.fromEntries(fields.map(k=>[k,row[k]??null]))),...(statisticsPlayer?{historyLimit:200}:{})},200,origin);
+      }
+      if(path==='/v2/statistic-consents'&&request.method==='GET'){
+        if(contract.value.statisticsConsent!==true)return json({error:'Statistics consent contract unavailable'},503,origin);
+        const athlete=url.searchParams.get('athlete_id');if(!validId(athlete))return json({error:'Invalid athlete'},400,origin);
+        const result=await call('sdl_004_list_statistic_consents',{p_athlete:athlete});
+        return result.error?json({error:'Statistics consent unavailable'},result.status,origin):json({items:result.value},200,origin);
+      }
+      const statisticsConsent=path.match(/^\/v2\/club-enrollments\/([^/]+)\/statistics-consent$/);
+      if(statisticsConsent){
+        if(request.method!=='POST')return json({error:'Method not allowed'},405,origin);
+        if(contract.value.statisticsConsent!==true)return json({error:'Statistics consent contract unavailable'},503,origin);
+        if(!validId(statisticsConsent[1]))return json({error:'Invalid enrollment'},400,origin);
+        // Small JSON only. Bound the stream even when a Content-Length is missing/forged.
+        let body;try{
+          const reader=request.body?.getReader();if(!reader)throw Error();let size=0;const parts=[];
+          while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>2048){await reader.cancel();return json({error:'Request too large'},413,origin);}parts.push(value);}
+          const bytes=new Uint8Array(size);let offset=0;for(const part of parts){bytes.set(part,offset);offset+=part.byteLength;}body=JSON.parse(new TextDecoder().decode(bytes));
+        }catch{return json({error:'Invalid JSON'},400,origin);}
+        if(!validId(body?.generation)||typeof body.roster!=='boolean'||!Array.isArray(body.metrics)||body.metrics.length>4||
+          body.metrics.some(m=>!['exit_velo','throwing_velo','sprint_time','broad_jump_ratio'].includes(m))||new Set(body.metrics).size!==body.metrics.length||
+          (!body.roster&&body.metrics.length)||(body.roster&&body.policy_version!=='sdl004-baseball-statistics-v1'))return json({error:'Explicit separate statistics consent required'},400,origin);
+        const result=await call('sdl_004_set_statistic_consent',{p_enrollment:statisticsConsent[1],p_generation:body.generation,p_roster:body.roster,p_metrics:body.metrics,p_policy_version:body.roster?body.policy_version:null});
+        return result.error?json({error:'Statistics consent denied or changed'},result.status,origin):json({updated:true},200,origin);
+      }
       if(path.startsWith('/v2/admin/')) {
         if(contract.value.enrollmentAdmin!==true)return json({error:'Enrollment administration backend unavailable'},503,origin);
         if(request.method!=='GET')return json({error:'Method not allowed'},405,origin);

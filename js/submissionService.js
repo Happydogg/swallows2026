@@ -1,6 +1,7 @@
 import { SUBMISSION_FEATURES_ENABLED } from './config.js';
 import { createPrivateMediaService, MediaError } from './privateMediaService.js';
 import { projectClubhouseRoster, projectClubhouseLeaderboard } from '../utils/dashboardUtils.js';
+export const STATISTICS_CONSENT_POLICY_VERSION='sdl004-baseball-statistics-v1';
 export const CLUB_CONSENT_POLICY_VERSION='sdl004-clubhouse-v1';
 export const SUBMISSION_REVISION='sdl004-club-enrollment-v2';
 const uuid=value=>{if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value??''))throw new MediaError('Invalid identifier.');return value;};
@@ -9,7 +10,7 @@ const text=value=>typeof value==='string'?value:'';
 const rows=data=>{if(!Array.isArray(data?.items))throw new MediaError('Invalid server response.');return data.items;};
 const status=value=>{if(!['pending','approved','rejected'].includes(value))throw new MediaError('Invalid submission status.');return value;};
 export function createSubmissionService({auth,enabled=SUBMISSION_FEATURES_ENABLED,transport=createPrivateMediaService({auth})}) {
-  let verified=null,adminAvailable=false,rosterAvailable=false,leaderboardAvailable=false;
+  let verified=null,adminAvailable=false,rosterAvailable=false,leaderboardAvailable=false,parentStatsAvailable=false,statisticsConsentAvailable=false;
   async function ready(options) {
     if(!enabled)throw new MediaError('Submissions, reviews and Clubhouse await verified backend deployment.');
     if(verified&&auth.isCurrentIdentity(verified))return;
@@ -20,6 +21,8 @@ export function createSubmissionService({auth,enabled=SUBMISSION_FEATURES_ENABLE
     adminAvailable=caps.enrollmentAdmin===true;
     rosterAvailable=caps.clubhouseRoster===true;
     leaderboardAvailable=caps.clubhouseLeaderboard===true;
+    parentStatsAvailable=caps.parentStatistics===true;
+    statisticsConsentAvailable=caps.statisticsConsent===true;
     verified=identity;
   }
   async function readyAdmin(options){await ready(options);if(!adminAvailable)throw new MediaError('Enrollment administration backend awaits deployment and verification.');}
@@ -31,6 +34,33 @@ export function createSubmissionService({auth,enabled=SUBMISSION_FEATURES_ENABLE
     preferred_name:typeof item.preferred_name==='string'?item.preferred_name:'Player',team_id:item.team_id?uuid(item.team_id):null,team_name:text(item.team_name)});
   return {
     enabled,
+    hasStatisticsConsent:()=>Boolean(verified&&auth.isCurrentIdentity(verified)&&statisticsConsentAvailable),
+    async statisticConsents(athlete,options){
+      await ready(options);if(!statisticsConsentAvailable)throw new MediaError('Statistics consent contract unavailable.');
+      return rows(await transport.requestJson(`/v2/statistic-consents?athlete_id=${uuid(athlete)}`,options)).map(row=>{
+        if(!Array.isArray(row.metrics)||row.metrics.some(m=>!['exit_velo','throwing_velo','sprint_time','broad_jump_ratio'].includes(m)))throw new MediaError('Invalid statistic consent.');
+        return {id:uuid(row.id),generation:uuid(row.generation),organization_id:uuid(row.organization_id),organization_name:text(row.organization_name),status:text(row.status),share_roster:row.share_roster===true,metrics:[...row.metrics],policy_version:text(row.policy_version)};
+      });
+    },
+    async setStatisticConsent(row,roster,metrics,options){
+      await ready(options);if(!statisticsConsentAvailable)throw new MediaError('Statistics consent contract unavailable.');
+      if(typeof roster!=='boolean'||!Array.isArray(metrics)||metrics.length>4||metrics.some(m=>!['exit_velo','throwing_velo','sprint_time','broad_jump_ratio'].includes(m))||new Set(metrics).size!==metrics.length||(!roster&&metrics.length))throw new MediaError('Invalid statistic consent.');
+      return transport.requestJson(`/v2/club-enrollments/${uuid(row.id)}/statistics-consent`,{...options,method:'POST',body:{generation:uuid(row.generation),roster,metrics,policy_version:roster?STATISTICS_CONSENT_POLICY_VERSION:null}});
+    },
+    hasParentStatistics:()=>Boolean(verified&&auth.isCurrentIdentity(verified)&&parentStatsAvailable),
+    async playerStatistics(player,options){
+      await ready(options);if(!parentStatsAvailable)throw new MediaError('Parent-safe statistics contract unavailable.');
+      const pid=uuid(player),data=rows(await transport.requestJson(`/v2/players/${pid}/statistics`,options));
+      if(data.length>200)throw new MediaError('Invalid statistics history.');
+      return data.map(row=>{
+        if(row.player_id!==pid||typeof row.session_date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(row.session_date)||!Number.isFinite(Date.parse(row.session_date)))throw new MediaError('Invalid statistics response.');
+        const result={id:uuid(row.id),player_id:pid,session_date:row.session_date};
+        for(const key of ['exit_velo','throwing_velo','sprint_time','broad_jump','control_exit_velo','attack_angle','height_cm','weight_kg']){
+          const value=row[key];if(value!=null&&((typeof value!=='number'&&typeof value!=='string')||value===''||!Number.isFinite(Number(value))))throw new MediaError('Invalid statistic value.');
+          result[key]=value==null?null:Number(value);
+        }return result;
+      }).sort((a,b)=>b.session_date.localeCompare(a.session_date)||b.id.localeCompare(a.id));
+    },
     hasClubhouseRoster:()=>Boolean(verified&&auth.isCurrentIdentity(verified)&&rosterAvailable),
     hasClubhouseLeaderboard:()=>Boolean(verified&&auth.isCurrentIdentity(verified)&&leaderboardAvailable),
     async adminOrganizations(options){await readyAdmin(options);return rows(await transport.requestJson('/v2/admin/organizations',options)).map(o=>({id:uuid(o.id),name:text(o.name)}));},

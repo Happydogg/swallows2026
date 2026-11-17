@@ -483,7 +483,7 @@ $$;
 
 CREATE FUNCTION public.sdl_004_submission_contract()
 RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
- SELECT CASE WHEN public.sdl_004_session_active() THEN jsonb_build_object('revision','sdl004-club-enrollment-v2','enrollmentAdmin',true) ELSE NULL END;
+ SELECT CASE WHEN public.sdl_004_session_active() THEN jsonb_build_object('revision','sdl004-club-enrollment-v2','enrollmentAdmin',true,'clubhouseRoster',true,'clubhouseLeaderboard',true,'parentStatistics',true,'statisticsConsent',true) ELSE NULL END;
 $$;
 CREATE FUNCTION public.sdl_004_workspace_players()
 RETURNS TABLE(id uuid,athlete_id uuid,preferred_name text,organization_id uuid,organization_name text,team_id uuid,team_name text,is_guardian boolean,is_coach boolean,can_clubhouse boolean)
@@ -496,6 +496,243 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
  WHERE public.sdl_004_session_active() AND (public.sdl_004_guardian_for((SELECT auth.uid()),p.id)
  OR (public.sdl_004_coach_for((SELECT auth.uid()),p.id) AND EXISTS (SELECT 1 FROM public.team_memberships tm WHERE tm.team_id=t.id AND tm.user_id=(SELECT auth.uid()) AND tm.role='coach' AND tm.status='active')));
 $$;
+
+-- Parent-safe read APIs. No historical session is automatically official or team-shareable.
+CREATE TABLE public.sdl_statistic_consents (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ enrollment_id uuid NOT NULL REFERENCES public.sdl_club_enrollments(id),
+ enrollment_generation uuid NOT NULL, guardian_id uuid NOT NULL REFERENCES auth.users(id),
+ policy_version text NOT NULL CHECK(policy_version='sdl004-baseball-statistics-v1'),
+ share_roster boolean NOT NULL DEFAULT false, metrics text[] NOT NULL DEFAULT '{}',
+ accepted_at timestamptz NOT NULL DEFAULT now(), withdrawn_at timestamptz, invalidated_at timestamptz,
+ CHECK(metrics <@ ARRAY['exit_velo','throwing_velo','sprint_time','broad_jump_ratio']::text[]),
+ CHECK(array_position(metrics,NULL) IS NULL), CHECK(cardinality(metrics)=0 OR share_roster)
+);
+CREATE UNIQUE INDEX ON public.sdl_statistic_consents(enrollment_id,enrollment_generation)
+ WHERE withdrawn_at IS NULL AND invalidated_at IS NULL;
+CREATE TABLE public.sdl_official_statistics (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(), session_id uuid NOT NULL REFERENCES public.sessions(id) ON DELETE CASCADE,
+ player_id uuid NOT NULL REFERENCES public.players(id), athlete_id uuid NOT NULL, organization_id uuid NOT NULL,
+ enrollment_id uuid NOT NULL REFERENCES public.sdl_club_enrollments(id), enrollment_generation uuid NOT NULL,
+ metric text NOT NULL CHECK(metric IN ('exit_velo','throwing_velo','sprint_time','broad_jump_ratio')),
+ value numeric NOT NULL CHECK(value>0 AND value<'Infinity'::numeric), recorded_at date NOT NULL,
+ source_hash text NOT NULL, invalidated_at timestamptz, approved_by uuid NOT NULL REFERENCES auth.users(id), approved_at timestamptz NOT NULL DEFAULT now(),
+ UNIQUE(session_id,metric)
+);
+CREATE INDEX ON public.sdl_official_statistics(player_id,metric);
+DO $tables$ DECLARE tab text; BEGIN
+ FOREACH tab IN ARRAY ARRAY['sdl_statistic_consents','sdl_official_statistics'] LOOP
+  EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY',tab);
+  EXECUTE format('REVOKE ALL ON public.%I FROM PUBLIC,anon,authenticated,service_role',tab);
+  EXECUTE format('GRANT SELECT ON public.%I TO service_role',tab);
+ END LOOP;
+END $tables$;
+
+-- Internal, non-browser helpers. Existing video consent is intentionally not consulted.
+CREATE FUNCTION public.sdl_004_statistics_enrollment(p_player uuid)
+RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+ SELECT e.id FROM public.players p JOIN public.sdl_club_enrollments e
+ ON e.athlete_id=p.athlete_id AND e.organization_id=p.organization_id
+ JOIN public.organizations o ON o.id=p.organization_id AND o.status='active'
+ WHERE p.id=p_player AND e.status='active' AND e.ended_at IS NULL AND e.started_at<=now();
+$$;
+CREATE FUNCTION public.sdl_004_statistics_consent(p_enrollment uuid)
+RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+ SELECT c.id FROM public.sdl_club_enrollments e JOIN public.sdl_statistic_consents c
+ ON c.enrollment_id=e.id AND c.enrollment_generation=e.generation
+ JOIN public.organizations o ON o.id=e.organization_id AND o.status='active'
+ WHERE e.id=p_enrollment AND e.status='active' AND e.ended_at IS NULL AND e.started_at<=now()
+ AND c.withdrawn_at IS NULL AND c.invalidated_at IS NULL
+ AND public.sdl_004_guardian_athlete(c.guardian_id,e.athlete_id);
+$$;
+CREATE FUNCTION public.sdl_004_statistics_source_hash(p_session uuid)
+RETURNS text LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+ SELECT md5(jsonb_build_array(s.id,s.player_id,s.session_date,s.exit_velo,s.throwing_velo,s.sprint_time,s.broad_jump,s.height_cm)::text)
+ FROM public.sessions s WHERE s.id=p_session;
+$$;
+
+-- Explicit guardian authorization for the minimal roster and chosen official metrics.
+-- This neither grants nor withdraws Clubhouse VIDEO consent.
+CREATE FUNCTION public.sdl_004_set_statistic_consent(p_enrollment uuid,p_generation uuid,p_roster boolean,p_metrics text[],p_policy_version text)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE e public.sdl_club_enrollments%ROWTYPE; receipt uuid;
+BEGIN
+ SELECT * INTO e FROM public.sdl_club_enrollments WHERE id=p_enrollment FOR UPDATE;
+ IF NOT FOUND OR NOT public.sdl_004_session_active() OR NOT public.sdl_004_guardian_athlete((SELECT auth.uid()),e.athlete_id) THEN
+  RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501'; END IF;
+ IF e.generation IS DISTINCT FROM p_generation THEN RAISE EXCEPTION 'Enrollment changed; refresh' USING ERRCODE='PT409'; END IF;
+ IF p_roster IS NULL OR p_metrics IS NULL OR array_position(p_metrics,NULL) IS NOT NULL
+ OR NOT p_metrics <@ ARRAY['exit_velo','throwing_velo','sprint_time','broad_jump_ratio']::text[]
+ OR (cardinality(p_metrics)>0 AND NOT p_roster)
+ OR cardinality(p_metrics)<>(SELECT count(DISTINCT x) FROM unnest(p_metrics) x) THEN
+  RAISE EXCEPTION 'Explicit baseball sharing choices required' USING ERRCODE='22023'; END IF;
+ IF (p_roster OR cardinality(p_metrics)>0) AND (p_policy_version IS DISTINCT FROM 'sdl004-baseball-statistics-v1'
+ OR e.status<>'active' OR e.ended_at IS NOT NULL OR e.started_at>now()
+ OR NOT EXISTS(SELECT 1 FROM public.organizations WHERE id=e.organization_id AND status='active')) THEN
+  RAISE EXCEPTION 'Active enrollment and separate statistics policy required' USING ERRCODE='22023'; END IF;
+ PERFORM 1 FROM public.athlete_guardians WHERE athlete_id=e.athlete_id AND user_id=(SELECT auth.uid()) AND status='verified' FOR SHARE;
+ PERFORM 1 FROM public.profiles WHERE id=(SELECT auth.uid()) AND status='active' FOR SHARE;
+ IF NOT public.sdl_004_guardian_athlete((SELECT auth.uid()),e.athlete_id) THEN RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501'; END IF;
+ UPDATE public.sdl_statistic_consents SET withdrawn_at=now() WHERE enrollment_id=e.id
+ AND enrollment_generation=e.generation AND withdrawn_at IS NULL AND invalidated_at IS NULL;
+ IF p_roster THEN
+  INSERT INTO public.sdl_statistic_consents(enrollment_id,enrollment_generation,guardian_id,policy_version,share_roster,metrics)
+  VALUES(e.id,e.generation,(SELECT auth.uid()),p_policy_version,p_roster,p_metrics) RETURNING id INTO receipt;
+ END IF;
+ INSERT INTO public.sdl_club_consent_events(enrollment_id,actor,action,details)
+ VALUES(e.id,(SELECT auth.uid()),'statistics_consent',jsonb_build_object('receipt',receipt,'generation',e.generation,
+ 'roster',p_roster,'metrics',p_metrics,'policy_version',p_policy_version));
+END;
+$$;
+CREATE FUNCTION public.sdl_004_list_statistic_consents(p_athlete uuid)
+RETURNS TABLE(id uuid,generation uuid,organization_id uuid,organization_name text,status text,share_roster boolean,metrics text[],policy_version text)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+ SELECT e.id,e.generation,e.organization_id,o.name,e.status,coalesce(c.share_roster,false),coalesce(c.metrics,'{}'),c.policy_version
+ FROM public.sdl_club_enrollments e JOIN public.organizations o ON o.id=e.organization_id
+ LEFT JOIN public.sdl_statistic_consents c ON c.id=public.sdl_004_statistics_consent(e.id)
+ WHERE e.athlete_id=p_athlete AND public.sdl_004_session_active()
+ AND public.sdl_004_guardian_athlete((SELECT auth.uid()),p_athlete) ORDER BY o.name,e.started_at DESC,e.id LIMIT 100;
+$$;
+CREATE FUNCTION public.sdl_004_statistics_consent_lifecycle()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE old_row jsonb=to_jsonb(OLD);
+BEGIN
+ IF TG_OP='UPDATE' THEN
+  IF TG_TABLE_NAME='sdl_club_enrollments' THEN
+   IF OLD.generation=NEW.generation THEN RETURN NEW; END IF;
+  ELSIF TG_TABLE_NAME='athlete_guardians' THEN
+   IF ROW(OLD.user_id,OLD.athlete_id,OLD.status) IS NOT DISTINCT FROM ROW(NEW.user_id,NEW.athlete_id,NEW.status) THEN RETURN NEW; END IF;
+  ELSIF TG_TABLE_NAME='profiles' THEN
+   IF ROW(OLD.id,OLD.status) IS NOT DISTINCT FROM ROW(NEW.id,NEW.status) THEN RETURN NEW; END IF;
+  END IF;
+ END IF;
+ WITH changed AS(UPDATE public.sdl_statistic_consents c SET invalidated_at=now()
+ WHERE c.withdrawn_at IS NULL AND c.invalidated_at IS NULL AND CASE TG_TABLE_NAME
+  WHEN 'sdl_club_enrollments' THEN c.enrollment_id=(old_row->>'id')::uuid
+  WHEN 'athlete_guardians' THEN c.guardian_id=(old_row->>'user_id')::uuid AND EXISTS(
+    SELECT 1 FROM public.sdl_club_enrollments e WHERE e.id=c.enrollment_id AND e.athlete_id=(old_row->>'athlete_id')::uuid)
+  WHEN 'profiles' THEN c.guardian_id=(old_row->>'id')::uuid ELSE false END RETURNING c.id,c.enrollment_id)
+ INSERT INTO public.sdl_club_consent_events(enrollment_id,actor,action,details)
+ SELECT enrollment_id,(SELECT auth.uid()),'statistics_consent_invalidated',jsonb_build_object('receipt',id,'reason',TG_TABLE_NAME) FROM changed;
+ IF TG_OP='DELETE' THEN RETURN OLD; END IF; RETURN NEW;
+END;
+$$;
+CREATE TRIGGER sdl_004_stat_enrollment_changed AFTER UPDATE ON public.sdl_club_enrollments FOR EACH ROW EXECUTE FUNCTION public.sdl_004_statistics_consent_lifecycle();
+CREATE TRIGGER sdl_004_stat_guardian_changed AFTER UPDATE OF user_id,athlete_id,status OR DELETE ON public.athlete_guardians FOR EACH ROW EXECUTE FUNCTION public.sdl_004_statistics_consent_lifecycle();
+CREATE TRIGGER sdl_004_stat_profile_changed AFTER UPDATE OF id,status OR DELETE ON public.profiles FOR EACH ROW EXECUTE FUNCTION public.sdl_004_statistics_consent_lifecycle();
+
+-- No legacy session is implicitly official. Only authorized current coaches/admins can
+-- attest individual allowlisted values; these RPCs do not permit editing raw sessions.
+CREATE FUNCTION public.sdl_004_approve_statistics(p_session uuid,p_metrics text[])
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE s public.sessions%ROWTYPE; p public.players%ROWTYPE; e public.sdl_club_enrollments%ROWTYPE;
+ metric_name text; metric_value numeric; height numeric;
+BEGIN
+ IF NOT public.sdl_004_session_active() THEN RAISE EXCEPTION 'Session expired or revoked' USING ERRCODE='42501'; END IF;
+ SELECT * INTO s FROM public.sessions WHERE id=p_session FOR SHARE;
+ SELECT * INTO p FROM public.players WHERE id=s.player_id FOR UPDATE;
+ IF p.id IS NULL OR NOT (public.sdl_004_coach_for((SELECT auth.uid()),p.id) OR public.sdl_004_club_admin(p.organization_id)) THEN
+  RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501'; END IF;
+ SELECT * INTO e FROM public.sdl_club_enrollments WHERE id=public.sdl_004_statistics_enrollment(p.id) FOR SHARE;
+ IF e.id IS NULL THEN RAISE EXCEPTION 'Active enrollment required' USING ERRCODE='42501'; END IF;
+ IF p_metrics IS NULL OR array_position(p_metrics,NULL) IS NOT NULL
+ OR NOT p_metrics <@ ARRAY['exit_velo','throwing_velo','sprint_time','broad_jump_ratio']::text[]
+ OR cardinality(p_metrics)<>(SELECT count(DISTINCT x) FROM unnest(p_metrics) x) THEN
+  RAISE EXCEPTION 'Invalid official metrics' USING ERRCODE='22023'; END IF;
+ -- Serialize conflicting reviews, even when no prior approval rows exist.
+ DELETE FROM public.sdl_official_statistics WHERE session_id=s.id;
+ FOREACH metric_name IN ARRAY p_metrics LOOP
+  metric_value=CASE metric_name WHEN 'exit_velo' THEN s.exit_velo WHEN 'throwing_velo' THEN s.throwing_velo WHEN 'sprint_time' THEN s.sprint_time ELSE NULL END;
+  IF metric_name='broad_jump_ratio' THEN
+   height=s.height_cm;
+   IF height IS NULL OR height=0 THEN SELECT height_cm INTO height FROM public.sessions WHERE player_id=p.id AND height_cm IS NOT NULL ORDER BY session_date DESC,id DESC LIMIT 1; END IF;
+   IF height>0 THEN metric_value=round(s.broad_jump/height,2); END IF;
+  END IF;
+  IF metric_value IS NULL OR metric_value<=0 OR metric_value>='Infinity'::numeric THEN RAISE EXCEPTION 'Metric unavailable or invalid' USING ERRCODE='22023'; END IF;
+  INSERT INTO public.sdl_official_statistics(session_id,player_id,athlete_id,organization_id,enrollment_id,enrollment_generation,metric,value,recorded_at,source_hash,approved_by)
+  VALUES(s.id,p.id,p.athlete_id,p.organization_id,e.id,e.generation,metric_name,metric_value,s.session_date,public.sdl_004_statistics_source_hash(s.id),(SELECT auth.uid()));
+ END LOOP;
+ INSERT INTO public.sdl_club_consent_events(enrollment_id,actor,action,details)
+ VALUES(e.id,(SELECT auth.uid()),'statistics_approved',jsonb_build_object('session_id',s.id,'metrics',p_metrics));
+END;
+$$;
+
+-- Source corrections require a fresh approval even if the exact old value is later restored.
+CREATE FUNCTION public.sdl_004_statistics_source_lifecycle()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+BEGIN
+ IF ROW(OLD.id,OLD.player_id,OLD.session_date,OLD.exit_velo,OLD.throwing_velo,OLD.sprint_time,OLD.broad_jump,OLD.height_cm)
+ IS NOT DISTINCT FROM ROW(NEW.id,NEW.player_id,NEW.session_date,NEW.exit_velo,NEW.throwing_velo,NEW.sprint_time,NEW.broad_jump,NEW.height_cm) THEN RETURN NEW; END IF;
+ WITH changed AS(UPDATE public.sdl_official_statistics SET invalidated_at=now()
+ WHERE session_id=OLD.id AND invalidated_at IS NULL RETURNING enrollment_id,metric)
+ INSERT INTO public.sdl_club_consent_events(enrollment_id,actor,action,details)
+ SELECT enrollment_id,(SELECT auth.uid()),'statistics_source_invalidated',jsonb_build_object('session_id',OLD.id,'metric',metric) FROM changed;
+ RETURN NEW;
+END;
+$$;
+CREATE TRIGGER sdl_004_statistics_source_changed AFTER UPDATE OF id,player_id,session_date,exit_velo,throwing_velo,sprint_time,broad_jump,height_cm
+ ON public.sessions FOR EACH ROW EXECUTE FUNCTION public.sdl_004_statistics_source_lifecycle();
+
+CREATE FUNCTION public.sdl_004_clubhouse_roster(p_team_id uuid)
+RETURNS TABLE(id uuid,team_id uuid,team_name text,preferred_name text,jersey text,"position" text,throws text,bats text)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS $$
+BEGIN
+ IF NOT public.sdl_004_clubhouse_member(p_team_id) THEN RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501'; END IF;
+ RETURN QUERY SELECT DISTINCT p.id,t.id,t.name,p.preferred_name,p.jersey,p.position,p.throws,p.bats
+ FROM public.teams t JOIN public.player_team_memberships pm ON pm.team_id=t.id AND pm.organization_id=t.organization_id
+ JOIN public.players p ON p.id=pm.player_id AND p.organization_id=t.organization_id
+ JOIN public.sdl_statistic_consents c ON c.id=public.sdl_004_statistics_consent(public.sdl_004_statistics_enrollment(p.id))
+ WHERE t.id=p_team_id AND pm.status='active' AND pm.end_date IS NULL AND pm.start_date<=CURRENT_DATE AND c.share_roster
+ ORDER BY p.preferred_name,p.id LIMIT 100;
+END;
+$$;
+CREATE FUNCTION public.sdl_004_clubhouse_leaderboard(p_team_id uuid)
+RETURNS TABLE(id uuid,player_id uuid,team_id uuid,team_name text,metric text,preferred_name text,jersey text,value numeric,unit text,rank integer,recorded_at text)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS $$
+BEGIN
+ IF NOT public.sdl_004_clubhouse_member(p_team_id) THEN RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501'; END IF;
+ RETURN QUERY WITH eligible AS(
+ SELECT DISTINCT a.id,a.player_id,t.id AS team_id,t.name AS team_name,a.metric,p.preferred_name,p.jersey,a.value,a.recorded_at
+ FROM public.sdl_official_statistics a JOIN public.players p ON p.id=a.player_id AND p.athlete_id=a.athlete_id AND p.organization_id=a.organization_id
+ JOIN public.sdl_club_enrollments e ON e.id=a.enrollment_id AND e.generation=a.enrollment_generation AND e.id=public.sdl_004_statistics_enrollment(p.id)
+ JOIN public.sdl_statistic_consents c ON c.id=public.sdl_004_statistics_consent(e.id)
+ JOIN public.player_team_memberships pm ON pm.player_id=p.id AND pm.organization_id=p.organization_id
+ JOIN public.teams t ON t.id=pm.team_id AND t.organization_id=p.organization_id
+ WHERE t.id=p_team_id AND pm.status='active' AND pm.end_date IS NULL AND pm.start_date<=CURRENT_DATE
+ AND a.invalidated_at IS NULL AND c.share_roster AND a.metric=ANY(c.metrics) AND a.source_hash=public.sdl_004_statistics_source_hash(a.session_id)
+ ), best AS(
+ SELECT DISTINCT ON (x.metric,x.player_id) x.* FROM eligible x
+ ORDER BY x.metric,x.player_id,CASE WHEN x.metric='sprint_time' THEN x.value ELSE -x.value END,x.recorded_at DESC,x.id
+ ), ranked AS(
+ SELECT x.*,row_number() OVER(PARTITION BY x.metric ORDER BY CASE WHEN x.metric='sprint_time' THEN x.value ELSE -x.value END,x.player_id)::integer AS place FROM best x
+ ) SELECT x.id,x.player_id,x.team_id,x.team_name,x.metric,x.preferred_name,x.jersey,x.value,
+ CASE x.metric WHEN 'sprint_time' THEN 's' WHEN 'broad_jump_ratio' THEN 'x' ELSE 'km/h' END,x.place,x.recorded_at::text
+ FROM ranked x WHERE x.place<=3 ORDER BY x.metric,x.place;
+END;
+$$;
+CREATE FUNCTION public.sdl_004_player_statistics(p_player_id uuid)
+RETURNS TABLE(id uuid,player_id uuid,session_date date,exit_velo numeric,throwing_velo numeric,sprint_time numeric,broad_jump numeric,
+ control_exit_velo numeric,attack_angle numeric,height_cm numeric,weight_kg numeric)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS $$
+BEGIN
+ IF NOT public.sdl_004_session_active() OR NOT public.sdl_004_guardian_for((SELECT auth.uid()),p_player_id)
+ OR public.sdl_004_statistics_enrollment(p_player_id) IS NULL THEN RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501'; END IF;
+ RETURN QUERY SELECT s.id,s.player_id,s.session_date,s.exit_velo,s.throwing_velo,s.sprint_time,s.broad_jump,
+ s.control_exit_velo,s.attack_angle,s.height_cm,s.weight_kg FROM public.sessions s
+ WHERE s.player_id=p_player_id ORDER BY s.session_date DESC,s.id DESC LIMIT 200;
+END;
+$$;
+DO $statistics_grants$ DECLARE r record; BEGIN
+ FOR r IN SELECT p.oid::regprocedure sig,p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+ WHERE n.nspname='public' AND p.proname=ANY(ARRAY['sdl_004_statistics_enrollment','sdl_004_statistics_consent','sdl_004_statistics_source_hash',
+ 'sdl_004_set_statistic_consent','sdl_004_list_statistic_consents','sdl_004_statistics_consent_lifecycle','sdl_004_statistics_source_lifecycle','sdl_004_approve_statistics',
+ 'sdl_004_clubhouse_roster','sdl_004_clubhouse_leaderboard','sdl_004_player_statistics']) LOOP
+  EXECUTE 'REVOKE ALL ON FUNCTION '||r.sig||' FROM PUBLIC,anon,authenticated,service_role';
+  IF r.proname=ANY(ARRAY['sdl_004_set_statistic_consent','sdl_004_list_statistic_consents','sdl_004_approve_statistics','sdl_004_clubhouse_roster','sdl_004_clubhouse_leaderboard','sdl_004_player_statistics']) THEN
+   EXECUTE 'GRANT EXECUTE ON FUNCTION '||r.sig||' TO authenticated';
+  END IF;
+ END LOOP;
+END $statistics_grants$;
 
 DO $grants$ DECLARE r record; BEGIN
  FOR r IN SELECT p.oid::regprocedure AS sig,p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace

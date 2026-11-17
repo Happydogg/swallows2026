@@ -11,9 +11,14 @@ SELECT role_name,
  has_function_privilege(role_name,'public.sdl_004_finish_submission(uuid,uuid,uuid)','EXECUTE') AS finalize_must_be_false
 FROM (VALUES ('anon'),('authenticated')) roles(role_name);
 SELECT relname,relrowsecurity FROM pg_class WHERE oid IN
- ('public.sdl_video_submissions'::regclass,'public.sdl_submission_uploads'::regclass,'public.sdl_club_enrollments'::regclass,'public.sdl_club_consents'::regclass,'public.sdl_club_consent_events'::regclass);
+ ('public.sdl_video_submissions'::regclass,'public.sdl_submission_uploads'::regclass,'public.sdl_club_enrollments'::regclass,'public.sdl_club_consents'::regclass,'public.sdl_club_consent_events'::regclass,'public.sdl_statistic_consents'::regclass,'public.sdl_official_statistics'::regclass);
 SELECT role_name,relation,
  has_table_privilege(role_name,relation,'INSERT,UPDATE,DELETE,TRUNCATE') AS direct_mutation_must_be_false
 FROM (VALUES ('anon'),('authenticated'),('service_role')) roles(role_name)
-CROSS JOIN (VALUES ('public.sdl_club_enrollments'),('public.sdl_club_consents'),('public.sdl_club_consent_events')) tables(relation);
+CROSS JOIN (VALUES ('public.sdl_club_enrollments'),('public.sdl_club_consents'),('public.sdl_club_consent_events'),('public.sdl_statistic_consents'),('public.sdl_official_statistics')) tables(relation);
+SELECT role_name,relation,has_table_privilege(role_name,relation,'SELECT') AS direct_read_must_be_false
+FROM (VALUES ('anon'),('authenticated')) roles(role_name)
+CROSS JOIN (VALUES ('public.sdl_statistic_consents'),('public.sdl_official_statistics')) tables(relation);
+SELECT public.sdl_004_submission_contract() AS authenticated_contract_must_include_safe_statistics;
+-- With an owner connection the contract is null. Verify flags with synthetic authenticated users.
 COMMIT;
