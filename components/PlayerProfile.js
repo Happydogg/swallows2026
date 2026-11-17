@@ -106,6 +106,11 @@ export const PlayerProfile = {
     </div>
   </div>
 
+  <!-- Family accounts: no parent-safe statistics API exists, so raw sessions are not loaded. -->
+  <div v-if="!isCoach && getPlayerSessions(selectedPlayer.id).length === 0" class="rounded-xl border border-amber-800/50 bg-amber-950/20 p-4 text-sm text-amber-300 no-print" role="status" data-stats-unavailable>
+    Dated session metrics, velocity and growth charts await the parent-safe statistics service. Raw session records are not requested for family accounts.
+  </div>
+
   <!-- Interactive Chart (Hidden on Print) -->
   <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-5 no-print">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-slate-700/60 pb-3">

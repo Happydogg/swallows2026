@@ -40,7 +40,8 @@ export const SubmissionWorkspace={
           <span class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-200">#{{ profile.jersey }}</span>
         </div>
         <p class="text-sm text-slate-200">#{{ profile.jersey }} · {{ profile.position }} · Throws {{ profile.throws }} / Bats {{ profile.bats }}</p>
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-950/70 p-2.5 rounded-lg border border-slate-800 text-xs font-mono">
+        <p v-if="!profile.statsAvailable" class="text-xs text-amber-300 bg-amber-950/20 border border-amber-800/50 rounded-lg p-2.5" role="status" data-stats-unavailable>{{ statsUnavailableNotice }}</p>
+        <div v-else class="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-950/70 p-2.5 rounded-lg border border-slate-800 text-xs font-mono">
           <div>
             <span class="text-slate-400 text-[10px] block">Exit Velo</span>
             <span class="text-blue-400 font-bold">{{ profile.latestExitVelo ? profile.latestExitVelo + ' km/h' : '--' }}</span>
@@ -218,12 +219,13 @@ export const SubmissionWorkspace={
               <h5 class="font-bold text-white">{{ card.name }}</h5>
               <div v-for="profile in card.profiles" :key="'stat-prof-'+profile.id" class="border-t border-slate-700/70 pt-2 space-y-2">
                 <p class="text-xs font-semibold text-blue-300">{{ profile.clubLabel }} · #{{ profile.jersey }} · {{ profile.position }}</p>
-                <div class="grid grid-cols-3 gap-2 text-xs font-mono bg-slate-900/80 p-2 rounded">
+                <p v-if="!profile.statsAvailable" class="text-xs text-amber-300 bg-amber-950/20 border border-amber-800/50 rounded p-2" role="status" data-stats-unavailable>{{ statsUnavailableNotice }}</p>
+                <div v-else class="grid grid-cols-3 gap-2 text-xs font-mono bg-slate-900/80 p-2 rounded">
                   <div><span class="text-[10px] text-slate-400 block">Exit Velo</span><span class="text-blue-400 font-bold">{{ profile.latestExitVelo ? profile.latestExitVelo + ' km/h' : '--' }}</span></div>
                   <div><span class="text-[10px] text-slate-400 block">Throw Velo</span><span class="text-emerald-400 font-bold">{{ profile.latestThrowingVelo ? profile.latestThrowingVelo + ' km/h' : '--' }}</span></div>
                   <div><span class="text-[10px] text-slate-400 block">Sprint</span><span class="text-amber-300 font-bold">{{ profile.latestSprintTime ? profile.latestSprintTime + 's' : '--' }}</span></div>
                 </div>
-                <button @click="showProfile(profile.id)" class="w-full sm:w-auto px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded text-xs font-semibold text-white">Open full baseball profile &amp; charts</button>
+                <button @click="showProfile(profile.id)" class="w-full sm:w-auto px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded text-xs font-semibold text-white">{{ profile.statsAvailable ? 'Open full baseball profile and charts' : 'Open baseball profile' }}</button>
               </div>
             </article>
           </div>

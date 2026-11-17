@@ -27,6 +27,40 @@ export async function fetchAllCloudData() {
   };
 }
 
+// SDL-004 parent-only loading. Authorization is enforced server-side by the existing
+// verified-guardian RLS on public.players; this request additionally limits scope to
+// verified linked athletes and an explicit baseball-only column list. It never queries
+// sessions (no parent-safe statistics API exists) and never uses select('*').
+export const GUARDIAN_PLAYER_COLUMNS = 'id, athlete_id, preferred_name, jersey, position, throws, bats';
+
+export function verifiedGuardianAthleteIds(guardianLinks = []) {
+  return [...new Set((guardianLinks || [])
+    .filter(link => link?.status === 'verified' && link?.athlete_id)
+    .map(link => link.athlete_id))];
+}
+
+export async function fetchVerifiedGuardianPlayers(guardianLinks = []) {
+  const athleteIds = verifiedGuardianAthleteIds(guardianLinks);
+  if (!athleteIds.length) return [];
+  const { data, error } = await supabaseClient
+    .from('players')
+    .select(GUARDIAN_PLAYER_COLUMNS)
+    .in('athlete_id', athleteIds)
+    .order('jersey', { ascending: true });
+  if (error) throw error;
+  const allowed = new Set(athleteIds);
+  // Explicit projection: discard any unexpected fields a misconfigured response may contain.
+  return (data || []).filter(p => p?.id && allowed.has(p.athlete_id)).map(p => ({
+    id: p.id,
+    athlete_id: p.athlete_id,
+    preferred_name: p.preferred_name || '',
+    jersey: p.jersey ?? '',
+    position: p.position || '',
+    throws: p.throws || '',
+    bats: p.bats || ''
+  }));
+}
+
 export async function insertPlayerRecord(payload) {
   const { data, error } = await supabaseClient
     .from('players')

@@ -48,10 +48,16 @@ export async function harness(t, initialUser = null) {
       }
     },
     from(table) {
-      h.calls.push({ table, userId: h.user?.id });
+      const entry = { table, userId: h.user?.id, columns: null, filters: [] };
+      h.calls.push(entry);
       const response = result(table, ok(h.rows[table] ?? []));
-      const q = { select() { return q; }, order() { return q; }, eq() { return q; },
-        then(yes, no) { return Promise.resolve(response).then(yes, no); } };
+      const q = {
+        select(cols) { entry.columns = cols; return q; },
+        order() { return q; },
+        eq(col, val) { entry.filters.push({ op: 'eq', col, val }); return q; },
+        in(col, vals) { entry.filters.push({ op: 'in', col, vals }); return q; },
+        then(yes, no) { return Promise.resolve(response).then(yes, no); }
+      };
       return q;
     },
     rpc(name) { h.calls.push({ rpc: name }); return Promise.resolve(result('roster', ok(h.rows.roster ?? []))); }

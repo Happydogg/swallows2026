@@ -14,16 +14,23 @@ export function useSubmissionWorkspace({auth,players,coachRoster,sessions=ref([]
   const enabled=service.enabled===true;
   const isTeamCoach=computed(()=>Boolean(auth.isTeamCoach?.value));
   const isVerifiedGuardian=computed(()=>Boolean(auth.isVerifiedGuardian?.value));
+  // Parent-only accounts have no parent-safe statistics API; raw sessions are never loaded
+  // for them, so statistics are reported as unavailable rather than derived client-side.
+  const statsAvailable=computed(()=>!auth.isParentOnly?.value&&Array.isArray(sessions?.value)&&sessions.value.length>0);
+  const statsUnavailableNotice='Permitted statistics await the parent-safe statistics service. Raw session records are not requested for family accounts.';
   const cards=computed(()=>{
     const raw=groupMyPlayers(players.value,auth.guardianLinks.value,workspace.value);
-    const sessionList=Array.isArray(sessions?.value)?sessions.value:[];
+    const available=statsAvailable.value;
+    const sessionList=available?sessions.value:[];
     return raw.map(card=>({
       ...card,
       profiles:card.profiles.map(prof=>{
+        if(!available)return {...prof,statsAvailable:false,sessionCount:null,latestExitVelo:null,latestThrowingVelo:null,latestSprintTime:null,latestBroadJump:null};
         const pSessions=sessionList.filter(s=>s&&s.player_id===prof.id);
         const latest=key=>{const found=pSessions.find(s=>s[key]!==null&&s[key]!==undefined&&s[key]!=='');return found?found[key]:null;};
         return {
           ...prof,
+          statsAvailable:true,
           sessionCount:pSessions.length,
           latestExitVelo:latest('exit_velo'),
           latestThrowingVelo:latest('throwing_velo'),
@@ -198,7 +205,7 @@ export function useSubmissionWorkspace({auth,players,coachRoster,sessions=ref([]
   function dispose(){reset();globalThis.window?.removeEventListener?.('focus',focus);}
   return{enabled,ready,tab,clubhouseSection,workspace,cards,teams,choices,clubEnrollments,consentAccepted,subjectConfirmed,consentPolicyVersion,playerId,teamId,category,share,file,previewUrl,playbackUrl,
     items,queue,shared,clubhouseRoster,clubhouseRosterSafe,clubhouseLeaderboard,clubhouseLeaderboardByMetric,clubhouseRosterReady,clubhouseLeaderboardReady,clubhouseRosterNotice,clubhouseLeaderboardNotice,
-    filter,reviewFilter,notes,shownItems,pendingCount,busy,progress,error,notice,isTeamCoach,isVerifiedGuardian,
+    filter,reviewFilter,notes,shownItems,pendingCount,busy,progress,error,notice,isTeamCoach,isVerifiedGuardian,statsAvailable,statsUnavailableNotice,
     refreshClubs,clubConsent,publish,previewError,playbackError,load,selectPlayer,selectTeam,enterReview,refreshItems,refreshQueue,refreshShared,refreshClubhouseSections,changeClubhouseSection,
     pickFile,submit,review,play,showProfile,openPrivateVideos,changeTab,reset,dispose};
 }

@@ -3,7 +3,7 @@
 import { translations } from './translations.js';
 import { clearPlayerChart } from './chartManager.js';
 import { formatImgUrl } from './mediaStorage.js';
-import { fetchAllCloudData } from './supabaseService.js';
+import { fetchAllCloudData, fetchVerifiedGuardianPlayers } from './supabaseService.js';
 import { fetchCoachRoster } from './coachRosterService.js';
 import { createArAnalyzerController } from './arAnalyzer.js';
 import { compareJerseys } from '../utils/jerseyUtils.js';
@@ -115,11 +115,24 @@ createApp({
         if (auth.isCurrentIdentity(identity)) coachRosterLoading.value = false;
       }
     };
+    // Guardian-scoped sessions: any account with guardian links (verified or not) and no
+    // coach/admin role. These must never use the legacy unrestricted loader.
+    const isGuardianScopedSession = () => !auth.isTeamCoach.value && !auth.isOrgAdmin.value &&
+      auth.guardianLinks.value.length > 0;
     const fetchAllData = async () => {
       const identity = auth.captureIdentity();
       if (!auth.isCurrentIdentity(identity)) return;
       loading.value = true;
       try {
+        if (isGuardianScopedSession()) {
+          // No parent-safe statistics API exists: sessions are never requested here.
+          const linked = await fetchVerifiedGuardianPlayers(auth.guardianLinks.value);
+          if (!auth.isCurrentIdentity(identity)) return;
+          players.value = linked.sort(compareJerseys);
+          sessions.value = [];
+          drillVideos.value = [];
+          return;
+        }
         const data = await fetchAllCloudData();
         if (!auth.isCurrentIdentity(identity)) return;
         players.value = data.players.sort(compareJerseys);
