@@ -10,7 +10,7 @@ test('Pages static export contains only frontend assets, root ES modules, safe h
  }finally{fs.rmSync(tmp,{recursive:true,force:true});}
 });
 test('Pages export refuses source symlinks and privileged credential patterns',()=>{
- const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'sdl004-pages-'));try{for(const file of frontendFiles)fs.cpSync(new URL(file,source),path.join(tmp,file),{recursive:true});fs.writeFileSync(path.join(tmp,'js/accident.js'),'const accidental="sb_secret_synthetic_fixture";');assert.throws(()=>buildStagingFrontend(tmp),/Privileged credential/);fs.rmSync(path.join(tmp,'js/accident.js'));fs.symlinkSync('/tmp',path.join(tmp,'js/unsafe'));assert.throws(()=>buildStagingFrontend(tmp),/Symlinks/);}finally{fs.rmSync(tmp,{recursive:true,force:true});}
+ const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'sdl004-pages-')),outside=fs.mkdtempSync(path.join(os.tmpdir(),'sdl004-pages-target-'));try{for(const file of frontendFiles)fs.cpSync(new URL(file,source),path.join(tmp,file),{recursive:true});fs.writeFileSync(path.join(tmp,'js/accident.js'),'const accidental="sb_secret_synthetic_fixture";');assert.throws(()=>buildStagingFrontend(tmp),/Privileged credential/);fs.rmSync(path.join(tmp,'js/accident.js'));fs.symlinkSync(outside,path.join(tmp,'js/unsafe'),process.platform==='win32'?'junction':'dir');assert.throws(()=>buildStagingFrontend(tmp),/Symlinks/);}finally{fs.rmSync(tmp,{recursive:true,force:true});fs.rmSync(outside,{recursive:true,force:true});}
 });
 
 test('Pages export refuses an import from backend source even when that local file exists',()=>{

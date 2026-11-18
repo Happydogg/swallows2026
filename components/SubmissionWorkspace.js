@@ -1,8 +1,9 @@
 import {PerformanceInbox} from './PerformanceInbox.js';
+import {translations} from '../js/translations.js';
 // No privileged flags are derived from form fields; server capabilities remain required.
 export const SubmissionWorkspace={
-  name:'SubmissionWorkspace',components:{PerformanceInbox},props:{controller:{type:Object,required:true},pilotController:{type:Object,default:null}},
-  setup(props){return {...props.controller,pilot:props.pilotController};},
+  name:'SubmissionWorkspace',components:{PerformanceInbox},props:{controller:{type:Object,required:true},pilotController:{type:Object,default:null},t:{type:Function,default:key=>translations.en[key]||key}},
+  setup(props){return {...props.controller,pilot:props.pilotController,t:props.t};},
   template:`
 <section class="my-6 rounded-xl border border-slate-700 bg-slate-800 p-4 space-y-4 no-print" aria-label="Player and video workspace">
   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -152,36 +153,37 @@ export const SubmissionWorkspace={
       </article>
     </template>
     <template v-else>
-      <div class="rounded-xl border border-slate-700 bg-slate-900/60 p-4 space-y-4" aria-label="Team Clubhouse read-only workspace">
+      <div class="rounded-xl border border-slate-700 bg-slate-900/60 p-3 sm:p-4 space-y-4" :aria-label="t('clubhouseTitle')+' '+t('clubhouseReadOnly')">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-800 pb-3">
           <div>
-            <h3 class="font-bold text-lg text-white">Team Clubhouse</h3>
-            <p class="text-xs text-slate-400">Read-only team space · Only approved, consented team data is shown. No family contacts, DOB, or registration numbers.</p>
+            <h3 class="font-bold text-lg text-white">{{ t('clubhouseTitle') }}</h3>
+            <p class="text-xs text-slate-400">{{ t('clubhouseSummary') }}</p>
           </div>
-          <span class="self-start sm:self-auto text-xs px-2.5 py-1 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono">Read-Only View</span>
+          <span class="self-start sm:self-auto text-xs px-2.5 py-1 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono">{{ t('clubhouseReadOnly') }}</span>
         </div>
 
-        <nav class="grid grid-cols-2 sm:grid-cols-4 gap-2" aria-label="Team Clubhouse sections">
-          <button v-for="sec in [{id:'roster',label:'1. Team Roster'},{id:'leaderboard',label:'2. Leaderboard'},{id:'stats',label:'3. Player Statistics'},{id:'videos',label:'4. Approved Videos'}]"
+        <nav class="sticky top-2 z-10 grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-xl border border-slate-700 bg-slate-900/95 p-2 backdrop-blur" :aria-label="t('clubhouseSections')">
+          <button v-for="sec in [{id:'roster',label:t('clubhouseRosterTab')},{id:'leaderboard',label:t('clubhouseLeaderboardTab')},{id:'stats',label:t('clubhouseStatsTab')},{id:'videos',label:t('clubhouseVideosTab')}]"
             :key="sec.id" @click="changeClubhouseSection(sec.id)" :aria-pressed="clubhouseSection===sec.id"
-            class="px-3 py-2.5 rounded-lg text-xs sm:text-sm font-medium transition"
+            :aria-label="sec.label"
+            class="min-h-12 px-2 py-3 sm:px-3 rounded-lg text-xs sm:text-sm font-medium leading-tight transition"
             :class="clubhouseSection===sec.id?'bg-blue-600 text-white font-semibold shadow':'bg-slate-800 text-slate-300 hover:bg-slate-700'">
             {{ sec.label }}
           </button>
         </nav>
 
         <!-- Section 1: Team Roster (Parent-Safe Read-Only) -->
-        <section v-if="clubhouseSection==='roster'" class="space-y-3" aria-label="Clubhouse Team Roster">
+        <section v-if="clubhouseSection==='roster'" class="space-y-3" :aria-label="t('clubhouseRosterHeading')">
           <div class="flex items-center justify-between">
-            <h4 class="font-semibold text-sm text-white">Team Roster (Approved Baseball Fields Only)</h4>
-            <span class="text-xs text-slate-400">{{ clubhouseRosterSafe.length }} players</span>
+            <h4 class="font-semibold text-sm text-white">{{ t('clubhouseRosterHeading') }}</h4>
+            <span class="text-xs text-slate-400">{{ clubhouseRosterSafe.length }} {{ t('clubhousePlayers') }}</span>
           </div>
           <div v-if="!clubhouseRosterReady" class="rounded-lg border border-amber-800/50 bg-amber-950/20 p-4 space-y-1" role="status">
-            <p class="text-sm font-semibold text-amber-300">Parent-safe Team Roster service coming soon</p>
-            <p class="text-xs text-slate-300">{{ clubhouseRosterNotice || 'The dedicated parent-safe Clubhouse roster endpoint (/v2/clubhouse/roster) awaits backend deployment and verification. Unrestricted coach rosters and raw player records are never reused here.' }}</p>
+            <p class="text-sm font-semibold text-amber-300">{{ t('clubhouseRosterPending') }}</p>
+            <p class="text-xs text-slate-300">{{ clubhouseRosterNotice || t('clubhouseRosterPendingDetail') }}</p>
           </div>
           <div v-else-if="!clubhouseRosterSafe.length" class="rounded-lg border border-slate-800 bg-slate-900 p-4 text-sm text-slate-400">
-            No approved, consented team roster entries are available for the selected team yet.
+            {{ t('clubhouseRosterEmpty') }}
           </div>
           <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <article v-for="member in clubhouseRosterSafe" :key="member.team_id+':'+member.id" class="rounded-lg border border-slate-700 bg-slate-800/80 p-3.5 space-y-1.5">
@@ -190,39 +192,39 @@ export const SubmissionWorkspace={
                 <span class="text-xs font-mono px-2 py-0.5 rounded bg-slate-900 text-blue-300">#{{ member.jersey }}</span>
               </div>
               <p class="text-xs text-slate-400">{{ member.team_name }}</p>
-              <p class="text-xs text-slate-200">Position: {{ member.position }} · Throws {{ member.throws }} / Bats {{ member.bats }}</p>
+              <p class="text-xs text-slate-200">{{ t('clubhousePosition') }}: {{ member.position }} · {{ t('clubhouseThrows') }} {{ member.throws }} / {{ t('clubhouseBats') }} {{ member.bats }}</p>
             </article>
           </div>
         </section>
 
         <!-- Section 2: Leaderboard (Parent-Safe Read-Only) -->
-        <section v-if="clubhouseSection==='leaderboard'" class="space-y-3" aria-label="Clubhouse Leaderboard">
+        <section v-if="clubhouseSection==='leaderboard'" class="space-y-3" :aria-label="t('clubhouseLeaderboardHeading')">
           <div class="flex items-center justify-between">
-            <h4 class="font-semibold text-sm text-white">Team Leaderboard (Top 3 Approved Metrics)</h4>
-            <span class="text-xs text-slate-400">Consented team members only</span>
+            <h4 class="font-semibold text-sm text-white">{{ t('clubhouseLeaderboardHeading') }}</h4>
+            <span class="text-xs text-slate-400">{{ t('clubhouseConsentedMembers') }}</span>
           </div>
           <div v-if="!clubhouseLeaderboardReady" class="rounded-lg border border-amber-800/50 bg-amber-950/20 p-4 space-y-1" role="status">
-            <p class="text-sm font-semibold text-amber-300">Parent-safe Team Leaderboard service coming soon</p>
-            <p class="text-xs text-slate-300">{{ clubhouseLeaderboardNotice || 'The dedicated parent-safe Clubhouse leaderboard endpoint (/v2/clubhouse/leaderboard) awaits backend deployment and verification. Unverified or raw session records are never used to populate team leaderboards.' }}</p>
+            <p class="text-sm font-semibold text-amber-300">{{ t('clubhouseLeaderboardPending') }}</p>
+            <p class="text-xs text-slate-300">{{ clubhouseLeaderboardNotice || t('clubhouseLeaderboardPendingDetail') }}</p>
           </div>
           <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <p v-if="!clubhouseBoards.length" class="text-sm text-slate-400">No approved leaderboard entries.</p>
-            <article v-for="board in clubhouseBoards" :key="board.key" class="rounded-lg border border-slate-700 bg-slate-900 p-3 space-y-2"><h5 class="font-semibold">{{ board.title }}</h5><p class="text-xs text-slate-400">Latest valid official measurement per athlete in this protocol</p><ol><li v-for="item in board.items" :key="item.id" class="py-2 text-sm">#{{ item.rank || '—' }} {{ item.preferred_name }} · #{{ item.jersey }} · {{ item.value }} {{ item.unit }}<span class="block text-xs text-slate-400">{{ item.recorded_at }}</span></li></ol></article>
+            <p v-if="!clubhouseBoards.length" class="text-sm text-slate-400">{{ t('clubhouseLeaderboardEmpty') }}</p>
+            <article v-for="board in clubhouseBoards" :key="board.key" class="rounded-lg border border-slate-700 bg-slate-900 p-3 space-y-2"><h5 class="font-semibold">{{ board.title }}</h5><p class="text-xs text-slate-400">{{ t('clubhouseLatestMeasurement') }}</p><ol><li v-for="item in board.items" :key="item.id" class="py-2 text-sm">#{{ item.rank || '—' }} {{ item.preferred_name }} · #{{ item.jersey }} · {{ item.value }} {{ item.unit }}<span class="block text-xs text-slate-400">{{ item.recorded_at }}</span></li></ol></article>
           </div>
         </section>
 
         <!-- Section 3: Player Statistics (Permitted Linked Child Access + Teammate Notice) -->
-        <section v-if="clubhouseSection==='stats'" class="space-y-3" aria-label="Clubhouse Player Statistics">
+        <section v-if="clubhouseSection==='stats'" class="space-y-3" :aria-label="t('clubhouseStatsHeading')">
           <div class="flex items-center justify-between">
-            <h4 class="font-semibold text-sm text-white">Player Statistics</h4>
-            <span class="text-xs text-slate-400">Permitted athlete profiles</span>
+            <h4 class="font-semibold text-sm text-white">{{ t('clubhouseStatsHeading') }}</h4>
+            <span class="text-xs text-slate-400">{{ t('clubhousePermittedProfiles') }}</span>
           </div>
           <div class="rounded-lg border border-slate-700 bg-slate-800/60 p-3.5 text-xs text-slate-300 space-y-1">
-            <p class="font-semibold text-slate-200">Privacy &amp; Authorization Policy</p>
-            <p>Detailed dated session histories and physical growth charts are restricted to your verified linked children. Teammate individual statistics await the parent-safe Clubhouse summary service.</p>
+            <p class="font-semibold text-slate-200">{{ t('clubhousePrivacyTitle') }}</p>
+            <p>{{ t('clubhouseStatsPrivacyCopy') }}</p>
           </div>
           <div v-if="!cards.length" class="rounded-lg border border-slate-800 bg-slate-900 p-4 text-sm text-slate-400">
-            No verified linked children are available on this account for individual statistics review.
+            {{ t('clubhouseStatsEmpty') }}
           </div>
           <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-3">
             <article v-for="card in cards" :key="'stats-'+card.athlete_id" class="rounded-lg border border-slate-700 bg-slate-800/80 p-3.5 space-y-2.5">
@@ -231,32 +233,32 @@ export const SubmissionWorkspace={
                 <p class="text-xs font-semibold text-blue-300">{{ profile.clubLabel }} · #{{ profile.jersey }} · {{ profile.position }}</p>
                 <p v-if="!profile.statsAvailable" class="text-xs text-amber-300 bg-amber-950/20 border border-amber-800/50 rounded p-2" role="status" data-stats-unavailable>{{ statsUnavailableNotice }}</p>
                 <div v-else class="grid grid-cols-3 gap-2 text-xs font-mono bg-slate-900/80 p-2 rounded">
-                  <div><span class="text-[10px] text-slate-400 block">Exit Velo</span><span class="text-blue-400 font-bold">{{ profile.latestExitVelo ? profile.latestExitVelo + ' km/h' : '--' }}</span></div>
-                  <div><span class="text-[10px] text-slate-400 block">Throw Velo</span><span class="text-emerald-400 font-bold">{{ profile.latestThrowingVelo ? profile.latestThrowingVelo + ' km/h' : '--' }}</span></div>
-                  <div><span class="text-[10px] text-slate-400 block">Sprint</span><span class="text-amber-300 font-bold">{{ profile.latestSprintTime ? profile.latestSprintTime + 's' : '--' }}</span></div>
+                  <div><span class="text-[10px] text-slate-400 block">{{ t('clubhouseExitVelocity') }}</span><span class="text-blue-400 font-bold">{{ profile.latestExitVelo ? profile.latestExitVelo + ' km/h' : '--' }}</span></div>
+                  <div><span class="text-[10px] text-slate-400 block">{{ t('clubhouseThrowVelocity') }}</span><span class="text-emerald-400 font-bold">{{ profile.latestThrowingVelo ? profile.latestThrowingVelo + ' km/h' : '--' }}</span></div>
+                  <div><span class="text-[10px] text-slate-400 block">{{ t('clubhouseSprint') }}</span><span class="text-amber-300 font-bold">{{ profile.latestSprintTime ? profile.latestSprintTime + 's' : '--' }}</span></div>
                 </div>
-                <button @click="showProfile(profile.id)" class="w-full sm:w-auto px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded text-xs font-semibold text-white">{{ profile.statsAvailable ? 'Open full baseball profile and charts' : 'Open baseball profile' }}</button>
+                <button @click="showProfile(profile.id)" class="w-full sm:w-auto min-h-11 px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded text-xs font-semibold text-white">{{ t(profile.statsAvailable ? 'clubhouseOpenFullProfile' : 'clubhouseOpenProfile') }}</button>
               </div>
             </article>
           </div>
         </section>
 
         <!-- Section 4: Approved Videos (Coach-Published & Consented) -->
-        <section class="space-y-3 border-t border-slate-800 pt-3" aria-label="Clubhouse Approved Videos">
+        <section v-if="clubhouseSection==='videos'" class="space-y-3 border-t border-slate-800 pt-3" :aria-label="t('clubhouseVideoHeading')">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h4 class="font-semibold text-sm text-white">Approved Team Videos</h4>
-              <p class="text-xs text-slate-400">Coach-published videos with current standing club consent only. Authorization is rechecked for every request; the list refreshes while this view is active.</p>
+              <h4 class="font-semibold text-sm text-white">{{ t('clubhouseVideoHeading') }}</h4>
+              <p class="text-xs text-slate-400">{{ t('clubhouseVideoPolicy') }}</p>
             </div>
-            <button @click="refreshShared" :disabled="!enabled||!ready||!teamId||busy" class="p-3 rounded bg-slate-700 text-sm disabled:opacity-50">Refresh team videos</button>
+            <button @click="refreshShared" :disabled="!enabled||!ready||!teamId||busy" class="min-h-11 w-full sm:w-auto px-3 py-2 rounded bg-slate-700 text-sm disabled:opacity-50">{{ t('clubhouseRefreshVideos') }}</button>
           </div>
-          <p v-if="!shared.length" class="text-sm text-slate-400">No approved, shareable videos loaded.</p>
-          <article v-for="item in shared" :key="item.id" class="rounded bg-slate-900 p-3 flex flex-wrap items-center justify-between gap-3">
+          <p v-if="!shared.length" class="text-sm text-slate-400">{{ t('clubhouseVideosEmpty') }}</p>
+          <article v-for="item in shared" :key="item.id" class="rounded bg-slate-900 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <span class="font-semibold text-white">{{ item.preferred_name }} · {{ item.category }}</span>
               <p v-if="item.created_at" class="text-xs text-slate-400">{{ item.created_at }}</p>
             </div>
-            <button @click="play(item,'clubhouse')" :disabled="!enabled||!ready||busy" class="p-3 bg-blue-700 rounded text-sm">Play approved video</button>
+            <button @click="play(item,'clubhouse')" :disabled="!enabled||!ready||busy" class="min-h-11 w-full sm:w-auto px-3 py-2 bg-blue-700 rounded text-sm">{{ t('clubhousePlayVideo') }}</button>
           </article>
         </section>
       </div>

@@ -63,13 +63,15 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   submissions.changeTab('review');submissions.queue.value=[{id:'s',preferred_name:'Test player',team_name:'Team',category:'pitching',status:'pending',history:[],can_review:true}];
   await Vue.nextTick();assert.match(flatten(host),/Approve/);
   submissions.changeTab('clubhouse');submissions.shared.value=[{id:'s',preferred_name:'Test teammate',category:'batting'}];
-  await Vue.nextTick();assert.match(flatten(host),/Play approved video/);
+  await Vue.nextTick();
   assert.match(flatten(host),/1\. Team Roster/);
   assert.match(flatten(host),/2\. Leaderboard/);
   assert.match(flatten(host),/3\. Player Statistics/);
   assert.match(flatten(host),/4\. Approved Videos/);
   assert.match(flatten(host),/Parent-safe Team Roster service coming soon/);
+  submissions.changeClubhouseSection('videos');await Vue.nextTick();assert.match(flatten(host),/Play approved video/);
   // Populate Clubhouse roster and leaderboard with authorized fixtures containing extra private fields to verify PII is stripped
+  submissions.changeClubhouseSection('roster');
   submissions.teamId.value='55555555-5555-4555-8555-555555555555';
   submissions.clubhouseRosterReady.value=true;
   submissions.clubhouseRoster.value=[{
