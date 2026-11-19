@@ -24,6 +24,7 @@ import { PrivateMediaPanel } from '../components/PrivateMediaPanel.js';
 import { useVideos } from '../composables/useVideos.js';
 import { useAnalytics } from '../composables/useAnalytics.js';
 import { useRosterCsv } from '../composables/useRosterCsv.js';
+import { LoginLanding } from '../components/LoginLanding.js';
 import { AppHeader } from '../components/AppHeader.js';
 import { TeamOverview } from '../components/TeamOverview.js';
 import { CoachTeamRoster } from '../components/CoachTeamRoster.js';
@@ -37,7 +38,7 @@ const { createApp, ref, onMounted, onUnmounted, markRaw, computed } = Vue;
 
 createApp({
   components: {
-    PilotWorkspace, PerformanceInbox, AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
+    PilotWorkspace, PerformanceInbox, LoginLanding, AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
     SessionFormModal, UploadVideoModal, ArAnalyzerModal
   },
   setup() {
@@ -249,7 +250,8 @@ createApp({
         }
       },
       // Passing the original refs (not Vue-unwrapped copies) maintains DOM/video ownership.
-      pilotController:markRaw(pilotWorkspace),
+      loginController: markRaw(auth),
+       pilotController:markRaw(pilotWorkspace),
       submissionController: markRaw(submissionWorkspace),
       enrollmentAdminController: markRaw(enrollmentAdmin),
       privateMediaController: markRaw(privateMedia),
