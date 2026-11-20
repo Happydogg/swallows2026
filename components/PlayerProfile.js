@@ -9,6 +9,7 @@ export const PlayerProfile = {
     t: { type: Function, required: true },
     selectedPlayer: { type: Object, required: true },
     isCoach: { type: Boolean, required: true },
+    canEditPhoto: { type: Boolean, default: false },
     failedImgs: { type: Object, required: true },
     formatImgUrl: { type: Function, required: true },
     markImgFailed: { type: Function, required: true },
@@ -38,7 +39,7 @@ export const PlayerProfile = {
     removeSession: { type: Function, required: true },
     deleteDrillVideo: { type: Function, required: true }
   },
-  emits: ["back", "open-submissions"],
+  emits: ["back", "open-submissions", "edit-photo"],
   setup(props) {
     const demoMatch=Vue.computed(()=>/^DEMO\s/.test(String(props.selectedPlayer?.preferred_name||'')) && /^(2[1-9]|3[0-5])$/.test(String(props.selectedPlayer?.jersey||'')));
     return { demoMatch };
@@ -68,7 +69,7 @@ export const PlayerProfile = {
   </div>
 
   <!-- SDL-UX-005: Reused athletic player hero. All original profile fields are passed through. -->
-  <player-hero-card variant="profile" :player="selectedPlayer" :is-coach="isCoach"
+  <player-hero-card variant="profile" :player="selectedPlayer" :is-coach="isCoach" :can-edit-photo="canEditPhoto" @edit-photo="$emit('edit-photo',$event)"
     :t="t" :failed-imgs="failedImgs" :format-img-url="formatImgUrl" :mark-img-failed="markImgFailed"
     :format-legal-name="formatLegalName" :get-player-display-name="getPlayerDisplayName"
     :get-latest-metric="getLatestMetric" :split-positions="splitPositions" :calculate-age="calculateAge"
