@@ -1,6 +1,6 @@
 // Static allowlisted export only. Never deploys, reads environment secrets or includes backend artifacts.
 import fs from 'node:fs';import path from 'node:path';import {fileURLToPath,pathToFileURL} from 'node:url';
-export const frontendFiles=['index.html','logo.png','components','composables','js','utils'];
+export const frontendFiles=['index.html','logo.png','components','composables','js','utils','assets/demo-players'];
 const repo=fileURLToPath(new URL('../../',import.meta.url));
 export function buildStagingFrontend(root=repo){
  root=path.resolve(root);
@@ -10,10 +10,14 @@ export function buildStagingFrontend(root=repo){
  const files=[];
  const copy=(relative)=>{const source=path.join(root,relative),stat=fs.lstatSync(source);if(stat.isSymbolicLink())throw Error('Symlinks are not allowed in frontend export');
   if(stat.isDirectory()){for(const entry of fs.readdirSync(source))copy(path.join(relative,entry));return;}
-  if(!/\.(js|html|png)$/.test(relative))throw Error('Unexpected frontend asset type: '+relative);
+  if(!/\.(js|html|png)$/.test(relative) && !(/^assets[\\/]demo-players[\\/]\d{2}\.svg$/.test(relative)))throw Error('Unexpected frontend asset type: '+relative);
   if(/\.(js|html)$/.test(relative)){
    const text=fs.readFileSync(source,'utf8');if(/sb_secret_|SUPABASE_SERVICE_ROLE_KEY|-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(text))throw Error('Privileged credential pattern in frontend source');
    for(const match of text.matchAll(/(?:from\s*|import\s*)['"](\.[^'"]+)['"]/g)){const dependency=path.resolve(path.dirname(source),match[1]);if(!dependency.startsWith(root+path.sep)||!fs.existsSync(dependency))throw Error('Missing or external local ES module');}
+  }
+  if(/\.svg$/.test(relative)){
+   const svg=fs.readFileSync(source,'utf8');
+   if(!svg.includes('Fictional baseball player avatar')||!svg.includes('>DEMO</text>')||/<script\b|<foreignObject\b|\bon(?:load|error|click)\s*=|(?:href|src)\s*=\s*['"](?:https?:|data:)/i.test(svg))throw Error('Unsafe demo avatar asset');
   }
   fs.mkdirSync(path.dirname(path.join(out,relative)),{recursive:true});fs.copyFileSync(source,path.join(out,relative));files.push(relative.replaceAll(path.sep,'/'));
  };
