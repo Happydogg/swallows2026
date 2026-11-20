@@ -206,3 +206,27 @@ test('a video shortcut cannot navigate for unlinked or revoked players', async t
   assert.equal(h.app.activeTab.value,'videos');
   assert.equal(h.app.privateMediaController.mediaPlayerId.value,'');
 });
+
+test('compact mobile player editing is reached only from the dedicated Player Profile',()=>{
+  const profile=fs.readFileSync(new URL('../components/PlayerProfile.js',import.meta.url),'utf8');
+  const hero=fs.readFileSync(new URL('../components/PlayerHeroCard.js',import.meta.url),'utf8');
+  const parent=fs.readFileSync(new URL('../components/ParentHome.js',import.meta.url),'utf8');
+  const editor=fs.readFileSync(new URL('../components/AvatarManager.js',import.meta.url),'utf8');
+  const app=fs.readFileSync(new URL('../js/app.js',import.meta.url),'utf8');
+  assert.equal((profile.match(/t\('editPlayer'\)/g)||[]).length,1);
+  assert.ok(profile.includes('v-if="canEditPhoto || isCoach"'));
+  assert.ok(profile.includes('@click="editPlayer"'));
+  assert.ok(profile.includes("emit('edit-photo',props.selectedPlayer.id)"));
+  assert.ok(profile.includes('props.openEditPlayerModal(props.selectedPlayer)'));
+  assert.ok(!hero.includes('Change profile picture'));
+  assert.ok(!parent.includes('Change profile picture'));
+  assert.ok(parent.includes("$emit('open-profile',player)"));
+  assert.ok(editor.includes('>Edit Player</h2>'));
+  assert.ok(editor.includes('Other player details remain read-only'));
+  assert.ok(!editor.includes('>Change photo'));
+  assert.ok(app.includes('submissionWorkspace.showProfile(player.id)'));
+  assert.ok(app.includes('avatarManager.rows.value.find'));
+  assert.ok(index.includes('@open-profile="openFamilyPlayerProfile"'));
+  assert.ok(index.includes('@open-profile="openManagedPlayerProfile"'));
+  assert.ok(index.includes(':show-list="activeTab === \'me\' && workspaceMode === \'admin\'"'));
+});
