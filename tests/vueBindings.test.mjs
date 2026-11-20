@@ -165,7 +165,10 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   h.app.privateMediaController.mediaReadAllowed.value = true;
   h.app.privateMediaController.mediaPlayerId.value = '11111111-1111-4111-8111-111111111111';
   h.app.privateMediaController.mediaItems.value = [{ id: '33333333-3333-4333-8333-333333333333', byte_size: 12 }];
-  await Vue.nextTick(); assert.match(flatten(host), /Play privately/);
+  await Vue.nextTick();
+  assert.match(h.options.components.PrivateMediaPanel.template,/Play privately/);
+  // A hidden/unapproved origin must never reveal even the selected clip title.
+  assert.doesNotMatch(flatten(host),/Practice clip 1 ·/);
   h.app.selectedPlayer.value = { id: 'player', preferred_name: 'Synthetic Player', jersey: '07', dob: '2015-01-01', hkll_reg_no: 'HKLL-777', last_name: 'Secret', given_names: 'Name' };
   h.app.currentView.value = 'player'; await Vue.nextTick();
   assert.match(flatten(host), /Synthetic Player/);
