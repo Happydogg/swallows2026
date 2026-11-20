@@ -7,7 +7,14 @@
  * Replace only sdl-r2-staging-gate after staging SQL migration passes.
  */
 const STAGING_URL = 'https://wvurolqbjhuckkkjiiiv.supabase.co';
-const ORIGINS = new Set(['http://127.0.0.1:5500', 'http://localhost:5500']);
+// Exact, approved HTTPS preview origins. This list is not a player-authorization grant.
+// Existing localhost and original staging Pages origins are retained.
+const ORIGINS = new Set([
+  'http://127.0.0.1:5500',
+  'http://localhost:5500',
+  'https://sdl-staging.pages.dev',
+  'https://sdl-ux-live.pages.dev'
+]);
 const LIMIT = 20 * 1024 * 1024;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
