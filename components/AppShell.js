@@ -1,14 +1,31 @@
 // SDL-UX-002: Shared responsive chrome. UI routing does not grant permissions.
 const DESTINATIONS = Object.freeze([
-  { id: 'home', text: 'Home', symbol: '⌂' },
-  { id: 'team', text: 'Team', symbol: '♟' },
-  { id: 'stats', text: 'Stats', symbol: '▥' },
-  { id: 'videos', text: 'Videos', symbol: '▷' },
-  { id: 'me', text: 'Me', symbol: '◉' }
+  { id: 'home', text: 'Home' },
+  { id: 'team', text: 'Team' },
+  { id: 'stats', text: 'Stats' },
+  { id: 'videos', text: 'Videos' },
+  { id: 'me', text: 'Me' }
 ]);
+// SVG icon paths are static source, not content returned by athlete records.
+const AppNavIcon = {
+  name:'AppNavIcon',
+  props:{name:{type:String,required:true}},
+  template:`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6 shrink-0"
+      aria-hidden="true" focusable="false">
+      <template v-if="name==='home'"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10Z"/><path d="M9 21v-8h6v8"/></template>
+      <template v-else-if="name==='team'"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></template>
+      <template v-else-if="name==='stats'"><path d="M4 20V10M10 20V4M16 20v-8M22 20v-4"/></template>
+      <template v-else-if="name==='videos'"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m10 9 5 3-5 3V9Z"/></template>
+      <template v-else-if="name==='me'"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></template>
+    </svg>
+  `
+};
 
 export const AppShell = {
   name: 'AppShell',
+  components:{ AppNavIcon },
   props: {
     activeTab: { type: String, required: true },
     mode: { type: String, required: true },
@@ -32,7 +49,7 @@ export const AppShell = {
             @click="$emit('navigate',item.id)" :aria-current="activeTab === item.id ? 'page' : undefined"
             :class="activeTab === item.id ? 'border-blue-400/40 bg-blue-600 text-white shadow-lg shadow-blue-950/50' : 'border-transparent text-slate-300 hover:bg-slate-800 hover:text-white'"
             class="flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">
-            <span class="w-6 text-center text-xl" aria-hidden="true">{{ item.symbol }}</span>{{ item.text }}
+            <app-nav-icon :name="item.id"></app-nav-icon>{{ item.text }}
           </button>
         </nav>
         <div class="mt-auto space-y-3 border-t border-slate-800 px-2 pt-5">
@@ -75,7 +92,7 @@ export const AppShell = {
           :aria-current="activeTab===item.id ? 'page' : undefined"
           :class="activeTab===item.id ? 'text-cyan-300' : 'text-slate-400'"
           class="flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-2 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">
-          <span class="text-xl leading-none" aria-hidden="true">{{ item.symbol }}</span><span>{{ item.text }}</span>
+          <app-nav-icon :name="item.id"></app-nav-icon><span>{{ item.text }}</span>
         </button>
       </nav>
     </div>
