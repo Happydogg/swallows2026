@@ -6,6 +6,7 @@ import { LoginLanding } from './components/LoginLanding.js';
 import { InviteOnboarding } from './components/InviteOnboarding.js';
 import { PlayerHeroCard } from './components/PlayerHeroCard.js';
 import { PrivateMediaPanel } from './components/PrivateMediaPanel.js';
+import { StatsHub } from './components/StatsHub.js';
 
 const { createApp, ref, computed } = Vue;
 const demoPlayers = Object.freeze([
@@ -73,7 +74,7 @@ function previewMediaController() {
 }
 
 createApp({
-  components: { AppShell, ParentHome, CoachHome, LoginLanding, InviteOnboarding, PlayerHeroCard, PrivateMediaPanel },
+  components: { AppShell, ParentHome, CoachHome, LoginLanding, InviteOnboarding, PlayerHeroCard, PrivateMediaPanel, StatsHub },
   setup() {
     const screen = ref('app');
     const role = ref('family');
@@ -86,6 +87,18 @@ createApp({
     const loginController = previewAuthController();
     const invitationController = previewInviteController();
     const previewMediaControllerState = previewMediaController();
+    // Fictional numbers on the explicitly labeled synthetic site.
+    const previewFamilyStats = Object.freeze([
+      { athlete_id: 'demo-athlete-1', name: 'Sample Player A', profiles: [
+        { id: 'demo-player-1', clubLabel: 'Swallows Demo Team', jersey: '12',
+          position: 'SS / P', statsAvailable: true, latestExitVelo: 74,
+          latestThrowingVelo: 67, latestSprintTime: 4.2, sessionCount: 6 }
+      ] },
+      { athlete_id: 'demo-athlete-2', name: 'Sample Player B', profiles: [
+        { id: 'demo-player-2', clubLabel: 'Swallows Demo Team', jersey: '08',
+          position: 'OF', statsAvailable: false }
+      ] }
+    ]);
     const previewTranslate = key => ({
       throws:'Throws',bats:'Bats',officialName:'Official name',
       dob:'DOB',jumpRatioLabel:'Jump ratio',batSpec:'Bat specification',
@@ -129,7 +142,7 @@ createApp({
     return {
       previewViews, screen, role, activeTab, tabTitle, version, branch,
       demoPlayers, demoRoster, loginController, invitationController,
-      previewMediaControllerState, previewTranslate, demoMeasurements,
+      previewMediaControllerState, previewFamilyStats, previewTranslate, demoMeasurements,
       reportOpen, issue, reportText, copyReport, copyNotice, manualReport
     };
   }
