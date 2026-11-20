@@ -28,6 +28,7 @@ import { LoginLanding } from '../components/LoginLanding.js';
 import { AppShell } from '../components/AppShell.js';
 import { CoachHome } from '../components/CoachHome.js';
 import { ParentHome } from '../components/ParentHome.js';
+import { StagingDataBrowser } from '../components/StagingDataBrowser.js';
 import { InviteOnboarding } from '../components/InviteOnboarding.js';
 import { AppHeader } from '../components/AppHeader.js';
 import { TeamOverview } from '../components/TeamOverview.js';
@@ -42,7 +43,7 @@ const { createApp, ref, onMounted, onUnmounted, markRaw, computed } = Vue;
 
 createApp({
   components: {
-    PilotWorkspace, PerformanceInbox, LoginLanding, AppShell, CoachHome, ParentHome, InviteOnboarding, AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
+    PilotWorkspace, PerformanceInbox, LoginLanding, AppShell, CoachHome, ParentHome, StagingDataBrowser, InviteOnboarding, AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
     SessionFormModal, UploadVideoModal, ArAnalyzerModal
   },
   setup() {
@@ -100,6 +101,19 @@ createApp({
       const authorized = new Set(auth.guardianLinks.value.filter(link => link.status === 'verified').map(link => link.athlete_id));
       return players.value.filter(player => authorized.has(player.athlete_id));
     });
+    // Staging player projection: never promote viewer choice to authorization.
+    const visibleStagingPlayers = computed(() => {
+      if (auth.authError.value) return [];
+      return workspaceMode.value === 'coach' && auth.isTeamCoach.value
+        ? coachRoster.value
+        : workspaceMode.value === 'family' && auth.isVerifiedGuardian.value ? familyPlayers.value : [];
+    });
+    // Existing private-media Worker authorizes only these exact browser origins.
+    // A new Pages hostname must never spoof or work around its Origin checks.
+    const mediaOriginAllowed = computed(() =>
+      ['https://sdl-staging.pages.dev','http://127.0.0.1:5500','http://localhost:5500']
+        .includes(window.location.origin)
+    );
     const changeWorkspace = requested => {
       if (requested !== 'coach' && requested !== 'family') return;
       if (requested === 'coach' && !auth.isTeamCoach.value) return;
@@ -265,7 +279,7 @@ createApp({
       if (!['home', 'team', 'stats', 'videos', 'me'].includes(tab)) return;
       activeTab.value = tab;
       currentView.value = 'overview';
-      if (tab === 'team' && workspaceMode.value === 'family') submissionWorkspace.changeTab('clubhouse');
+      if (tab === 'team' && workspaceMode.value === 'family') submissionWorkspace.changeTab('players');
       if (tab === 'stats') {
         submissionWorkspace.changeTab(workspaceMode.value === 'coach' ? 'review' : 'players');
         overviewTab.value = 'leaderboard';
@@ -281,7 +295,7 @@ createApp({
     onUnmounted(() => { auth.disposeAuth(); submissionWorkspace.dispose(); enrollmentAdmin.dispose();pilotWorkspace.dispose(); });
 
     return {
-      currentLang, t, saveLanguage, loading, isSaving, currentView, overviewTab, activeTab, workspaceMode, familyPlayers, navigateTab, changeWorkspace, pendingInvitation, dismissInvitePrompt, searchQuery,
+      currentLang, t, saveLanguage, loading, isSaving, currentView, overviewTab, activeTab, workspaceMode, familyPlayers, visibleStagingPlayers, mediaOriginAllowed, navigateTab, changeWorkspace, pendingInvitation, dismissInvitePrompt, searchQuery,
       selectedPlayer, players, sessions, drillVideos, coachRoster, coachRosterLoading, coachRosterError,
       formatImgUrl, triggerPrintReport,
       ...auth, signInAndLoad, signOutAndClear,
