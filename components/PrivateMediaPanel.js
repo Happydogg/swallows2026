@@ -3,6 +3,21 @@
 export const PrivateMediaPanel = {
   name: 'PrivateMediaPanel',
   props: { controller: { type: Object, required: true } },
+  directives: {
+    // Demand-driven previews: only visible cards fetch their authorized MP4.
+    'media-visible': {
+      mounted(el,binding) {
+        const run=()=>binding.instance?.ensureMediaThumbnail?.(binding.value);
+        if(typeof IntersectionObserver==='undefined'){run();return;}
+        const observer=new IntersectionObserver(entries=>{
+          if(entries.some(entry=>entry.isIntersecting)){observer.disconnect();run();}
+        },{rootMargin:'120px'});
+        el.__sdlObserver=observer;
+        observer.observe(el);
+      },
+      unmounted(el){el.__sdlObserver?.disconnect();delete el.__sdlObserver;}
+    }
+  },
   setup(props) { return { ...props.controller }; },
   template: `
 <section class="my-5 space-y-5 no-print" aria-label="Private player videos">
@@ -69,18 +84,35 @@ export const PrivateMediaPanel = {
         <p class="mt-2 text-sm font-bold text-white">No private clips found</p>
         <p class="mt-1 text-xs text-slate-400">Select another player or check again after a private video has been uploaded.</p>
       </div>
-      <ul v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <li v-for="(item, index) in mediaItems" :key="item.id"
-          class="overflow-hidden rounded-2xl border border-slate-700 bg-slate-950/80">
-          <div class="flex aspect-video items-center justify-center bg-gradient-to-br from-blue-950 via-slate-900 to-slate-950" aria-hidden="true">
-            <span class="rounded-full border border-sky-300/40 bg-slate-900/60 px-5 py-3 text-3xl text-cyan-300">▶</span>
-          </div>
-          <div class="space-y-3 p-4">
-            <p class="text-sm font-bold text-white">Practice clip {{ index + 1 }}</p>
-            <p class="text-xs text-slate-400">{{ item.created_at ? new Date(item.created_at).toLocaleString() : 'New private clip' }} · {{ (item.byte_size / 1048576).toFixed(1) }} MiB</p>
+      <ul v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2" aria-label="Authorized private video library">
+        <li v-for="(item, index) in mediaItems" :key="item.id" v-media-visible="item"
+          class="flex min-w-0 overflow-hidden rounded-2xl border border-slate-700 bg-slate-950/80 sm:block">
+          <button type="button" @click="playPrivateMedia(item)" :disabled="mediaPlaybackLoading"
+            :aria-label="'Play private practice clip '+(index+1)"
+            class="relative flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden bg-slate-900 sm:aspect-video sm:h-auto sm:w-full disabled:opacity-60">
+            <img v-if="mediaThumbnails[item.id]" :src="mediaThumbnails[item.id]"
+              :alt="'Frame preview of private practice clip '+(index+1)" loading="lazy"
+              class="h-full w-full object-cover">
+            <div v-else class="flex flex-col items-center gap-2 px-2 text-center text-xs text-slate-400">
+              <span class="text-2xl text-cyan-300" aria-hidden="true">▣</span>
+              <span>{{ mediaThumbnailBusy[item.id] ? 'Loading preview…' :
+                mediaThumbnailFailed[item.id] ? 'Preview unavailable' : 'Preparing preview…' }}</span>
+            </div>
+            <span class="absolute inset-0 flex items-center justify-center bg-black/20 transition hover:bg-black/40" aria-hidden="true">
+              <span class="flex h-11 w-11 items-center justify-center rounded-full border border-cyan-200/70 bg-slate-950/70 text-xl text-cyan-200 shadow-lg">▶</span>
+            </span>
+          </button>
+          <div class="flex min-w-0 flex-1 flex-col justify-between gap-2 p-3 sm:p-4">
+            <div>
+              <p class="text-sm font-bold text-white">Practice clip {{ index + 1 }}</p>
+              <p class="mt-1 text-xs leading-relaxed text-slate-400">
+                {{ item.created_at ? new Date(item.created_at).toLocaleDateString() : 'New private clip' }}
+                · {{ (item.byte_size / 1048576).toFixed(1) }} MiB
+              </p>
+            </div>
             <button type="button" @click="playPrivateMedia(item)" :disabled="mediaPlaybackLoading"
-              class="w-full rounded-xl bg-blue-600 px-4 py-3.5 text-sm font-bold text-white hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:opacity-50">
-              Play privately
+              class="min-h-10 w-full rounded-xl bg-blue-600 px-3 py-2 text-sm font-bold text-white hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:opacity-50">
+              ▶ Play privately
             </button>
           </div>
         </li>
