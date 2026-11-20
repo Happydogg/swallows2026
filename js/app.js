@@ -73,6 +73,7 @@ createApp({
       onInvitation:token=>{initialInvitation=token;},
       onIdentityChange: previous => {if(previous?.userId)initialInvitation='';clearSensitiveState();},
       onAuthenticated: async () => {
+        const identity = auth.captureIdentity();
         if (auth.isVerifiedGuardian.value && !auth.isTeamCoach.value) {
           submissionWorkspace.changeTab('players');
           currentView.value = 'overview';
@@ -82,7 +83,7 @@ createApp({
         await submissionWorkspace.load();
         await enrollmentAdmin.load();
         await pilotWorkspace.load();
-        if(initialInvitation){pilotWorkspace.redemptionToken.value=initialInvitation;pendingInvitation.value=true;initialInvitation='';}
+        if(initialInvitation && auth.isCurrentIdentity(identity)){pilotWorkspace.redemptionToken.value=initialInvitation;pendingInvitation.value=true;initialInvitation='';}
       }
     });
     // Presentation-only selection. Every data request still uses verified server roles.
