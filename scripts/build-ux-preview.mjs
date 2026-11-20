@@ -83,7 +83,7 @@ export function buildUxPreview(root = ROOT) {
     '  Permissions-Policy: camera=(), microphone=(), geolocation=()',
     "  Content-Security-Policy: default-src 'none'; script-src 'self' 'unsafe-eval' https://cdn.tailwindcss.com https://unpkg.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'none'; frame-src 'none'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
     ''
-  ].join('\\n');
+  ].join(String.fromCharCode(10));
   fs.writeFileSync(path.join(out, '_headers'), headers);
   fs.writeFileSync(path.join(out, '404.html'), '<!doctype html><title>SDL UX Preview</title><p>Page not found.</p>');
   manifest.push('_headers', '404.html');
