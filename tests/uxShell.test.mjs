@@ -179,3 +179,30 @@ test('Stats Hub displays static staging fixture without requesting live sessions
   assert.equal(lab.includes('supabaseClient'),false);
   assert.equal(lab.includes('fetch('),false);
 });
+
+test('video shortcuts are wired through one server-scoped player route', () => {
+  const cards = fs.readFileSync(new URL('../components/StagingDataBrowser.js', import.meta.url),'utf8');
+  assert.match(cards, /emits: \['navigate', 'open-video'\]/);
+  assert.match(cards, /\$emit\('open-video', player\)/);
+  assert.match(coachHome, /\$emit\('open-video',player\)/);
+  assert.match(familyHome, /\$emit\('open-video',player\)/);
+  assert.match(index, /@open-video="openAuthorizedPlayerVideos"/);
+  assert.match(appSource, /const currentlyScoped = visibleStagingPlayers\.value\.some/);
+  assert.match(appSource, /privateMedia\.mediaPlayers\.value\.some/);
+  assert.match(appSource, /privateMedia\.selectMediaPlayer\(player\.id\)/);
+});
+
+test('a video shortcut cannot navigate for unlinked or revoked players', async t => {
+  const h = await harness(t,user('video-shortcut'));
+  h.app.guardianLinks.value = [{ athlete_id:'linked',status:'verified' },{ athlete_id:'revoked',status:'revoked' }];
+  h.app.players.value = [
+    {id:'authorized-player',athlete_id:'linked',preferred_name:'Linked'},
+    {id:'blocked-player',athlete_id:'revoked',preferred_name:'Not linked'}
+  ];
+  h.app.activeTab.value='home';
+  h.app.openAuthorizedPlayerVideos({id:'blocked-player'});
+  assert.equal(h.app.activeTab.value,'home');
+  h.app.openAuthorizedPlayerVideos({id:'authorized-player'});
+  assert.equal(h.app.activeTab.value,'videos');
+  assert.equal(h.app.privateMediaController.mediaPlayerId.value,'');
+});
