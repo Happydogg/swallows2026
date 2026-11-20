@@ -30,6 +30,9 @@ import { CoachHome } from '../components/CoachHome.js';
 import { ParentHome } from '../components/ParentHome.js';
 import { StatsHub } from '../components/StatsHub.js';
 import { StagingDataBrowser } from '../components/StagingDataBrowser.js';
+import { AvatarManager } from '../components/AvatarManager.js';
+import { useAvatarManager } from '../composables/useAvatarManager.js';
+import { publicAvatarOrFallback } from './avatarService.js';
 import { InviteOnboarding } from '../components/InviteOnboarding.js';
 import { AppHeader } from '../components/AppHeader.js';
 import { TeamOverview } from '../components/TeamOverview.js';
@@ -44,7 +47,7 @@ const { createApp, ref, onMounted, onUnmounted, markRaw, computed } = Vue;
 
 createApp({
   components: {
-    PilotWorkspace, PerformanceInbox, LoginLanding, AppShell, CoachHome, ParentHome, StatsHub, StagingDataBrowser, InviteOnboarding, AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
+    PilotWorkspace, PerformanceInbox, LoginLanding, AppShell, CoachHome, ParentHome, StatsHub, StagingDataBrowser, AvatarManager, InviteOnboarding, AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
     SessionFormModal, UploadVideoModal, ArAnalyzerModal
   },
   setup() {
@@ -82,12 +85,21 @@ createApp({
         }
         void arAnalyzer.initPoseTracker();
         await fetchAllData();
+        if (auth.isCurrentIdentity(identity)) await avatarManager.load();
         await submissionWorkspace.load();
         await enrollmentAdmin.load();
         await pilotWorkspace.load();
         if(initialInvitation && auth.isCurrentIdentity(identity)){pilotWorkspace.redemptionToken.value=initialInvitation;pendingInvitation.value=true;initialInvitation='';}
       }
     });
+    const avatarManager = useAvatarManager({auth});
+    const avatarForPlayer = player => {
+      if (!player) return '';
+      return avatarManager.photos.value[player.id] || publicAvatarOrFallback(player.photo_url,player);
+    };
+    const coachRosterDisplay = computed(() => coachRoster.value.map(row => ({
+      ...row, photo_url: avatarForPlayer(row)
+    })));
     // Presentation-only selection. Every data request still uses verified server roles.
     const workspaceMode = computed(() => {
       if (requestedWorkspace.value === 'family' && auth.isVerifiedGuardian.value) return 'family';
@@ -100,13 +112,13 @@ createApp({
     const familyPlayers = computed(() => {
       if (!auth.isVerifiedGuardian.value || auth.authError.value) return [];
       const authorized = new Set(auth.guardianLinks.value.filter(link => link.status === 'verified').map(link => link.athlete_id));
-      return players.value.filter(player => authorized.has(player.athlete_id));
+      return players.value.filter(player => authorized.has(player.athlete_id)).map(player => ({...player,photo_url:avatarForPlayer(player)}));
     });
     // Staging player projection: never promote viewer choice to authorization.
     const visibleStagingPlayers = computed(() => {
       if (auth.authError.value) return [];
       return workspaceMode.value === 'coach' && auth.isTeamCoach.value
-        ? coachRoster.value
+        ? coachRosterDisplay.value
         : workspaceMode.value === 'family' && auth.isVerifiedGuardian.value ? familyPlayers.value : [];
     });
     // Exact browser origins approved by the staging media Worker (SDL-004).
@@ -149,13 +161,13 @@ createApp({
       players,
       coachRoster,
       sessions,
-      onProfile: (player,permitted=[])=>{guardianProfileId.value=player.id;guardianProfileSessions.value=permitted;playerFeature.selectPlayer(player);},
+      onProfile: (player,permitted=[])=>{guardianProfileId.value=player.id;guardianProfileSessions.value=permitted;playerFeature.selectPlayer({...player,photo_url:avatarForPlayer(player)});},
       onFamilyStatistics: (id,rows,denied=false)=>{if(guardianProfileId.value===id){guardianProfileSessions.value=rows;if(denied){guardianProfileId.value='';selectedPlayer.value=null;currentView.value='overview';clearPlayerChart();analytics.hasChartData.value=false;}else analytics.renderPlayerChart();}},
       onBulkShare:(row,mode)=>pilotWorkspace.share(row,mode,{},false),
       onPrivateVideos: playerId => { void privateMedia.selectMediaPlayer(playerId); }
     });
     const enrollmentAdmin = useEnrollmentAdmin({ auth });
-    const pilotWorkspace=usePilotWorkspace({auth,onLinked:async()=>{const identity=auth.captureIdentity();await auth.reloadMemberships();if(!auth.isCurrentIdentity(identity))return;await fetchAllData();if(auth.isCurrentIdentity(identity))await submissionWorkspace.load();if(auth.isCurrentIdentity(identity))pendingInvitation.value=false;},onUpdated:()=>{void submissionWorkspace.load();}});
+    const pilotWorkspace=usePilotWorkspace({auth,onLinked:async()=>{const identity=auth.captureIdentity();await auth.reloadMemberships();if(!auth.isCurrentIdentity(identity))return;await fetchAllData();if(auth.isCurrentIdentity(identity))await avatarManager.load();if(auth.isCurrentIdentity(identity))await submissionWorkspace.load();if(auth.isCurrentIdentity(identity))pendingInvitation.value=false;},onUpdated:()=>{void submissionWorkspace.load();}});
     // Fragments are not sent in HTTP requests. Remove the invitation before any sharing/navigation.
     if(window.location?.hash?.startsWith('#guardian-invite=')){
       const token=window.location.hash.slice('#guardian-invite='.length);
@@ -237,10 +249,9 @@ createApp({
       if (!auth.isTeamCoach.value || workspaceMode.value !== 'coach' || auth.authError.value) return;
       const authorized = coachRoster.value.find(row => row.id === player?.id && row.team_id === player?.team_id);
       if (!authorized) return;
-      const jersey=String(authorized.jersey||'');
-      const isDemo=/^DEMO\s/.test(String(authorized.preferred_name||'')) && /^(2[1-9]|3[0-5])$/.test(jersey);
-      // Synthetic asset only. Real player photo fields remain excluded from coach RPC.
-      const projected={...authorized, ...(isDemo ? {photo_url:'https://sdl-ux-live.pages.dev/assets/demo-players/'+jersey+'.svg'} : {})};
+      // The authenticated service supplies private, short-lived signed photos.
+      // The coach roster RPC remains narrowly scoped, with no raw profile read.
+      const projected={...authorized,photo_url:avatarForPlayer(authorized)};
       sessions.value=[]; drillVideos.value=[];
       guardianProfileId.value=''; guardianProfileSessions.value=[];
       playerFeature.selectPlayer(projected);
@@ -269,6 +280,7 @@ createApp({
       searchQuery.value = '';
       coach.lockCoachMode();
       privateMedia.resetMedia();
+      avatarManager.reset();
       submissionWorkspace.reset();
       enrollmentAdmin.reset();
       pilotWorkspace.reset();
@@ -303,6 +315,12 @@ createApp({
       if (tab === 'team' && workspaceMode.value === 'coach') overviewTab.value = 'roster';
     };
     Vue.watch(currentView, view => { if (view === 'player') activeTab.value = 'team'; });
+    Vue.watch(avatarManager.photos, photos => {
+      const id=selectedPlayer.value?.id;
+      if (id && photos[id] && selectedPlayer.value.photo_url !== photos[id]) {
+        selectedPlayer.value={...selectedPlayer.value,photo_url:photos[id]};
+      }
+    });
     const dismissInvitePrompt = () => {pendingInvitation.value=false;};
     const signInAndLoad = () => auth.signIn();
     const signOutAndClear = () => {initialInvitation='';return auth.signOut();};
@@ -310,8 +328,8 @@ createApp({
     onUnmounted(() => { auth.disposeAuth(); submissionWorkspace.dispose(); enrollmentAdmin.dispose();pilotWorkspace.dispose(); });
 
     return {
-      currentLang, t, saveLanguage, loading, isSaving, currentView, overviewTab, activeTab, workspaceMode, familyPlayers, visibleStagingPlayers, mediaOriginAllowed, statsFamilyCards: submissionWorkspace.cards, navigateTab, changeWorkspace, pendingInvitation, dismissInvitePrompt, searchQuery,
-      selectedPlayer, players, sessions, drillVideos, coachRoster, coachRosterLoading, coachRosterError, selectCoachRosterPlayer,
+      currentLang, t, saveLanguage, loading, isSaving, currentView, overviewTab, activeTab, workspaceMode, familyPlayers, visibleStagingPlayers, coachRosterDisplay, mediaOriginAllowed, statsFamilyCards: submissionWorkspace.cards, navigateTab, changeWorkspace, pendingInvitation, dismissInvitePrompt, searchQuery,
+      selectedPlayer, players, sessions, drillVideos, coachRoster, coachRosterLoading, coachRosterError, selectCoachRosterPlayer, canEditPlayerPhoto: avatarManager.canEdit, avatarManager,
       formatImgUrl, triggerPrintReport,
       ...auth, signInAndLoad, signOutAndClear,
       ...coach, ...analytics, ...playerFeature, ...sessionFeature, ...videoFeature, ...csvFeature,
@@ -331,6 +349,7 @@ createApp({
       submissionController: markRaw(submissionWorkspace),
       enrollmentAdminController: markRaw(enrollmentAdmin),
       privateMediaController: markRaw(privateMedia),
+       avatarController: markRaw(avatarManager),
       analyzerController: markRaw(arAnalyzer)
     };
   }
