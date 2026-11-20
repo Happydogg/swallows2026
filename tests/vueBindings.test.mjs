@@ -57,7 +57,9 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   assert.match(flatten(host),/Video Room|Open the authorized video viewer/);
   h.app.activeTab.value='home';
   await Vue.nextTick();
-  assert.match(flatten(host), /Choose a player/);
+  // The private player selector must exist in the scoped component, but
+  // must not be rendered on an origin that fails the Worker allowlist.
+  assert.match(h.options.components.PrivateMediaPanel.template,/Choose a player/);
   const submissions=h.app.submissionController;
   submissions.changeTab('submissions');await Vue.nextTick();assert.match(flatten(host),/Submit for coach review/);
   submissions.clubEnrollments.value=[{id:'test-enrollment',generation:'gen',organization_name:'Test club',status:'active',consent_active:false,history:[]}];
