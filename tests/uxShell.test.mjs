@@ -172,7 +172,12 @@ test('redesigned private video controls still use authorized existing controller
 test('Stats Hub displays static staging fixture without requesting live sessions',()=>{
   const hub=fs.readFileSync(new URL('../components/StatsHub.js',import.meta.url),'utf8');
   const lab=fs.readFileSync(new URL('../components/DemoGrowthLab.js',import.meta.url),'utf8');
-  assert.ok(hub.includes('<demo-growth-lab></demo-growth-lab>'));
+  assert.ok(hub.includes('<demo-growth-lab v-if="showSynthetic"'), 'synthetic charts appear only in design preview');
+  const live=fs.readFileSync(new URL('../components/AuthorizedStatsBoard.js',import.meta.url),'utf8');
+  assert.ok(index.includes('<authorized-stats-board'));
+  assert.ok(index.includes(':show-synthetic="false"'));
+  assert.ok(live.includes('Live staging measurements'));
+  assert.equal(/supabaseClient|\\.from\\s*\\(/.test(live),false, 'presentation component does no unscoped database reads');
   assert.ok(lab.includes('not a live Supabase query'));
   for(const key of ['sprint_18m_s','height_cm','weight_kg','throwing_velo_kmh'])
     assert.ok(lab.includes(key));
