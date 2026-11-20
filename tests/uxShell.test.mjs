@@ -132,3 +132,39 @@ test('approved live UX hostname enables the existing private-media panel without
   assert.match(index,/v-if="activeTab === 'videos' && !mediaOriginAllowed"/);
 });
 
+
+test('Stats Hub uses only permissioned family cards or coach roster, with no raw queries', () => {
+  const source=fs.readFileSync(new URL('../components/StatsHub.js', import.meta.url),'utf8');
+  assert.match(index, /<stats-hub v-if="activeTab === 'stats'/);
+  assert.match(index, /:family-cards="statsFamilyCards"/);
+  assert.match(appSource, /statsFamilyCards: submissionWorkspace\.cards/);
+  assert.match(source, /profile\.statsAvailable === true/);
+  assert.match(source, /No verified, permitted statistics/);
+  assert.doesNotMatch(source, /\bfetch\s*\(|supabaseClient|\.from\s*\(|\.rpc\s*\(/);
+});
+
+test('athlete hero preserves legacy history and coach-only identity fields', () => {
+  const hero=fs.readFileSync(new URL('../components/PlayerHeroCard.js', import.meta.url),'utf8');
+  const detailed=fs.readFileSync(new URL('../components/PlayerProfile.js', import.meta.url),'utf8');
+  const family=fs.readFileSync(new URL('../components/ParentHome.js', import.meta.url),'utf8');
+  assert.match(detailed, /<player-hero-card variant="profile"/);
+  assert.match(family, /<player-hero-card :player="player" variant="compact"/);
+  assert.match(hero, /v-if="isCoach"/);
+  for (const retained of ['playerVelocityChart','getPlayerSessions(selectedPlayer.id)','openAnalyzer(video)','toggleSessionExpand']) {
+    assert.ok(detailed.includes(retained),retained);
+  }
+  for (const sensitive of ['last_name','given_names','parent_phone']) {
+    assert.doesNotMatch(family, new RegExp(sensitive));
+  }
+});
+
+test('redesigned private video controls still use authorized existing controller', () => {
+  const source=fs.readFileSync(new URL('../components/PrivateMediaPanel.js', import.meta.url),'utf8');
+  for(const action of ['selectMediaPlayer($event.target.value)','refreshMedia','uploadPrivateMedia','playPrivateMedia(item)','analyzePrivateMedia','reportPlaybackError']){
+    assert.ok(source.includes(action),action);
+  }
+  assert.match(source, /<video :key="mediaPlaybackUrl" :src="mediaPlaybackUrl" controls playsinline/);
+  assert.match(source, /v-if="mediaReadAllowed"/);
+  assert.match(source, /v-if="mediaUploadAllowed"/);
+  assert.doesNotMatch(source, /\bfetch\s*\(|supabaseClient|\.from\s*\(/);
+});
