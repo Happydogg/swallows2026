@@ -233,6 +233,20 @@ createApp({
         if (auth.isCurrentIdentity(identity)) loading.value = false;
       }
     };
+    const selectCoachRosterPlayer = player => {
+      if (!auth.isTeamCoach.value || workspaceMode.value !== 'coach' || auth.authError.value) return;
+      const authorized = coachRoster.value.find(row => row.id === player?.id && row.team_id === player?.team_id);
+      if (!authorized) return;
+      const jersey=String(authorized.jersey||'');
+      const isDemo=/^DEMO\s/.test(String(authorized.preferred_name||'')) && /^(2[1-9]|3[0-5])$/.test(jersey);
+      // Synthetic asset only. Real player photo fields remain excluded from coach RPC.
+      const projected={...authorized, ...(isDemo ? {photo_url:'https://sdl-ux-live.pages.dev/assets/demo-players/'+jersey+'.svg'} : {})};
+      sessions.value=[]; drillVideos.value=[];
+      guardianProfileId.value=''; guardianProfileSessions.value=[];
+      playerFeature.selectPlayer(projected);
+      activeTab.value='team';
+      if (mediaOriginAllowed.value) void privateMedia.selectMediaPlayer(authorized.id);
+    };
     const saveLanguage = () => {
       localStorage.setItem('swallows_lang', currentLang.value);
       analytics.renderPlayerChart();
@@ -297,7 +311,7 @@ createApp({
 
     return {
       currentLang, t, saveLanguage, loading, isSaving, currentView, overviewTab, activeTab, workspaceMode, familyPlayers, visibleStagingPlayers, mediaOriginAllowed, statsFamilyCards: submissionWorkspace.cards, navigateTab, changeWorkspace, pendingInvitation, dismissInvitePrompt, searchQuery,
-      selectedPlayer, players, sessions, drillVideos, coachRoster, coachRosterLoading, coachRosterError,
+      selectedPlayer, players, sessions, drillVideos, coachRoster, coachRosterLoading, coachRosterError, selectCoachRosterPlayer,
       formatImgUrl, triggerPrintReport,
       ...auth, signInAndLoad, signOutAndClear,
       ...coach, ...analytics, ...playerFeature, ...sessionFeature, ...videoFeature, ...csvFeature,

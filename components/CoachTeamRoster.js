@@ -1,12 +1,13 @@
 // SDL-004-006: Separate coach-only roster. No private player profile navigation.
 export const CoachTeamRoster = {
   name: 'CoachTeamRoster',
-  emits: ['open-review'],
+  emits: ['open-review', 'open-profile'],
   setup(props) {
     const selectedTeam=Vue.ref('');
     const teamOptions=Vue.computed(()=>[...new Map(props.roster.map(p=>[p.team_id,{id:p.team_id,name:p.team_name}])).values()]);
     const displayedRoster=Vue.computed(()=>props.roster.filter(p=>!selectedTeam.value||p.team_id===selectedTeam.value));
-    return {selectedTeam,teamOptions,displayedRoster};
+    const avatarFor=player => /^DEMO\s/.test(String(player?.preferred_name||'')) && /^(2[1-9]|3[0-5])$/.test(String(player?.jersey||'')) ? '/assets/demo-players/'+player.jersey+'.svg' : '';
+    return {selectedTeam,teamOptions,displayedRoster,avatarFor};
   },
   props: {
     roster: { type: Array, required: true },
@@ -18,7 +19,7 @@ export const CoachTeamRoster = {
       <header class="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 class="text-xl font-bold text-white">Team Dashboard</h2>
-          <p class="text-xs text-slate-400">Read-only team roster · Approved baseball fields only</p>
+          <p class="text-xs text-slate-400">Full authorized roster · Select a player for profile, growth charts and videos</p>
         </div>
         <span class="text-sm text-slate-300">{{ displayedRoster.length }} players</span>
       </header>
@@ -32,15 +33,23 @@ export const CoachTeamRoster = {
         <article v-for="player in displayedRoster" :key="player.team_id + ':' + player.id"
           class="rounded-xl border border-slate-700 bg-slate-800 p-4">
           <div class="flex items-start justify-between gap-2">
-            <div>
-              <p class="text-white font-semibold">{{ player.preferred_name }}</p>
-              <p class="text-slate-400 text-xs">{{ player.team_name }}</p>
-            </div>
+            <button type="button" @click="$emit('open-profile',player)" class="flex min-w-0 items-center gap-3 rounded-lg text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300" :aria-label="'Open '+player.preferred_name+' player profile'">
+              <img v-if="avatarFor(player)" :src="avatarFor(player)" alt="" class="h-14 w-14 shrink-0 rounded-xl border border-blue-400/40 bg-blue-950 object-cover"/>
+              <span v-else class="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-slate-600 bg-slate-900 text-blue-300">#{{ player.jersey || '–' }}</span>
+              <span class="min-w-0">
+                <span class="block truncate text-white font-semibold">{{ player.preferred_name }}</span>
+                <span class="block truncate text-slate-400 text-xs">{{ player.team_name }}</span>
+                <span v-if="avatarFor(player)" class="mt-0.5 block text-[10px] font-bold uppercase text-amber-300">Synthetic demo portrait</span>
+              </span>
+            </button>
             <span class="text-blue-300 text-sm font-mono">#{{ player.jersey ?? '--' }}</span>
           </div>
           <p class="mt-3 text-sm text-slate-200">{{ player.position || 'Position not set' }}</p>
           <p class="text-xs text-slate-400 mt-1">Throws {{ player.throws || '--' }} · Bats {{ player.bats || '--' }}</p>
-          <button @click="$emit('open-review',player.team_id)" class="mt-3 p-3 rounded bg-slate-700 text-sm">Videos and review</button>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <button type="button" @click="$emit('open-profile',player)" class="rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-bold text-white hover:bg-blue-500">View player profile →</button>
+            <button type="button" @click="$emit('open-review',player.team_id)" class="rounded-lg border border-slate-600 bg-slate-700 px-3 py-2.5 text-sm">Team review</button>
+          </div>
         </article>
       </div>
     </section>

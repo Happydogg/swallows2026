@@ -104,7 +104,7 @@
         @dismiss="dismissInvitePrompt"></invite-onboarding>
 
       <coach-home v-if="activeTab === 'home' && workspaceMode === 'coach'"
-        :roster="coachRoster" :loading="coachRosterLoading" :error="coachRosterError" @navigate="navigateTab"></coach-home>
+        :roster="coachRoster" :loading="coachRosterLoading" :error="coachRosterError" @navigate="navigateTab" @open-profile="selectCoachRosterPlayer"></coach-home>
       <parent-home v-else-if="activeTab === 'home' && workspaceMode === 'family'"
         :players="familyPlayers" :loading="loading" @navigate="navigateTab"></parent-home>
       <section v-else-if="activeTab === 'home'" class="rounded-2xl border border-slate-700 bg-slate-800 p-6" aria-label="Account home">
@@ -117,7 +117,7 @@
         :loading="loading" :enabled="submissionController.enabled"
         @navigate="navigateTab" @open-player="submissionController.showProfile($event)"></stats-hub>
 
-      <staging-data-browser v-if="activeTab === 'team' && currentView === 'overview' && (workspaceMode === 'coach' || workspaceMode === 'family')"
+      <staging-data-browser v-if="activeTab === 'team' && currentView === 'overview' && workspaceMode === 'family'"
         :players="visibleStagingPlayers" :mode="workspaceMode" :loading="loading || (workspaceMode === 'coach' && coachRosterLoading)"
         :error="workspaceMode === 'coach' ? coachRosterError : ''" :video-here="mediaOriginAllowed"
         @navigate="navigateTab"></staging-data-browser>
@@ -151,7 +151,6 @@
     <pilot-workspace :class="activeTab === 'me' ? '' : 'hidden'" :controller="pilotController"></pilot-workspace>
     <submission-workspace :class="(activeTab === 'team' || activeTab === 'stats' || (activeTab === 'videos' && mediaOriginAllowed)) && currentView !== 'player' ? '' : 'hidden'" :controller="submissionController" :pilot-controller="pilotController" :t="t"></submission-workspace>
     <club-enrollment-admin :class="activeTab === 'me' ? '' : 'hidden'" :controller="enrollmentAdminController"></club-enrollment-admin>
-    <private-media-panel :class="activeTab === 'videos' && mediaOriginAllowed ? '' : 'hidden'" :controller="privateMediaController"></private-media-panel>
 
     <!-- Loading Indicator -->
     <div v-if="loading" class="p-8 text-center text-slate-400 font-mono text-sm no-print">
@@ -160,7 +159,7 @@
 
     <!-- SDL-001 / SDL-004: Verified parents land on My Players above, not the legacy Coach Overview -->
     <coach-team-roster v-else-if="currentView === 'overview' && isTeamCoach && workspaceMode === 'coach'" :class="activeTab === 'team' ? '' : 'hidden'"
-      :roster="coachRoster" :loading="coachRosterLoading" :error="coachRosterError" @open-review="submissionController.enterReview($event)"></coach-team-roster>
+      :roster="coachRoster" :loading="coachRosterLoading" :error="coachRosterError" @open-review="submissionController.enterReview($event)" @open-profile="selectCoachRosterPlayer"></coach-team-roster>
     <team-overview v-else-if="currentView === 'overview' && isCoach && workspaceMode === 'coach'" :class="activeTab === 'team' || activeTab === 'stats' ? '' : 'hidden'"
       :t="t"
       :players="players"
@@ -208,7 +207,11 @@
       :is-session-expanded="isSessionExpanded" :toggle-session-expand="toggleSessionExpand"
       :get-attack-angle-color="getAttackAngleColor" :open-edit-session-modal="openEditSessionModal"
       :remove-session="removeSession" :delete-drill-video="deleteDrillVideo"
-      @open-submissions="submissionController.changeTab('submissions'); submissionController.selectPlayer($event)" @back="currentView = 'overview'"></player-profile>
+      @open-submissions="submissionController.changeTab('submissions'); submissionController.selectPlayer($event)" @back="currentView = 'overview'; privateMediaController.resetMedia()"></player-profile>
+
+    <!-- Existing permission-enforced private media is visible directly after a coach's selected profile. -->
+    <private-media-panel :class="mediaOriginAllowed && (activeTab === 'videos' || (activeTab === 'team' && currentView === 'player' && workspaceMode === 'coach')) ? '' : 'hidden'"
+      :controller="privateMediaController"></private-media-panel>
 
     <!-- SDL-002: Unified Player Form (Add / Edit) -->
     <player-form-modal

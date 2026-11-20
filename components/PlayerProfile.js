@@ -1,9 +1,10 @@
 // SDL-003: player profile and historical session presentation; stats supplied as props.
 import { PlayerHeroCard } from './PlayerHeroCard.js';
+import { DemoGrowthLab } from './DemoGrowthLab.js';
 
 export const PlayerProfile = {
   name: "PlayerProfile",
-  components: { PlayerHeroCard },
+  components: { PlayerHeroCard, DemoGrowthLab },
   props: {
     t: { type: Function, required: true },
     selectedPlayer: { type: Object, required: true },
@@ -38,6 +39,10 @@ export const PlayerProfile = {
     deleteDrillVideo: { type: Function, required: true }
   },
   emits: ["back", "open-submissions"],
+  setup(props) {
+    const demoMatch=Vue.computed(()=>/^DEMO\s/.test(String(props.selectedPlayer?.preferred_name||'')) && /^(2[1-9]|3[0-5])$/.test(String(props.selectedPlayer?.jersey||'')));
+    return { demoMatch };
+  },
   template: `
 <div class="space-y-6">
 
@@ -75,8 +80,11 @@ export const PlayerProfile = {
     No permitted session history is loaded. The parent-safe statistics service must be enabled and authorized to show history and charts.
   </div>
 
+  <!-- Demo records show clearly labeled staging snapshot, never fabricated official rows. -->
+  <demo-growth-lab v-if="demoMatch" :player-name="selectedPlayer.preferred_name" :embedded="true"></demo-growth-lab>
+
   <!-- Interactive Chart (Hidden on Print) -->
-  <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-5 no-print">
+  <div v-if="!demoMatch" class="bg-slate-800/50 border border-slate-700 rounded-xl p-5 no-print">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-slate-700/60 pb-3">
       <div>
         <h3 class="text-base font-bold text-white flex items-center gap-2">

@@ -4,10 +4,13 @@ import { DEMO_GROWTH_SNAPSHOT } from '../js/demoGrowthFixture.js';
 
 export const DemoGrowthLab = {
   name: 'DemoGrowthLab',
-  setup() {
+  props: { playerName: { type: String, default: '' }, embedded: { type: Boolean, default: false } },
+  setup(props) {
     const players = DEMO_GROWTH_SNAPSHOT.players;
     const selectedJersey = Vue.ref(players[0]?.jersey || '');
-    const selected = Vue.computed(() => players.find(p => p.jersey === selectedJersey.value) || players[0]);
+    const selected = Vue.computed(() => props.embedded
+      ? players.find(p => p.name === props.playerName) || null
+      : players.find(p => p.jersey === selectedJersey.value) || players[0]);
     const metrics = Object.freeze([
       { key:'height_cm', label:'Height', unit:'cm', color:'#22d3ee', decimals:1 },
       { key:'weight_kg', label:'Weight', unit:'kg', color:'#a78bfa', decimals:1 },
@@ -39,7 +42,7 @@ export const DemoGrowthLab = {
   template: `
     <section class="space-y-4 rounded-3xl border border-cyan-400/25 bg-slate-900/85 p-4 sm:p-6"
       aria-label="Synthetic staging growth dashboard">
-      <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div v-if="!embedded" class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p class="text-xs font-black uppercase tracking-widest text-cyan-300">Staging fixture snapshot · DEMO ONLY</p>
           <h2 class="mt-2 text-2xl font-black text-white">15 players. Eight checkpoints each.</h2>
@@ -53,7 +56,7 @@ export const DemoGrowthLab = {
         </span>
       </div>
 
-      <label class="block max-w-md text-sm font-semibold text-slate-200" for="sdl-demo-growth-player">
+      <label v-if="!embedded" class="block max-w-md text-sm font-semibold text-slate-200" for="sdl-demo-growth-player">
         Choose demo player
         <select id="sdl-demo-growth-player" v-model="selectedJersey"
           class="mt-2 block w-full rounded-xl border border-slate-600 bg-slate-950 px-4 py-3 text-base text-white outline-none focus:border-cyan-400">
@@ -63,6 +66,7 @@ export const DemoGrowthLab = {
         </select>
       </label>
 
+      <p v-if="embedded" class="text-xs font-bold uppercase tracking-widest text-amber-300">Fictional staging snapshot · Not live or official athlete statistics</p>
       <template v-if="selected">
         <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-950/75 p-3">
           <p class="text-base font-black text-white">{{ selected.name }} <span class="ml-1 font-mono text-sky-300">#{{ selected.jersey }}</span></p>
