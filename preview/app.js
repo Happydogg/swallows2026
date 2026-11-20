@@ -76,9 +76,14 @@ function previewMediaController() {
 createApp({
   components: { AppShell, ParentHome, CoachHome, LoginLanding, InviteOnboarding, PlayerHeroCard, PrivateMediaPanel, StatsHub },
   setup() {
-    const screen = ref('app');
-    const role = ref('family');
-    const activeTab = ref('home');
+    // Safe, whitelisted review deep links. Query values cannot grant roles or
+    // access any real data because this build has no backend connection.
+    const reviewQuery = new URLSearchParams(window.location.search);
+    const requestedScreen = reviewQuery.get('screen');
+    const requestedTab = reviewQuery.get('tab');
+    const screen = ref(['app','profile','login','invite'].includes(requestedScreen) ? requestedScreen : 'app');
+    const role = ref(reviewQuery.get('role') === 'coach' ? 'coach' : 'family');
+    const activeTab = ref(['home','team','stats','videos','me'].includes(requestedTab) ? requestedTab : 'home');
     const previewViews = Object.freeze([
       { id:'app', title:'Inside app' }, { id:'profile', title:'Player profile' }, { id:'login', title:'Login' }, { id:'invite', title:'Invitation' }
     ]);
