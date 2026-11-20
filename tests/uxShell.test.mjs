@@ -62,6 +62,24 @@ test('logout resets the navigation and removes scoped family data', async t => {
   assert.deepEqual([...h.app.familyPlayers.value],[]);
 });
 
+test('invitation fragment survives sign-in for server verification but never links a guardian by itself', async t => {
+  const token='a'.repeat(64);
+  const h=await harness(t,null,{invitationHash:'#guardian-invite='+token});
+  assert.equal(h.replacedUrl,'/');
+  assert.equal(h.app.pendingInvitation.value,false);
+  h.app.loginEmail.value='invited@example.invalid';
+  h.app.loginPassword.value='synthetic';
+  await h.app.signInAndLoad();
+  assert.equal(h.app.pendingInvitation.value,true);
+  assert.equal(h.app.pilotController.redemptionToken.value,token);
+  assert.equal(h.app.isVerifiedGuardian.value,false);
+  h.app.dismissInvitePrompt();
+  assert.equal(h.app.pendingInvitation.value,false);
+  await h.app.signOutAndClear();
+  assert.equal(h.app.pilotController.redemptionToken.value,'');
+  assert.equal(h.app.pendingInvitation.value,false);
+});
+
 test('new home components contain no private identifiers, predicted metrics or unrestricted fetches', () => {
   for (const [name,source] of [['ParentHome',familyHome],['CoachHome',coachHome]]) {
     assert.doesNotMatch(source, /(?:parent_phone|hkll_reg_no|given_names|last_name|dob|date_of_birth)/i, name);
