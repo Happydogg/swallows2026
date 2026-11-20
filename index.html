@@ -106,7 +106,7 @@
       <coach-home v-if="activeTab === 'home' && workspaceMode === 'coach'"
         :roster="coachRosterDisplay" :loading="coachRosterLoading" :error="coachRosterError" @navigate="navigateTab" @open-profile="selectCoachRosterPlayer" @open-video="openAuthorizedPlayerVideos"></coach-home>
       <parent-home v-else-if="activeTab === 'home' && workspaceMode === 'family'"
-        :players="familyPlayers" :loading="loading" :can-edit-photo="canEditPlayerPhoto" @navigate="navigateTab" @edit-photo="avatarManager.choose($event)" @open-video="openAuthorizedPlayerVideos"></parent-home>
+        :players="familyPlayers" :loading="loading" @navigate="navigateTab" @open-profile="openFamilyPlayerProfile" @open-video="openAuthorizedPlayerVideos"></parent-home>
       <section v-else-if="activeTab === 'home'" class="rounded-2xl border border-slate-700 bg-slate-800 p-6" aria-label="Account home">
         <h1 class="text-2xl font-black">Welcome to Swallows DataLab</h1>
         <p class="mt-2 text-sm text-slate-300">Your membership and permissions determine which team, family and administrative tools are available.</p>
@@ -152,7 +152,7 @@
     <submission-workspace :class="(activeTab === 'team' || activeTab === 'stats' || (activeTab === 'videos' && mediaOriginAllowed)) && currentView !== 'player' ? '' : 'hidden'" :controller="submissionController" :pilot-controller="pilotController" :t="t"></submission-workspace>
     <club-enrollment-admin :class="activeTab === 'me' ? '' : 'hidden'" :controller="enrollmentAdminController"></club-enrollment-admin>
     <!-- Private staging avatars: all available profiles are server-filtered. -->
-    <avatar-manager :controller="avatarController" :show-list="activeTab === 'me'"></avatar-manager>
+    <avatar-manager :controller="avatarController" :show-list="activeTab === 'me' && workspaceMode === 'admin'" @open-profile="openManagedPlayerProfile"></avatar-manager>
 
     <!-- Loading Indicator -->
     <div v-if="loading" class="p-8 text-center text-slate-400 font-mono text-sm no-print">
@@ -209,7 +209,7 @@
       :is-session-expanded="isSessionExpanded" :toggle-session-expand="toggleSessionExpand"
       :get-attack-angle-color="getAttackAngleColor" :open-edit-session-modal="openEditSessionModal"
       :remove-session="removeSession" :delete-drill-video="deleteDrillVideo"
-      @open-submissions="submissionController.changeTab('submissions'); submissionController.selectPlayer($event)" @back="currentView = 'overview'; privateMediaController.resetMedia()"></player-profile>
+      @open-submissions="submissionController.changeTab('submissions'); submissionController.selectPlayer($event)" @back="leavePlayerProfile"></player-profile>
 
     <!-- Existing permission-enforced private media is visible directly after a coach's selected profile. -->
     <private-media-panel :class="mediaOriginAllowed && (activeTab === 'videos' || (activeTab === 'team' && currentView === 'player' && workspaceMode === 'coach')) ? '' : 'hidden'"
