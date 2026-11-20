@@ -152,7 +152,7 @@ export function useAuthSession({ onIdentityChange = () => {}, onAuthenticated = 
       authReady.value = true;
       return;
     }
-    if (authUser.value?.id === incomingId && authReady.value && !authError.value) {
+    if (authUser.value?.id === incomingId && authReady.value) {
       // Keep the mounted roster, player selection, videos and loaded GPU state.
       // Same-user auth refresh is not evidence of a changed authorization grant.
       authUser.value = session.user;
