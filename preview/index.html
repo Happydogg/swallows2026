@@ -89,8 +89,10 @@
 
     <section v-else-if="screen==='profile'" class="mx-auto max-w-5xl space-y-4" aria-label="Athlete profile design">
       <div class="flex flex-wrap gap-2">
-        <button type="button" @click="screen='app';role='coach';activeTab='team'"
-          class="rounded-xl border border-slate-600 px-4 py-3 text-sm font-bold text-cyan-300">← Back to full team roster</button>
+        <button type="button" @click="previewEditOpen=false;screen='app';activeTab=role==='coach'?'team':'home'"
+          class="rounded-xl border border-slate-600 px-4 py-3 text-sm font-bold text-cyan-300">← Back to {{ role==='coach'?'roster':'family' }}</button>
+        <button type="button" @click="previewEditOpen=true"
+          class="rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white">✏️ Edit Player</button>
         <button type="button" @click="screen='app';activeTab='videos'"
           class="rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white">View player videos</button>
       </div>
@@ -100,6 +102,19 @@
       </p>
       <player-hero-card variant="profile" :player="previewSelectedPlayer" :t="previewTranslate"
         :format-height-weight="demoMeasurements"></player-hero-card>
+      <div v-if="previewEditOpen" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4">
+        <section class="w-full max-w-md space-y-4 rounded-2xl border border-slate-600 bg-slate-900 p-5"
+          role="dialog" aria-modal="true" aria-labelledby="preview-edit-player-heading">
+          <h2 id="preview-edit-player-heading" class="text-xl font-black">Edit Player</h2>
+          <p class="text-sm text-slate-300">{{ previewSelectedPlayer.preferred_name }}</p>
+          <div class="flex items-center gap-3 rounded-xl bg-slate-950 p-3">
+            <img :src="previewSelectedPlayer.photo_url" alt="" class="h-20 w-20 rounded-xl object-cover">
+            <div><p class="font-bold">Profile picture</p><p class="mt-1 text-xs text-slate-400">Photo upload is available only in the authenticated SDL UX Live app, with server-verified permission.</p></div>
+          </div>
+          <p class="text-xs text-amber-200">Design preview only. No actual photo or player record can be edited here.</p>
+          <button type="button" @click="previewEditOpen=false" class="min-h-11 w-full rounded-xl bg-blue-600 px-4 py-3 font-bold">Close editor</button>
+        </section>
+      </div>
       <demo-growth-lab :player-name="previewSelectedPlayer.preferred_name" :embedded="true"></demo-growth-lab>
       <div class="rounded-2xl border border-slate-700 bg-slate-900 p-5">
         <h2 class="font-bold">Private practice videos</h2>
@@ -112,7 +127,7 @@
       account-email="demo@example.invalid" @navigate="activeTab=$event" @mode-change="role=$event;activeTab='home'"
       @sign-out="screen='login'">
       <coach-home v-if="activeTab==='home' && role==='coach'" :roster="demoRoster" :loading="false" error="" @navigate="activeTab=$event" @open-profile="openPreviewProfile"></coach-home>
-      <parent-home v-else-if="activeTab==='home'" :players="demoPlayers" :loading="false" @navigate="activeTab=$event"></parent-home>
+      <parent-home v-else-if="activeTab==='home'" :players="demoPlayers" :loading="false" @navigate="activeTab=$event" @open-profile="openPreviewProfile"></parent-home>
       <coach-team-roster v-else-if="activeTab==='team' && role==='coach'"
         :roster="demoRoster" :loading="false" error=""
         @open-profile="openPreviewProfile" @open-review="activeTab='stats'"></coach-team-roster>
