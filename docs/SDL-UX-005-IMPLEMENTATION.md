@@ -43,3 +43,13 @@ The legacy `60+ km/h Club` display was retained rather than silently changed. It
 5. Report any clipping, overlap, wrong account data, stale playback or navigation issue with a screenshot and build version.
 
 **Rollback:** Revert the recent frontend component commits in this isolated branch or roll back the affected Pages deployment. Preserve the already independently approved and deployed staging media Worker; this UI slice does not require a Worker rollback.
+
+## Verified hosted checkpoint (source `050f2435598153eea4aabe55554f4231090e6137`)
+
+- **SDL UX Live:** Cloudflare Pages deployment of commit `050f2435` succeeded, including **101/101 targeted regression tests** and **1/1 Vue 3 compiler/renderer smoke test**. The protected staging export contained 54 frontend files.
+- **SDL UX Preview:** Cloudflare Pages deployment of the same commit succeeded with **4/4 synthetic-export safety checks**. The package contains exactly 15 allowlisted files and no connected Supabase/R2 services.
+- **Browser evidence:** Cloudflare Browser Rendering at a 390 × 844 mobile viewport rendered the direct `?screen=profile` link with the reusable detailed hero and demo marker, without uncompiled custom elements.
+- **Not independently browser-verified:** the direct `?tab=stats` and `?tab=videos` views could not be retested in the same batch because the Cloudflare Browser Rendering API returned HTTP 429 rate limits. Their source and Vue template integration passed the hosted automated checks, but mobile visual UAT is still due.
+- **Previously user-reported:** the original private video playback path works; the revised Video Room must be retested by the project owner on their actual signed-in device.
+
+**User review URLs:** `https://sdl-ux-live.pages.dev/`, `https://sdl-ux-preview.pages.dev/?screen=profile`, `https://sdl-ux-preview.pages.dev/?tab=stats`, `https://sdl-ux-preview.pages.dev/?tab=videos`.
