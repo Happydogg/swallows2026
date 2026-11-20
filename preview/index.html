@@ -37,6 +37,17 @@
       </div>
     </header>
 
+    <section class="mb-4 rounded-2xl border border-cyan-400/30 bg-blue-950/50 p-4" aria-label="Authenticated staging preview">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p class="text-sm font-bold text-white">Ready to inspect real staging players?</p>
+          <p class="mt-1 text-xs text-slate-300">Open the separate login-enabled staging review. This design preview stays synthetic and offline.</p>
+        </div>
+        <a href="https://sdl-ux-live.pages.dev/" target="_blank" rel="noopener noreferrer"
+          class="rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white hover:bg-blue-500">Open live staging login</a>
+      </div>
+    </section>
+
     <section v-if="reportOpen" class="mb-4 rounded-2xl border border-amber-400/50 bg-slate-900 p-4" aria-label="Problem report">
       <h2 class="text-lg font-bold">Report what you see</h2>
       <p class="mt-1 text-sm text-slate-400">Describe the layout issue, then copy the report into your SDL ChatGPT conversation. Attach a screenshot separately.</p>
