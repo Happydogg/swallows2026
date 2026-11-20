@@ -58,3 +58,12 @@
 SDL-004: future nonblocking, rate-limited auth/role freshness strategy, including revoked membership and session changes on other tabs, while preserving visible workspace during ordinary network transitions. SDL-003: replace Tailwind runtime CDN with a version-pinned, compiled static CSS asset before production pilot. SDL-005: lazy MediaPipe GPU creation on first analyzer use rather than all successful signins (requires isolated video regression tests).
 
 **No production deployment was made.**
+
+## Follow-up verification, 2026-11-20
+
+- Removed the remaining same-user `authError` dependency from the tab-focus fast path: an unrelated transient network error must not force a session reset on the next `SIGNED_IN` focus notification.
+- Added a focused regression reproducing that case while ensuring `SIGNED_OUT` still immediately clears private data.
+- Final verified implementation commit: `d12a5f69e4dab713ba38c8fcb1e6a6179071d588`.
+- Cloudflare `sdl-ux-live` deployed this source successfully: **119/119 tests**, plus **1/1 Vue renderer test**.
+- Cloudflare `sdl-ux-preview` deployed this source successfully.
+- Actual browser tab background/foreground, Chrome extension isolation and real poor-reception UAT remain outstanding; source and synthetic unit tests alone do not establish field acceptance.
