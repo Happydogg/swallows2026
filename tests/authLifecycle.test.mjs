@@ -384,3 +384,19 @@ test('offline tab return does not re-check session or clear loaded data',async t
   assert.equal(h.calls.length,before);
   assert.equal(h.poseCalls,calls);
 });
+
+test('temporary network errors do not turn next same-user focus into a fresh login',async t=>{
+  const h=await harness(t,user('coach'));
+  h.app.selectedPlayer.value={id:'selected'};
+  h.app.authError.value='temporary network error';
+  const before=h.calls.length,pose=h.poseCalls;
+  h.emit('SIGNED_IN',user('coach'));
+  await new Promise(resolve=>setTimeout(resolve,3));
+  assert.equal(h.app.authUser.value.id,'coach');
+  assert.equal(h.app.selectedPlayer.value?.id,'selected');
+  assert.equal(h.app.authReady.value,true);
+  assert.equal(h.calls.length,before);
+  assert.equal(h.poseCalls,pose);
+  h.emit('SIGNED_OUT',null);
+  assertCleared(h.app);
+});
