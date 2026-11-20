@@ -4,6 +4,8 @@ import { ParentHome } from './components/ParentHome.js';
 import { CoachHome } from './components/CoachHome.js';
 import { LoginLanding } from './components/LoginLanding.js';
 import { InviteOnboarding } from './components/InviteOnboarding.js';
+import { PlayerHeroCard } from './components/PlayerHeroCard.js';
+import { PrivateMediaPanel } from './components/PrivateMediaPanel.js';
 
 const { createApp, ref, computed } = Vue;
 const demoPlayers = Object.freeze([
@@ -45,19 +47,51 @@ function previewInviteController() {
   };
 }
 
+function previewMediaController() {
+  const mediaPlayers = ref([
+    {id:'demo-player-1',label:'Sample Player A · Swallows Demo Team'},
+    {id:'demo-player-2',label:'Sample Player B · Swallows Demo Team'}
+  ]);
+  const mediaPlayerId = ref('demo-player-1');
+  const mediaItems = ref([
+    {id:'demo-clip-1',created_at:'2026-11-13T10:00:00Z',byte_size:8388608},
+    {id:'demo-clip-2',created_at:'2026-11-11T10:00:00Z',byte_size:5242880}
+  ]);
+  const mediaReadAllowed = ref(true), mediaUploadAllowed = ref(false), mediaLoading = ref(false);
+  const mediaUploading = ref(false), mediaPlaybackLoading = ref(false), mediaProgress = ref(0);
+  const mediaError = ref(''), mediaNotice = ref('Design-only clip cards. Real playback requires signing in on SDL UX Live.');
+  const mediaFile = ref(null), mediaPlaybackUrl = ref(''), mediaPlaybackId = ref('');
+  const unavailable = () => { mediaNotice.value = 'Demo only. Use the authenticated SDL UX Live website for permitted videos.'; };
+  return {
+    mediaPlayers, mediaPlayerId, mediaItems, mediaReadAllowed, mediaUploadAllowed, mediaLoading,
+    mediaUploading, mediaPlaybackLoading, mediaProgress, mediaError, mediaNotice,
+    mediaFile, mediaPlaybackUrl, mediaPlaybackId,
+    selectMediaPlayer(id) { if (mediaPlayers.value.some(p=>p.id===id)) {mediaPlayerId.value=id;unavailable();} },
+    refreshMedia:unavailable, selectMediaFile:unavailable, uploadPrivateMedia:unavailable,
+    playPrivateMedia:unavailable, analyzePrivateMedia:unavailable, reportPlaybackError:unavailable
+  };
+}
+
 createApp({
-  components: { AppShell, ParentHome, CoachHome, LoginLanding, InviteOnboarding },
+  components: { AppShell, ParentHome, CoachHome, LoginLanding, InviteOnboarding, PlayerHeroCard, PrivateMediaPanel },
   setup() {
     const screen = ref('app');
     const role = ref('family');
     const activeTab = ref('home');
     const previewViews = Object.freeze([
-      { id:'app', title:'Inside app' }, { id:'login', title:'Login' }, { id:'invite', title:'Invitation' }
+      { id:'app', title:'Inside app' }, { id:'profile', title:'Player profile' }, { id:'login', title:'Login' }, { id:'invite', title:'Invitation' }
     ]);
     const version = window.SDL_UX_META?.commit?.slice(0, 8) || 'local';
     const branch = window.SDL_UX_META?.branch || 'local-preview';
     const loginController = previewAuthController();
     const invitationController = previewInviteController();
+    const previewMediaControllerState = previewMediaController();
+    const previewTranslate = key => ({
+      throws:'Throws',bats:'Bats',officialName:'Official name',
+      dob:'DOB',jumpRatioLabel:'Jump ratio',batSpec:'Bat specification',
+      notSpecified:'Not specified'
+    })[key] || key;
+    const demoMeasurements = () => 'Synthetic example · 140 cm · 32 kg';
     const tabTitle = computed(() => ({
       home:'Home', team:'Team and Clubhouse', stats:'Stats and Progress',
       videos:'Videos', me:'My Account'
@@ -95,6 +129,7 @@ createApp({
     return {
       previewViews, screen, role, activeTab, tabTitle, version, branch,
       demoPlayers, demoRoster, loginController, invitationController,
+      previewMediaControllerState, previewTranslate, demoMeasurements,
       reportOpen, issue, reportText, copyReport, copyNotice, manualReport
     };
   }
