@@ -119,3 +119,13 @@ test('synthetic team screen renders the entire fifteen-player roster and drill-d
   assert.ok(html.includes(':player="previewSelectedPlayer"'));
   assert.ok(html.includes(':player-name="previewSelectedPlayer.preferred_name"'));
 });
+
+test('synthetic family cards drill into selected player and show one staged Edit Player dialog',()=>{
+  const entry=fs.readFileSync(new URL('../preview/app.js',import.meta.url),'utf8');
+  const html=fs.readFileSync(new URL('../preview/index.html',import.meta.url),'utf8');
+  assert.ok(entry.includes('demoRoster.slice(0,2)'));
+  assert.ok(entry.includes('previewEditOpen = ref(false)'));
+  assert.ok(html.includes('@open-profile="openPreviewProfile"'));
+  assert.ok(html.includes('preview-edit-player-heading'));
+  assert.ok(html.includes('Design preview only. No actual photo or player record can be edited here.'));
+});
