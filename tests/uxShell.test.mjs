@@ -121,13 +121,13 @@ test('new preview host does not claim private Worker CORS eligibility', async t 
 test('media fallback links to original staging host for unapproved origins',()=>{
   assert.match(index,/href="https:\/\/sdl-staging\.pages\.dev\/"/);
   assert.match(index,/v-if="activeTab === 'videos' && !mediaOriginAllowed"/);
-  assert.match(index,/:class="activeTab === 'videos' && mediaOriginAllowed/);
+  assert.match(index,/:class="mediaOriginAllowed && \(activeTab === 'videos' \|\|/);
 });
 
 test('approved live UX hostname enables the existing private-media panel without changing Worker calls', () => {
   assert.ok(appSource.includes('https://sdl-ux-live.pages.dev'));
   assert.match(appSource,/mediaOriginAllowed = computed/);
-  assert.match(index,/:class="activeTab === 'videos' && mediaOriginAllowed/);
+  assert.match(index,/:class="mediaOriginAllowed && \(activeTab === 'videos' \|\|/);
   assert.match(index,/<private-media-panel/);
   assert.match(index,/v-if="activeTab === 'videos' && !mediaOriginAllowed"/);
 });
