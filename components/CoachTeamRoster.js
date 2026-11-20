@@ -6,7 +6,13 @@ export const CoachTeamRoster = {
     const selectedTeam=Vue.ref('');
     const teamOptions=Vue.computed(()=>[...new Map(props.roster.map(p=>[p.team_id,{id:p.team_id,name:p.team_name}])).values()]);
     const displayedRoster=Vue.computed(()=>props.roster.filter(p=>!selectedTeam.value||p.team_id===selectedTeam.value));
-    const avatarFor=player => /^DEMO\s/.test(String(player?.preferred_name||'')) && /^(2[1-9]|3[0-5])$/.test(String(player?.jersey||'')) ? '/assets/demo-players/'+player.jersey+'.svg' : '';
+    const avatarFor = player => {
+      const approved=String(player?.photo_url||'');
+      if (/^https:\/\//.test(approved) || /^\/assets\/demo-players\/(2[1-9]|3[0-5])\.svg$/.test(approved)) return approved;
+      const jersey=String(player?.jersey||'');
+      return /^DEMO\s/.test(String(player?.preferred_name||'')) && /^(2[1-9]|3[0-5])$/.test(jersey)
+        ? '/assets/demo-players/'+jersey+'.svg' : '';
+    };
     return {selectedTeam,teamOptions,displayedRoster,avatarFor};
   },
   props: {
