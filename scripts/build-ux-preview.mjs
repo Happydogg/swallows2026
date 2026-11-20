@@ -16,13 +16,15 @@ const ALLOWLIST = Object.freeze([
   ['components/LoginLanding.js', 'components/LoginLanding.js'],
   ['components/InviteOnboarding.js', 'components/InviteOnboarding.js']
 ]);
-const CONFIG_SHIM = '// Synthetic preview; no Supabase client, no live configuration.\nexport const SUBMISSION_FEATURES_ENABLED = false;\n';
-const DISALLOWED = [
-  /SUPABASE_URL/i, /SUPABASE_SERVICE_ROLE_KEY/i, /PRIVATE_MEDIA_WORKER_URL/i,
-  /(?:https?:\\/\\/)?[a-z0-9.-]+\\.supabase\\.co/i, /workers\\.dev/i,
-  /sb_secret_/i, /(?:^|[^a-z])service_role(?:$|[^a-z])/i,
-  /\\b(?:fetch|XMLHttpRequest|WebSocket|EventSource)\\s*\\(/,
-  /(?:\\.from|\\.rpc)\\s*\\(/
+const CONFIG_SHIM = [
+  '// Synthetic preview; no live configuration.',
+  'export const SUBMISSION_FEATURES_ENABLED = false;',
+  ''
+  ].join(String.fromCharCode(10));
+const DENY_TERMS = [
+  'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'PRIVATE_MEDIA_WORKER_URL',
+  '.supabase.co', 'workers.dev', 'sb_secret_', 'service_role',
+  'fetch(', 'XMLHttpRequest', 'WebSocket(', 'EventSource(', '.from(', '.rpc('
 ];
 
 function branchCommit() {
@@ -49,8 +51,8 @@ export function buildUxPreview(root = ROOT) {
     const content = fs.readFileSync(source);
     if (sourceRelative.endsWith('.js') || sourceRelative.endsWith('.html')) {
       const decoded = content.toString('utf8');
-      for (const deny of DISALLOWED) {
-        if (deny.test(decoded)) throw Error('Disallowed live API or secret pattern in preview source: ' + sourceRelative);
+      for (const deny of DENY_TERMS) {
+        if (decoded.toLowerCase().includes(deny.toLowerCase())) throw Error('Disallowed live API or secret pattern in preview source: ' + sourceRelative);
       }
     }
     const dest = path.join(out, outputRelative);
