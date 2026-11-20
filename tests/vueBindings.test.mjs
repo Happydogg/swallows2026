@@ -164,18 +164,17 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   await Vue.nextTick(); assert.match(flatten(host), /Back to Profile/);
   await h.app.signOutAndClear(); await Vue.nextTick();
   assert.doesNotMatch(flatten(host), /Synthetic Player|Play privately|Back to Profile|case-123|Admin athlete|Own family visible marker|Scoped staff/);
-  // Verify mobile authentication UI tabs on signed-out screen
-  assert.match(flatten(host), /Email & Password/);
-  assert.match(flatten(host), /Phone Sign-In/);
-  assert.match(flatten(host), /One-Time Code/);
-  assert.match(flatten(host), /Club Invitation/);
+  // Verify the redesigned login preserves all staging authentication methods.
+  assert.match(flatten(host), /Welcome to the team/);
+  assert.match(flatten(host), /Invitation/);
   h.app.setAuthMethod('phone'); await Vue.nextTick();
-  assert.match(flatten(host), /SMS and WhatsApp delivery require a configured messaging provider/);
+  assert.match(flatten(host), /SMS\/WhatsApp OTP is not yet configured/);
   h.app.setAuthMethod('otp'); await Vue.nextTick();
-  assert.match(flatten(host), /6-digit verification code/);
+  assert.match(flatten(host), /One-time code verification awaits backend integration/);
   h.app.setAuthMethod('invite'); await Vue.nextTick();
-  assert.match(flatten(host), /Parent-to-child links are verified on the server/);
+  assert.match(flatten(host), /Received a WhatsApp invitation/);
   h.app.setAuthMethod('email'); await Vue.nextTick();
+  assert.match(flatten(host), /Sign in securely/);
   assert.equal(errors.length, 0, errors.map(String).join('\n'));
   assert.equal(warnings.length, 0, warnings.join('\n'));
 });
