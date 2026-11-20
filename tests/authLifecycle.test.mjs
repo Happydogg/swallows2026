@@ -373,7 +373,7 @@ test('offline tab return does not re-check session or clear loaded data',async t
   h.app.players.value=[{id:'authorized',jersey:'21'}];
   const before=h.calls.length;
   const calls=h.poseCalls;
-  h.queue('getUser',Promise.reject(new Error('offline connectivity')));
+  h.queue('getUser',{data:{user:null},error:{message:'offline connectivity'}});
   h.emit('SIGNED_IN',user('coach'));
   h.emit('TOKEN_REFRESHED',user('coach'));
   await new Promise(resolve=>setTimeout(resolve,5));
