@@ -15,7 +15,16 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
     render._rc = true; // Match Vue's runtime compiler handling of with(_ctx).
     return render;
   };
-  for (const component of Object.values(h.options.components)) component.render = makeRender(component.template);
+  // Compile nested components too: the shared PlayerHeroCard is imported by
+  // both ParentHome and PlayerProfile, and the test renderer has no DOM compiler.
+  const compiled = new Set();
+  const compileRecursive = component => {
+    if (!component || compiled.has(component)) return;
+    compiled.add(component);
+    for (const child of Object.values(component.components || {})) compileRecursive(child);
+    if (component.template) component.render = makeRender(component.template);
+  };
+  for (const component of Object.values(h.options.components)) compileRecursive(component);
   const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   const template = html.slice(html.indexOf('  <div id="app"'), html.indexOf('  <!-- Root Application Entry Module -->'));
   const node = (type, text = '') => ({ type, text, children: [], props: {}, parent: null, tagName: type.toUpperCase(), addEventListener() {}, removeEventListener() {},
