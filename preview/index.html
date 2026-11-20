@@ -87,11 +87,28 @@
       <invite-onboarding :controller="invitationController" account-email="example-parent@example.invalid" @dismiss="screen='app'"></invite-onboarding>
     </div>
 
+    <section v-else-if="screen==='profile'" class="mx-auto max-w-5xl space-y-4" aria-label="Athlete profile design">
+      <p class="rounded-xl border border-amber-500/40 bg-amber-950/20 p-3 text-xs text-amber-200">Synthetic layout preview only. The authenticated player profile retains its real charts, sessions and videos in SDL UX Live.</p>
+      <player-hero-card variant="profile" :player="demoPlayers[0]" :t="previewTranslate"
+        :format-height-weight="demoMeasurements"></player-hero-card>
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div class="rounded-2xl border border-slate-700 bg-slate-900 p-5">
+          <h2 class="font-bold">Development charts</h2>
+          <p class="mt-2 text-sm text-slate-400">Charts appear here only when permitted session data exists.</p>
+        </div>
+        <div class="rounded-2xl border border-slate-700 bg-slate-900 p-5">
+          <h2 class="font-bold">Videos and practice history</h2>
+          <p class="mt-2 text-sm text-slate-400">The working player video and session tools remain in the authenticated app.</p>
+        </div>
+      </div>
+    </section>
+
     <app-shell v-else :active-tab="activeTab" :mode="role" :can-coach="true" :can-family="true"
       account-email="demo@example.invalid" @navigate="activeTab=$event" @mode-change="role=$event;activeTab='home'"
       @sign-out="screen='login'">
       <coach-home v-if="activeTab==='home' && role==='coach'" :roster="demoRoster" :loading="false" error="" @navigate="activeTab=$event"></coach-home>
       <parent-home v-else-if="activeTab==='home'" :players="demoPlayers" :loading="false" @navigate="activeTab=$event"></parent-home>
+      <private-media-panel v-else-if="activeTab==='videos'" :controller="previewMediaControllerState"></private-media-panel>
 
       <section v-else class="space-y-4" :aria-label="'Preview '+activeTab">
         <div class="rounded-2xl border border-blue-400/25 bg-gradient-to-r from-blue-950 to-slate-900 p-6">
