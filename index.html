@@ -96,7 +96,20 @@
     <div v-if="!authReady" class="p-10 text-center text-slate-300" role="status">Checking secure session…</div>
     <login-landing v-else-if="!authUser" :controller="loginController"></login-landing>
     <template v-else>
-      <section class="mb-4 flex flex-wrap items-center justify-between gap-3 bg-slate-800 border border-slate-700 p-3 rounded-lg no-print">
+      <app-shell :active-tab="activeTab" :mode="workspaceMode" :can-coach="isTeamCoach"
+        :can-family="isVerifiedGuardian" :account-email="authUser.email || ''" :sign-out-busy="authBusy"
+        @navigate="navigateTab" @mode-change="changeWorkspace" @sign-out="signOutAndClear">
+
+      <coach-home v-if="activeTab === 'home' && workspaceMode === 'coach'"
+        :roster="coachRoster" :loading="coachRosterLoading" :error="coachRosterError" @navigate="navigateTab"></coach-home>
+      <parent-home v-else-if="activeTab === 'home' && workspaceMode === 'family'"
+        :players="familyPlayers" :loading="loading" @navigate="navigateTab"></parent-home>
+      <section v-else-if="activeTab === 'home'" class="rounded-2xl border border-slate-700 bg-slate-800 p-6" aria-label="Account home">
+        <h1 class="text-2xl font-black">Welcome to Swallows DataLab</h1>
+        <p class="mt-2 text-sm text-slate-300">Your membership and permissions determine which team, family and administrative tools are available.</p>
+        <button type="button" @click="navigateTab('me')" class="mt-4 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold">Open account workspace</button>
+      </section>
+      <section v-show="activeTab === 'me'" class="mb-4 flex flex-wrap items-center justify-between gap-3 bg-slate-800 border border-slate-700 p-3 rounded-lg no-print">
         <div class="text-sm">
           <div class="font-semibold">{{ authUser.email }}</div>
           <div class="text-slate-400">{{ isTeamCoach ? 'Team coach (read-only pilot)' : isVerifiedGuardian ? 'My Players (guardian)' : 'No team or family access' }}</div>
@@ -106,17 +119,17 @@
       </section>
       <p v-if="authError" role="alert" class="mb-3 text-rose-300 text-sm no-print">{{ authError }}</p>
     <!-- Top Header Bar (Hidden during printing) -->
-    <app-header :t="t" :current-lang="currentLang" :current-view="currentView" :is-coach="isCoach"
+    <app-header v-show="activeTab === 'team' || activeTab === 'stats'" :t="t" :current-lang="currentLang" :current-view="currentView" :is-coach="isCoach"
       @change-language="currentLang = $event; saveLanguage()"
       @navigate-overview="currentView = 'overview'; if (isVerifiedGuardian && !isTeamCoach) submissionController.changeTab('players')"
       @export-csv="exportTeamCSV" @import-csv="importTeamCSV($event)"
       @add-player="openAddPlayerModal" @lock-coach="lockCoachMode"
       @unlock-coach="unlockCoachMode"></app-header>
 
-    <pilot-workspace :controller="pilotController"></pilot-workspace>
-    <submission-workspace :controller="submissionController" :pilot-controller="pilotController" :t="t"></submission-workspace>
-    <club-enrollment-admin :controller="enrollmentAdminController"></club-enrollment-admin>
-    <private-media-panel :controller="privateMediaController"></private-media-panel>
+    <pilot-workspace v-show="activeTab === 'me'" :controller="pilotController"></pilot-workspace>
+    <submission-workspace v-show="(activeTab === 'team' || activeTab === 'stats' || activeTab === 'videos') && currentView !== 'player'" :controller="submissionController" :pilot-controller="pilotController" :t="t"></submission-workspace>
+    <club-enrollment-admin v-show="activeTab === 'me'" :controller="enrollmentAdminController"></club-enrollment-admin>
+    <private-media-panel v-show="activeTab === 'videos'" :controller="privateMediaController"></private-media-panel>
 
     <!-- Loading Indicator -->
     <div v-if="loading" class="p-8 text-center text-slate-400 font-mono text-sm no-print">
@@ -124,9 +137,9 @@
     </div>
 
     <!-- SDL-001 / SDL-004: Verified parents land on My Players above, not the legacy Coach Overview -->
-    <coach-team-roster v-else-if="currentView === 'overview' && isTeamCoach"
+    <coach-team-roster v-else-if="currentView === 'overview' && isTeamCoach && workspaceMode === 'coach'" v-show="activeTab === 'team'"
       :roster="coachRoster" :loading="coachRosterLoading" :error="coachRosterError" @open-review="submissionController.enterReview($event)"></coach-team-roster>
-    <team-overview v-else-if="currentView === 'overview' && isCoach"
+    <team-overview v-else-if="currentView === 'overview' && isCoach && workspaceMode === 'coach'" v-show="activeTab === 'team' || activeTab === 'stats'"
       :t="t"
       :players="players"
       :get-club-count="getClubCount"
@@ -158,7 +171,7 @@
 
 
     <!-- VIEW 2: Individual Player Profile & Dated Session History -->
-    <player-profile v-if="currentView === 'player' && selectedPlayer"
+    <player-profile v-if="currentView === 'player' && selectedPlayer" v-show="activeTab === 'team'"
       :t="t" :selected-player="selectedPlayer" :is-coach="isCoach"
       :failed-imgs="failedImgs" :format-img-url="formatImgUrl" :mark-img-failed="markImgFailed"
       :format-legal-name="formatLegalName" :get-player-display-name="getPlayerDisplayName"
@@ -217,6 +230,7 @@
     <ar-analyzer-modal v-if="activeAnalyzerVideo" :t="t"
       :controller="analyzerController"></ar-analyzer-modal>
 
+      </app-shell>
     </template>
   </div>
 
