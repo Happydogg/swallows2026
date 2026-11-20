@@ -10,6 +10,8 @@ export const PlayerProfile = {
     selectedPlayer: { type: Object, required: true },
     isCoach: { type: Boolean, required: true },
     canEditPhoto: { type: Boolean, default: false },
+    historyLoading: { type: Boolean, default: false },
+    historyError: { type: String, default: '' },
     failedImgs: { type: Object, required: true },
     formatImgUrl: { type: Function, required: true },
     markImgFailed: { type: Function, required: true },
@@ -85,16 +87,25 @@ export const PlayerProfile = {
     :calculate-jump-ratio="calculateJumpRatio" :get-jump-ratio-color="getJumpRatioColor"
     :format-height-weight="formatHeightWeight"></player-hero-card>
 
-  <!-- Family accounts: no parent-safe statistics API exists, so raw sessions are not loaded. -->
-  <div v-if="!isCoach && getPlayerSessions(selectedPlayer.id).length === 0" class="rounded-xl border border-amber-800/50 bg-amber-950/20 p-4 text-sm text-amber-300 no-print" role="status" data-stats-unavailable>
-    No permitted session history is loaded. The parent-safe statistics service must be enabled and authorized to show history and charts.
+  <div v-if="historyLoading" class="rounded-xl border border-sky-700/40 bg-slate-900 p-4 text-sm text-sky-200 no-print" role="status">
+    Loading this player's authorized measurement history…
   </div>
+  <div v-else-if="historyError" class="rounded-xl border border-amber-700/50 bg-amber-950/20 p-4 text-sm text-amber-200 no-print" role="alert">
+    {{ historyError }}
+  </div>
+  <div v-else-if="getPlayerSessions(selectedPlayer.id).length===0 && !demoMatch"
+    class="rounded-xl border border-slate-700 bg-slate-900 p-4 text-sm text-slate-300 no-print" role="status" data-stats-unavailable>
+    No permitted measurements have been recorded for this player yet.
+  </div>
+  <p v-if="!historyLoading && !historyError && getPlayerSessions(selectedPlayer.id).length>0"
+    class="text-xs font-bold uppercase tracking-wider text-emerald-300 no-print">Live authorized measurement history · {{ getPlayerSessions(selectedPlayer.id).length }} sessions</p>
 
-  <!-- Demo records show clearly labeled staging snapshot, never fabricated official rows. -->
-  <demo-growth-lab v-if="demoMatch" :player-name="selectedPlayer.preferred_name" :embedded="true"></demo-growth-lab>
+  <!-- Synthetic design fallback only when no authorized live measurements exist. -->
+  <demo-growth-lab v-if="demoMatch && !historyLoading && !historyError && getPlayerSessions(selectedPlayer.id).length===0"
+    :player-name="selectedPlayer.preferred_name" :embedded="true"></demo-growth-lab>
 
   <!-- Interactive Chart (Hidden on Print) -->
-  <div v-if="!demoMatch" class="bg-slate-800/50 border border-slate-700 rounded-xl p-5 no-print">
+  <div v-if="(!demoMatch || getPlayerSessions(selectedPlayer.id).length>0) && !historyLoading && !historyError" class="bg-slate-800/50 border border-slate-700 rounded-xl p-5 no-print">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-slate-700/60 pb-3">
       <div>
         <h3 class="text-base font-bold text-white flex items-center gap-2">
