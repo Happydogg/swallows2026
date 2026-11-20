@@ -39,3 +39,7 @@ This Pages project is only for synthetic UX review. It does not approve final-pi
 
 ## Next
 Connect Pages GitHub builds, verify the URL and CSP, then iterate on Player Profile, Team, Stats, Videos and Me. Keep the preview script updated to use real redesigned components as they are completed.
+
+## Cloudflare Pages project configuration
+
+Project `sdl-ux-preview` is GitHub-connected to this exact redesign branch. The build output is strictly `dist-ux-preview`. The initial public preview deployment must still be independently verified before the URL is advertised as live.
