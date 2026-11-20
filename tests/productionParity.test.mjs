@@ -84,7 +84,7 @@ test('all 28 original production-branch core JS modules are still present',()=>{
 test('all original named exports in modified production core modules are still declared',()=>{
   for(const [path,names] of Object.entries(symbols)){
     const source=read(path);
-    const declared=[...source.matchAll(/\\bexport\\s+(?:(?:async|default)\\s+)?(?:const|let|var|function|class)\\s+([A-Za-z_$][\\w$]*)/g)].map(m=>m[1]);
+    const declared=[...source.matchAll(new RegExp('export'+'\\s+'+'(?:(?:async|default)\\s+)?'+'(?:const|let|var|function|class)\\s+'+'([A-Za-z_$][\\w$]*)','g'))].map(m=>m[1]);
     for(const name of names)assert.ok(declared.includes(name),path+' must still export '+name);
   }
 });
