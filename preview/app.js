@@ -7,18 +7,27 @@ import { InviteOnboarding } from './components/InviteOnboarding.js';
 import { PlayerHeroCard } from './components/PlayerHeroCard.js';
 import { PrivateMediaPanel } from './components/PrivateMediaPanel.js';
 import { StatsHub } from './components/StatsHub.js';
+import { CoachTeamRoster } from './components/CoachTeamRoster.js';
+import { DemoGrowthLab } from './components/DemoGrowthLab.js';
+import { DEMO_GROWTH_SNAPSHOT } from './js/demoGrowthFixture.js';
 
 const { createApp, ref, computed } = Vue;
 const demoPlayers = Object.freeze([
   { id: 'demo-player-1', athlete_id: 'demo-athlete-1', preferred_name: 'Sample Player A', jersey: '12', position: 'SS / P', bats: 'R', throws: 'R' },
   { id: 'demo-player-2', athlete_id: 'demo-athlete-2', preferred_name: 'Sample Player B', jersey: '08', position: 'OF', bats: 'L', throws: 'R' }
 ]);
-const demoRoster = Object.freeze([
-  { id: 'demo-player-1', team_id: 'demo-team', team_name: 'Swallows Demo Team', preferred_name: 'Sample Player A', jersey: '12', position: 'SS / P', bats: 'R', throws: 'R' },
-  { id: 'demo-player-2', team_id: 'demo-team', team_name: 'Swallows Demo Team', preferred_name: 'Sample Player B', jersey: '08', position: 'OF', bats: 'L', throws: 'R' },
-  { id: 'demo-player-3', team_id: 'demo-team', team_name: 'Swallows Demo Team', preferred_name: 'Sample Player C', jersey: '21', position: 'C', bats: 'R', throws: 'R' },
-  { id: 'demo-player-4', team_id: 'demo-team', team_name: 'Swallows Demo Team', preferred_name: 'Sample Player D', jersey: '05', position: '3B', bats: 'L', throws: 'L' }
-]);
+// The same fifteen fictional names and jerseys used by the staging fixture.
+const demoRoster = Object.freeze(DEMO_GROWTH_SNAPSHOT.players.map((player, i) => ({
+  id: 'demo-player-'+player.jersey,
+  team_id: 'demo-team',
+  team_name: 'Swallows Demo Team',
+  preferred_name: player.name,
+  jersey: player.jersey,
+  position: ['SS','2B','P','C','CF','3B','LF','P','1B','RF','SS','C','2B','P','CF'][i],
+  throws: i % 4 === 0 ? 'L' : 'R',
+  bats: i % 3 === 0 ? 'L' : 'R',
+  photo_url: '/assets/demo-players/'+player.jersey+'.svg'
+})));
 
 function previewAuthController() {
   const c = {
@@ -49,11 +58,8 @@ function previewInviteController() {
 }
 
 function previewMediaController() {
-  const mediaPlayers = ref([
-    {id:'demo-player-1',label:'Sample Player A · Swallows Demo Team'},
-    {id:'demo-player-2',label:'Sample Player B · Swallows Demo Team'}
-  ]);
-  const mediaPlayerId = ref('demo-player-1');
+  const mediaPlayers = ref(demoRoster.map(p=>({id:p.id,label:p.preferred_name+' · Swallows Demo Team'})));
+  const mediaPlayerId = ref(demoRoster[0].id);
   const mediaItems = ref([
     {id:'demo-clip-1',created_at:'2026-11-13T10:00:00Z',byte_size:8388608},
     {id:'demo-clip-2',created_at:'2026-11-11T10:00:00Z',byte_size:5242880}
@@ -74,7 +80,7 @@ function previewMediaController() {
 }
 
 createApp({
-  components: { AppShell, ParentHome, CoachHome, LoginLanding, InviteOnboarding, PlayerHeroCard, PrivateMediaPanel, StatsHub },
+  components: { AppShell, ParentHome, CoachHome, LoginLanding, InviteOnboarding, PlayerHeroCard, PrivateMediaPanel, StatsHub, CoachTeamRoster, DemoGrowthLab },
   setup() {
     // Safe, whitelisted review deep links. Query values cannot grant roles or
     // access any real data because this build has no backend connection.
@@ -92,6 +98,14 @@ createApp({
     const loginController = previewAuthController();
     const invitationController = previewInviteController();
     const previewMediaControllerState = previewMediaController();
+    const previewSelectedPlayer = ref(demoRoster[0]);
+    const openPreviewProfile = player => {
+      const allowed=demoRoster.find(p=>p.id===player?.id && p.team_id===player?.team_id);
+      if (!allowed) return;
+      previewSelectedPlayer.value=allowed;
+      previewMediaControllerState.selectMediaPlayer(allowed.id);
+      screen.value='profile';
+    };
     // Fictional numbers on the explicitly labeled synthetic site.
     const previewFamilyStats = Object.freeze([
       { athlete_id: 'demo-athlete-1', name: 'Sample Player A', profiles: [
@@ -146,7 +160,7 @@ createApp({
     }
     return {
       previewViews, screen, role, activeTab, tabTitle, version, branch,
-      demoPlayers, demoRoster, loginController, invitationController,
+      demoPlayers, demoRoster, previewSelectedPlayer, openPreviewProfile, loginController, invitationController,
       previewMediaControllerState, previewFamilyStats, previewTranslate, demoMeasurements,
       reportOpen, issue, reportText, copyReport, copyNotice, manualReport
     };
