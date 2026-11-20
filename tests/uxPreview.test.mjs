@@ -61,6 +61,9 @@ test('all exported modules pass Node syntax and resolve only allowlisted local i
 
 test('browser policy blocks network API calls and search indexing', () => {
   const headers=fs.readFileSync(new URL('../dist-ux-preview/_headers',import.meta.url),'utf8');
+  assert.ok(headers.startsWith('/*' + String.fromCharCode(10) + '  Cache-Control:'), 'Cloudflare must receive real header lines');
+  assert.ok(headers.split(String.fromCharCode(10)).length >= 8, 'Header rules must be multiline');
+  assert.equal(headers.includes(String.fromCharCode(92) + 'n'), false, 'Literal backslash-n must not appear');
   assert.match(headers,/connect-src 'none'/);
   assert.match(headers,/X-Robots-Tag: noindex, nofollow/);
   assert.match(headers,/Cache-Control: no-store/);
