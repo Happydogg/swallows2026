@@ -21,7 +21,7 @@ export const AppShell = {
   setup() { return { destinations: DESTINATIONS }; },
   template: `
     <div class="min-h-screen text-slate-100 md:flex md:gap-6">
-      <aside class="hidden md:flex md:w-52 lg:w-60 md:shrink-0 md:flex-col md:rounded-3xl md:border md:border-slate-700/70 md:bg-slate-950/95 md:p-4 md:shadow-xl no-print" aria-label="App navigation">
+      <aside class="hidden md:sticky md:top-4 md:z-30 md:flex md:h-[calc(100vh-2rem)] md:max-h-[calc(100dvh-2rem)] md:w-52 lg:w-60 md:shrink-0 md:self-start md:flex-col md:overflow-y-auto md:overscroll-contain md:rounded-3xl md:border md:border-slate-700/70 md:bg-slate-950/95 md:p-4 md:shadow-xl no-print" aria-label="App navigation">
         <div class="flex items-center gap-3 border-b border-slate-700/70 px-2 pb-6 pt-2">
           <img src="./logo.png" alt="" class="h-11 w-11 rounded-xl object-contain">
           <div class="text-sm font-black leading-tight tracking-wider">SWALLOWS<br><span class="text-cyan-400">DATALAB</span></div>
