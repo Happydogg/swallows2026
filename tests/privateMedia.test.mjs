@@ -163,10 +163,18 @@ test('coach media access does not enable official statistics editing', async t =
 
 test('playback and analyzer reuse a revocable Blob; clearing media releases it', async t => {
   const { c, calls, revoked } = await controllerHarness(t);
-  await c.selectMediaPlayer(PLAYER); await c.playPrivateMedia(row); c.analyzePrivateMedia();
-  assert.equal(c.mediaPlaybackUrl.value, 'blob:private-test');
-  assert.equal(calls.includes('init'), true); assert.equal(calls.at(-1).video_url, 'blob:private-test');
-  c.resetMedia(); assert.deepEqual(revoked, ['blob:private-test']); assert.equal(c.mediaPlaybackUrl.value, '');
+  await c.selectMediaPlayer(PLAYER); await c.playPrivateMedia(row);
+  c.analyzePrivateMedia();
+  assert.equal(calls.includes('init'),false,'no guess at unknown recording metadata');
+  assert.match(c.mediaError.value,/Choose the motion type/);
+  c.analysisCategory.value='pitching';c.analysisFps.value='120';c.analyzePrivateMedia();
+  assert.equal(c.mediaPlaybackUrl.value,'blob:private-test');
+  assert.equal(calls.includes('init'),true);
+  assert.equal(calls.at(-1).video_url,'blob:private-test');
+  assert.equal(calls.at(-1).category,'pitching');
+  assert.equal(calls.at(-1).fps_mode,120);
+  c.resetMedia(); assert.deepEqual(revoked,['blob:private-test']);
+  assert.equal(c.mediaPlaybackUrl.value,'');assert.equal(c.analysisCategory.value,'');assert.equal(c.analysisFps.value,'');
 });
 
 test('late playback after logout/account switch never creates a URL', async t => {
@@ -321,4 +329,12 @@ test('private thumbnails render real images, not decorative fake video artwork',
  assert.ok(markup.includes(':src="mediaThumbnails[item.id]"'));
  assert.ok(markup.includes('Preview unavailable'));
  assert.ok(!markup.includes('image/pseudo'));
+});
+
+test('private analysis screen asks for recording metadata, never labels every clip batting at 60 FPS',()=>{
+ const panel=fs.readFileSync(new URL('../components/PrivateMediaPanel.js',import.meta.url),'utf8');
+ assert.ok(panel.includes('v-model="analysisCategory"'));
+ assert.ok(panel.includes('v-model="analysisFps"'));
+ assert.ok(panel.includes('automatic motion checkpoints remain experimental'));
+ assert.ok(!panel.includes('default batting / 60 FPS'));
 });
