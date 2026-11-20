@@ -168,3 +168,14 @@ test('redesigned private video controls still use authorized existing controller
   assert.match(source, /v-if="mediaUploadAllowed"/);
   assert.doesNotMatch(source, /\bfetch\s*\(|supabaseClient|\.from\s*\(/);
 });
+
+test('Stats Hub displays static staging fixture without requesting live sessions',()=>{
+  const hub=fs.readFileSync(new URL('../components/StatsHub.js',import.meta.url),'utf8');
+  const lab=fs.readFileSync(new URL('../components/DemoGrowthLab.js',import.meta.url),'utf8');
+  assert.ok(hub.includes('<demo-growth-lab></demo-growth-lab>'));
+  assert.ok(lab.includes('not a live Supabase query'));
+  for(const key of ['sprint_18m_s','height_cm','weight_kg','throwing_velo_kmh'])
+    assert.ok(lab.includes(key));
+  assert.equal(lab.includes('supabaseClient'),false);
+  assert.equal(lab.includes('fetch('),false);
+});
