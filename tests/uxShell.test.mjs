@@ -123,3 +123,12 @@ test('live media navigation links only to the previously authorized staging host
   assert.match(index,/v-if="activeTab === 'videos' && !mediaOriginAllowed"/);
   assert.match(index,/:class="activeTab === 'videos' && mediaOriginAllowed/);
 });
+
+test('approved live UX hostname enables the existing private-media panel without changing Worker calls', () => {
+  assert.match(appSource,/https:\\/\\/sdl-ux-live\\.pages\\.dev/);
+  assert.match(appSource,/mediaOriginAllowed = computed/);
+  assert.match(index,/:class="activeTab === 'videos' && mediaOriginAllowed/);
+  assert.match(index,/<private-media-panel/);
+  assert.match(index,/v-if="activeTab === 'videos' && !mediaOriginAllowed"/);
+});
+
