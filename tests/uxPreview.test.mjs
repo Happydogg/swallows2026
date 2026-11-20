@@ -8,7 +8,7 @@ import { buildUxPreview } from '../scripts/build-ux-preview.mjs';
 
 const EXPECTED = [
   'index.html','app.js','logo.png','components/AppShell.js',
-  'components/CoachHome.js','components/ParentHome.js',
+  'components/CoachHome.js','components/CoachTeamRoster.js','components/ParentHome.js',
   'assets/demo-players/21.svg',
   'assets/demo-players/22.svg',
   'assets/demo-players/23.svg',
@@ -29,7 +29,7 @@ const EXPECTED = [
   'js/config.js','meta.js','_headers','404.html'
 ];
 
-test('preview build exports exactly 32 allowlisted synthetic files', () => {
+test('preview build exports exactly 33 allowlisted synthetic files', () => {
   const result = buildUxPreview();
   assert.deepEqual([...result.manifest].sort(), [...EXPECTED].sort());
   const exported = [];
@@ -108,4 +108,14 @@ test('the synthetic staging snapshot contains exactly 15 players and 120 dated m
   assert.ok(source.includes('Staging fixture snapshot'));
   assert.equal(source.includes('supabaseClient'),false);
   assert.equal(source.includes('fetch('),false);
+});
+
+test('synthetic team screen renders the entire fifteen-player roster and drill-down',()=>{
+  const entry=fs.readFileSync(new URL('../preview/app.js',import.meta.url),'utf8');
+  const html=fs.readFileSync(new URL('../preview/index.html',import.meta.url),'utf8');
+  assert.ok(entry.includes('DEMO_GROWTH_SNAPSHOT.players.map'));
+  assert.ok(entry.includes('openPreviewProfile'));
+  assert.ok(html.includes("<coach-team-roster v-else-if"));
+  assert.ok(html.includes(':player="previewSelectedPlayer"'));
+  assert.ok(html.includes(':player-name="previewSelectedPlayer.preferred_name"'));
 });
