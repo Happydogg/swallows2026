@@ -7,8 +7,8 @@
 BEGIN;
 DO $seed$
 DECLARE
-  org_id constant uuid := '8f24e090-0ccc-4c10-a00d-ace7d53a190c';
-  team_id constant uuid := '2847fab3-d5b7-4120-9468-324700578b48';
+  v_org_id constant uuid := '8f24e090-0ccc-4c10-a00d-ace7d53a190c';
+  v_team_id constant uuid := '2847fab3-d5b7-4120-9468-324700578b48';
   r record;
   athlete_key uuid;
   player_key uuid;
@@ -32,7 +32,7 @@ BEGIN
     JOIN public.team_memberships tm ON tm.team_id=t.id AND tm.role='coach' AND tm.status='active'
     JOIN public.organization_memberships om ON om.organization_id=t.organization_id
       AND om.user_id=tm.user_id AND om.role IN ('staff','admin') AND om.status='active'
-    WHERE t.id=team_id AND t.organization_id=org_id AND t.status='active'
+    WHERE t.id=v_team_id AND t.organization_id=v_org_id AND t.status='active'
   ) THEN
     RAISE EXCEPTION 'SDL demo seed aborted: authorized staging coach-team context missing';
   END IF;
@@ -74,7 +74,7 @@ BEGIN
     INSERT INTO public.players
       (id,athlete_id,organization_id,preferred_name,name,jersey,"position",throws,bats,
        dob,current_height_cm,current_weight_kg)
-    VALUES (player_key,athlete_key,org_id,r.display_name,r.display_name,r.jersey_number,
+    VALUES (player_key,athlete_key,v_org_id,r.display_name,r.display_name,r.jersey_number,
       r.field_position,r.throw_hand,r.bat_hand,
       make_date(2012+(r.idx%4),1+((r.idx-1)%12),5+(r.idx%20)),
       round((base_height+7*growth_height)::numeric,1),
@@ -83,7 +83,7 @@ BEGIN
 
     IF NOT EXISTS (
       SELECT 1 FROM public.players
-      WHERE id=player_key AND athlete_id=athlete_key AND organization_id=org_id
+      WHERE id=player_key AND athlete_id=athlete_key AND organization_id=v_org_id
         AND preferred_name=r.display_name AND jersey=r.jersey_number
     ) THEN
       RAISE EXCEPTION 'SDL demo seed aborted: player key collision for %',r.slug;
@@ -91,7 +91,7 @@ BEGIN
 
     INSERT INTO public.player_team_memberships
       (id,player_id,team_id,organization_id,start_date,end_date,status)
-    VALUES(membership_key,player_key,team_id,org_id,DATE '2025-08-01',NULL,'active')
+    VALUES(membership_key,player_key,v_team_id,v_org_id,DATE '2025-08-01',NULL,'active')
     ON CONFLICT(id) DO NOTHING;
 
     FOR step_number IN 0..7 LOOP
