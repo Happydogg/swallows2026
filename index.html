@@ -211,10 +211,18 @@
       :is-session-expanded="isSessionExpanded" :toggle-session-expand="toggleSessionExpand"
       :get-attack-angle-color="getAttackAngleColor" :open-edit-session-modal="openEditSessionModal"
       :remove-session="removeSession" :delete-drill-video="deleteDrillVideo"
-      @open-submissions="submissionController.changeTab('submissions'); submissionController.selectPlayer($event)" @back="leavePlayerProfile"></player-profile>
+      @open-submissions="submissionController.changeTab('submissions'); submissionController.selectPlayer($event)" @back="leavePlayerProfile">
+      <template #private-media>
+        <private-media-panel v-if="mediaOriginAllowed && visibleStagingPlayers.some(row => row.id === selectedPlayer.id)"
+          :controller="privateMediaController"></private-media-panel>
+        <p v-else class="rounded-xl border border-slate-700 bg-slate-900 p-4 text-sm text-slate-300">
+          Private videos are available only to permitted team coaches or verified family members on the authorized staging site.
+        </p>
+      </template>
+    </player-profile>
 
-    <!-- Existing permission-enforced private media is visible directly after a coach's selected profile. -->
-    <private-media-panel :class="mediaOriginAllowed && (activeTab === 'videos' || (activeTab === 'team' && currentView === 'player' && workspaceMode === 'coach')) ? '' : 'hidden'"
+    <!-- The same protected media state is available in the Videos tab. -->
+    <private-media-panel v-if="activeTab === 'videos' && mediaOriginAllowed"
       :controller="privateMediaController"></private-media-panel>
 
     <!-- SDL-002: Unified Player Form (Add / Edit) -->
