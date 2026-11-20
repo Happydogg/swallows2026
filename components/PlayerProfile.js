@@ -40,28 +40,37 @@ export const PlayerProfile = {
     deleteDrillVideo: { type: Function, required: true }
   },
   emits: ["back", "open-submissions", "edit-photo"],
-  setup(props) {
+  setup(props, { emit }) {
     const demoMatch=Vue.computed(()=>/^DEMO\s/.test(String(props.selectedPlayer?.preferred_name||'')) && /^(2[1-9]|3[0-5])$/.test(String(props.selectedPlayer?.jersey||'')));
-    return { demoMatch };
+    // Exactly one editing entry point. Staging uses the permission-scoped
+    // private picture editor; the legacy full editor remains for explicitly
+    // authorized coach editing in environments where that is enabled.
+    const editPlayer = () => {
+      if (props.canEditPhoto) emit('edit-photo',props.selectedPlayer.id);
+      else if (props.isCoach) props.openEditPlayerModal(props.selectedPlayer);
+    };
+    return { demoMatch, editPlayer };
   },
   template: `
 <div class="space-y-6">
 
   <!-- Top Action Navigation Bar -->
-  <div class="flex items-center justify-between no-print">
-    <button @click="$emit('back')" class="text-sm text-slate-400 hover:text-white">← {{ t('backToOverview') }}</button>
-    <div class="flex items-center gap-2">
-      <button @click="triggerPrintReport" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-md text-sm font-medium transition flex items-center gap-1.5 shadow">
-        🖨️ {{ t('printReportBtn') }}
+  <div class="flex flex-wrap items-center justify-between gap-2 no-print">
+    <button type="button" @click="$emit('back')" class="min-h-11 rounded-lg px-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white">← {{ t('backToOverview') }}</button>
+    <div class="flex flex-wrap items-center justify-end gap-2">
+      <button v-if="canEditPhoto || isCoach" type="button" @click="editPlayer"
+        class="min-h-11 rounded-xl border border-cyan-500/50 bg-blue-900/50 px-4 py-2 text-sm font-bold text-cyan-100 hover:bg-blue-800/60">
+        ✏️ {{ t('editPlayer') }}
+      </button>
+      <button type="button" @click="triggerPrintReport" :aria-label="t('printReportBtn')"
+        class="min-h-11 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700">
+        🖨️ <span class="hidden sm:inline">{{ t('printReportBtn') }}</span>
       </button>
       <template v-if="isCoach">
-        <button @click="openUploadVideoModal(selectedPlayer)" class="bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded-md text-sm font-medium transition flex items-center gap-1">
+        <button type="button" @click="openUploadVideoModal(selectedPlayer)" class="min-h-11 rounded-xl bg-purple-800 px-3 py-2 text-sm font-semibold text-white hover:bg-purple-700">
           📹 {{ t('uploadVideo') }}
         </button>
-        <button @click="openEditPlayerModal(selectedPlayer)" class="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 px-3 py-1.5 rounded-md text-sm font-medium transition">
-          ✏️ {{ t('editPlayer') }}
-        </button>
-        <button @click="openLogModal(selectedPlayer)" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-md text-sm font-medium text-white transition">
+        <button type="button" @click="openLogModal(selectedPlayer)" class="min-h-11 rounded-xl bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-600">
           + {{ t('logNewSession') }}
         </button>
       </template>
@@ -69,7 +78,7 @@ export const PlayerProfile = {
   </div>
 
   <!-- SDL-UX-005: Reused athletic player hero. All original profile fields are passed through. -->
-  <player-hero-card variant="profile" :player="selectedPlayer" :is-coach="isCoach" :can-edit-photo="canEditPhoto" @edit-photo="$emit('edit-photo',$event)"
+  <player-hero-card variant="profile" :player="selectedPlayer" :is-coach="isCoach"
     :t="t" :failed-imgs="failedImgs" :format-img-url="formatImgUrl" :mark-img-failed="markImgFailed"
     :format-legal-name="formatLegalName" :get-player-display-name="getPlayerDisplayName"
     :get-latest-metric="getLatestMetric" :split-positions="splitPositions" :calculate-age="calculateAge"
