@@ -66,10 +66,6 @@ export const PlayerHeroCard = {
             </div>
             <h2 class="mt-2 break-words text-2xl font-black tracking-tight text-white sm:text-3xl">{{ getPlayerDisplayName(player) }}</h2>
             <p class="mt-2 text-sm font-medium text-slate-300">{{ t('throws') }}: {{ player.throws || '–' }} <span class="text-slate-600">|</span> {{ t('bats') }}: {{ player.bats || '–' }}</p>
-            <button v-if="canEditPhoto" type="button" @click="$emit('edit-photo',player.id)"
-              class="mt-3 rounded-lg border border-cyan-400/50 bg-sky-900/40 px-3 py-2 text-xs font-bold text-cyan-200 hover:bg-sky-800/70">
-              <span aria-hidden="true">📷</span> Change profile picture
-            </button>
             <p v-if="isCoach" class="mt-2 break-words text-xs text-slate-400">
               {{ t('officialName') }}: <span class="text-slate-200">{{ formatLegalName(player) }}</span>
               <span v-if="player.hkll_reg_no"> · HKLL: <span class="text-blue-300">{{ player.hkll_reg_no }}</span></span>
