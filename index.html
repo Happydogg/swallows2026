@@ -195,7 +195,7 @@
 
     <!-- VIEW 2: Individual Player Profile & Dated Session History -->
     <player-profile v-if="currentView === 'player' && selectedPlayer" :class="activeTab === 'team' ? '' : 'hidden'" :can-edit-photo="canEditPlayerPhoto(selectedPlayer.id)" @edit-photo="avatarManager.choose($event)"
-      :t="t" :selected-player="selectedPlayer" :is-coach="isCoach"
+      :t="t" :selected-player="selectedPlayer" :is-coach="isCoach" :history-loading="profileHistoryLoading" :history-error="profileHistoryError"
       :failed-imgs="failedImgs" :format-img-url="formatImgUrl" :mark-img-failed="markImgFailed"
       :format-legal-name="formatLegalName" :get-player-display-name="getPlayerDisplayName"
       :get-latest-metric="getLatestMetric" :split-positions="splitPositions" :calculate-age="calculateAge"
