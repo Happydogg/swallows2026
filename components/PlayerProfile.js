@@ -166,6 +166,9 @@ export const PlayerProfile = {
     </div>
   </div>
 
+  <!-- SDL-005: A server-authorized private video room replaces legacy card URLs
+       in staging. Keep the original video gallery as a fallback when no slot is supplied. -->
+  <slot name="private-media">
   <!-- STAGE 1: Video Analysis & Drill Clips Gallery -->
   <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-5 no-print space-y-4">
     <div class="flex items-center justify-between border-b border-slate-700/60 pb-3">
@@ -236,6 +239,7 @@ export const PlayerProfile = {
       {{ t('noVideosLogged') }}
     </div>
   </div>
+  </slot>
 
   <!-- Dated Session History Details -->
   <div class="space-y-3">
