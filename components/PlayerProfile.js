@@ -1,6 +1,9 @@
 // SDL-003: player profile and historical session presentation; stats supplied as props.
+import { PlayerHeroCard } from './PlayerHeroCard.js';
+
 export const PlayerProfile = {
   name: "PlayerProfile",
+  components: { PlayerHeroCard },
   props: {
     t: { type: Function, required: true },
     selectedPlayer: { type: Object, required: true },
@@ -59,52 +62,13 @@ export const PlayerProfile = {
     </div>
   </div>
 
-  <!-- Printable Player Summary Card -->
-  <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 print-card">
-    <div class="flex items-center gap-4">
-      <div class="w-20 h-20 rounded-2xl overflow-hidden flex-shrink-0 bg-slate-700 border-2 border-slate-600 shadow-md flex items-center justify-center font-bold text-xl text-blue-300">
-        <img v-if="selectedPlayer.photo_url && !failedImgs[selectedPlayer.id]" 
-             :src="formatImgUrl(selectedPlayer.photo_url)" 
-             :alt="getPlayerDisplayName(selectedPlayer)" 
-             class="w-full h-full object-cover" 
-             referrerpolicy="no-referrer"
-             @error="markImgFailed(selectedPlayer.id)">
-        <span v-else>#{{ selectedPlayer.jersey }}</span>
-      </div>
-      <div>
-        <div class="flex items-center gap-2 mb-1">
-          <span class="text-xs font-mono px-2 py-0.5 rounded bg-slate-700 text-white">#{{ selectedPlayer.jersey }}</span>
-          <div class="flex gap-1">
-            <span v-for="pos in splitPositions(selectedPlayer.position)" :key="pos" class="px-2 py-0.5 rounded bg-blue-900/60 text-blue-300 text-xs font-medium border border-blue-700/50">
-              {{ pos }}
-            </span>
-          </div>
-          <span v-if="Number(getLatestMetric(selectedPlayer.id, 'exit_velo')) >= 60" class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold">
-            🏅 60+ km/h Club
-          </span>
-        </div>
-        <h2 class="text-2xl font-bold">{{ getPlayerDisplayName(selectedPlayer) }}</h2>
-        <p v-if="isCoach" class="text-xs text-slate-400 font-mono mt-0.5">
-          {{ t('officialName') }}: <span class="text-slate-200">{{ formatLegalName(selectedPlayer) }}</span>
-          <span v-if="selectedPlayer.hkll_reg_no"> • HKLL: <span class="text-blue-300">{{ selectedPlayer.hkll_reg_no }}</span></span>
-        </p>
-        <p class="text-sm text-slate-400 mt-1">
-          {{ t('throws') }}: {{ selectedPlayer.throws }} | {{ t('bats') }}: {{ selectedPlayer.bats }}
-          <span v-if="isCoach && selectedPlayer.dob"> | {{ t('dob') }}: {{ selectedPlayer.dob }} ({{ calculateAge(selectedPlayer.dob) }})</span>
-        </p>
-        <p class="text-sm text-blue-400 mt-1 font-mono font-medium">
-          {{ t('latestMeasurements') }}: {{ formatHeightWeight(selectedPlayer.id) }}
-          <span v-if="calculateJumpRatio(selectedPlayer.id)" class="ml-2 font-bold" :class="getJumpRatioColor(calculateJumpRatio(selectedPlayer.id))">
-            • {{ t('jumpRatioLabel') }}: {{ calculateJumpRatio(selectedPlayer.id) }}x
-          </span>
-        </p>
-      </div>
-    </div>
-
-    <div class="text-sm text-slate-300 space-y-1 self-stretch md:self-auto border-t md:border-t-0 border-slate-700/60 pt-3 md:pt-0">
-      <p><span class="text-slate-500">{{ t('batSpec') }}:</span> {{ selectedPlayer.bat_spec || t('notSpecified') }}</p>
-    </div>
-  </div>
+  <!-- SDL-UX-005: Reused athletic player hero. All original profile fields are passed through. -->
+  <player-hero-card variant="profile" :player="selectedPlayer" :is-coach="isCoach"
+    :t="t" :failed-imgs="failedImgs" :format-img-url="formatImgUrl" :mark-img-failed="markImgFailed"
+    :format-legal-name="formatLegalName" :get-player-display-name="getPlayerDisplayName"
+    :get-latest-metric="getLatestMetric" :split-positions="splitPositions" :calculate-age="calculateAge"
+    :calculate-jump-ratio="calculateJumpRatio" :get-jump-ratio-color="getJumpRatioColor"
+    :format-height-weight="formatHeightWeight"></player-hero-card>
 
   <!-- Family accounts: no parent-safe statistics API exists, so raw sessions are not loaded. -->
   <div v-if="!isCoach && getPlayerSessions(selectedPlayer.id).length === 0" class="rounded-xl border border-amber-800/50 bg-amber-950/20 p-4 text-sm text-amber-300 no-print" role="status" data-stats-unavailable>
