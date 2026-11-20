@@ -28,6 +28,7 @@ import { LoginLanding } from '../components/LoginLanding.js';
 import { AppShell } from '../components/AppShell.js';
 import { CoachHome } from '../components/CoachHome.js';
 import { ParentHome } from '../components/ParentHome.js';
+import { StatsHub } from '../components/StatsHub.js';
 import { StagingDataBrowser } from '../components/StagingDataBrowser.js';
 import { InviteOnboarding } from '../components/InviteOnboarding.js';
 import { AppHeader } from '../components/AppHeader.js';
@@ -43,7 +44,7 @@ const { createApp, ref, onMounted, onUnmounted, markRaw, computed } = Vue;
 
 createApp({
   components: {
-    PilotWorkspace, PerformanceInbox, LoginLanding, AppShell, CoachHome, ParentHome, StagingDataBrowser, InviteOnboarding, AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
+    PilotWorkspace, PerformanceInbox, LoginLanding, AppShell, CoachHome, ParentHome, StatsHub, StagingDataBrowser, InviteOnboarding, AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
     SessionFormModal, UploadVideoModal, ArAnalyzerModal
   },
   setup() {
@@ -295,7 +296,7 @@ createApp({
     onUnmounted(() => { auth.disposeAuth(); submissionWorkspace.dispose(); enrollmentAdmin.dispose();pilotWorkspace.dispose(); });
 
     return {
-      currentLang, t, saveLanguage, loading, isSaving, currentView, overviewTab, activeTab, workspaceMode, familyPlayers, visibleStagingPlayers, mediaOriginAllowed, navigateTab, changeWorkspace, pendingInvitation, dismissInvitePrompt, searchQuery,
+      currentLang, t, saveLanguage, loading, isSaving, currentView, overviewTab, activeTab, workspaceMode, familyPlayers, visibleStagingPlayers, mediaOriginAllowed, statsFamilyCards: submissionWorkspace.cards, navigateTab, changeWorkspace, pendingInvitation, dismissInvitePrompt, searchQuery,
       selectedPlayer, players, sessions, drillVideos, coachRoster, coachRosterLoading, coachRosterError,
       formatImgUrl, triggerPrintReport,
       ...auth, signInAndLoad, signOutAndClear,
