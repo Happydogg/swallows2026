@@ -88,3 +88,38 @@ test('new home components contain no private identifiers, predicted metrics or u
   assert.match(familyHome, /No estimated values are shown/);
   assert.match(coachHome, /does not invent team averages/);
 });
+
+test('authenticated player browser uses scoped coach or verified-guardian data only', async t => {
+  const h=await harness(t,user('staging-review'));
+  const coach={id:'coach-child',team_id:'authorized-team',preferred_name:'Coach Athlete'};
+  const linked={id:'linked-child',athlete_id:'guardian-athlete',preferred_name:'Family Athlete'};
+  const other={id:'unrelated',athlete_id:'unrelated-athlete',preferred_name:'Unlinked Athlete'};
+  h.app.players.value=[linked,other];
+  h.app.coachRoster.value=[coach];
+  h.app.guardianLinks.value=[{athlete_id:'guardian-athlete',status:'verified'}];
+  assert.deepEqual([...h.app.visibleStagingPlayers.value.map(row=>row.id)],['linked-child']);
+  h.app.teamMemberships.value=[{team_id:'authorized-team',role:'coach',status:'active'}];
+  assert.deepEqual([...h.app.visibleStagingPlayers.value.map(row=>row.id)],['coach-child']);
+  h.app.changeWorkspace('family');
+  assert.deepEqual([...h.app.visibleStagingPlayers.value.map(row=>row.id)],['linked-child']);
+  h.app.authError.value='Membership service denied';
+  assert.deepEqual([...h.app.visibleStagingPlayers.value],[]);
+});
+
+test('new preview host does not claim private Worker CORS eligibility', async t => {
+  const h=await harness(t,user('staging-review'));
+  assert.equal(h.app.mediaOriginAllowed.value,false);
+  h.app.guardianLinks.value=[{athlete_id:'guardian-athlete',status:'verified'}];
+  h.app.submissionController.changeTab('clubhouse');
+  h.app.navigateTab('team');
+  assert.equal(h.app.submissionController.tab.value,'players');
+  h.app.navigateTab('videos');
+  assert.equal(h.app.activeTab.value,'videos');
+  assert.equal(h.app.mediaOriginAllowed.value,false);
+});
+
+test('live media navigation links only to the previously authorized staging host',()=>{
+  assert.match(index,/href="https:\/\/sdl-staging\.pages\.dev\/"/);
+  assert.match(index,/v-if="activeTab === 'videos' && !mediaOriginAllowed"/);
+  assert.match(index,/:class="activeTab === 'videos' && mediaOriginAllowed/);
+});
