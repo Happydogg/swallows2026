@@ -177,7 +177,8 @@ test('Stats Hub displays static staging fixture without requesting live sessions
   assert.ok(index.includes('<authorized-stats-board'));
   assert.ok(index.includes(':show-synthetic="false"'));
   assert.ok(live.includes('Live staging measurements'));
-  assert.equal(/supabaseClient|\\.from\\s*\\(/.test(live),false, 'presentation component does no unscoped database reads');
+  assert.equal(live.includes('supabaseClient'),false);
+  assert.equal(live.includes('.from('),false,'presentation component cannot query unscoped tables');
   assert.ok(lab.includes('not a live Supabase query'));
   for(const key of ['sprint_18m_s','height_cm','weight_kg','throwing_velo_kmh'])
     assert.ok(lab.includes(key));
