@@ -136,17 +136,44 @@ export function useAuthSession({ onIdentityChange = () => {}, onAuthenticated = 
     }
   }
 
-  function handleAuthChange(_event, session) {
+  // Supabase emits SIGNED_IN when a tab regains focus, and TOKEN_REFRESHED as
+  // tokens rotate. Neither event alone is a sign-out or an account switch.
+  // No authorization is decided here: every data endpoint still checks the JWT.
+  let pendingEventUserId = null;
+  function handleAuthChange(event, session) {
     if (disposed) return;
+    const incomingId = session?.user?.id || null;
+    if (event === 'SIGNED_OUT' || !incomingId) {
+      // A true sign-out is synchronous so stale private screens disappear now.
+      pendingEventUserId = null;
+      actionVersion++;
+      authBusy.value = false;
+      invalidateIdentity();
+      authReady.value = true;
+      return;
+    }
+    if (authUser.value?.id === incomingId && authReady.value && !authError.value) {
+      // Keep the mounted roster, player selection, videos and loaded GPU state.
+      // Same-user auth refresh is not evidence of a changed authorization grant.
+      authUser.value = session.user;
+      return;
+    }
+    if (pendingEventUserId === incomingId && !authUser.value && !authReady.value) {
+      // Multiple initial notifications for the same pending identity coalesce.
+      return;
+    }
     actionVersion++;
     authBusy.value = false;
     const version = invalidateIdentity();
-    authReady.value = !session;
-    if (session) {
-      // Supabase invokes auth listeners while holding its auth lock. Never await
-      // getUser or another Supabase request inside the listener itself.
-      refreshTimer = setTimeout(() => { refreshTimer = null; void refreshIdentity(version); }, 0);
-    }
+    pendingEventUserId = incomingId;
+    authReady.value = false;
+    // Avoid Supabase's auth lock: do not await a database request in this callback.
+    refreshTimer = setTimeout(() => {
+      refreshTimer = null;
+      void refreshIdentity(version).finally(() => {
+        if (version === sessionVersion) pendingEventUserId = null;
+      });
+    }, 0);
   }
 
   async function initializeAuth() {
