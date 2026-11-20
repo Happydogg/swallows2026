@@ -100,6 +100,9 @@
         :can-family="isVerifiedGuardian" :account-email="authUser.email || ''" :sign-out-busy="authBusy"
         @navigate="navigateTab" @mode-change="changeWorkspace" @sign-out="signOutAndClear">
 
+      <invite-onboarding v-if="pendingInvitation" :controller="pilotController" :account-email="authUser.email || ''"
+        @dismiss="dismissInvitePrompt"></invite-onboarding>
+
       <coach-home v-if="activeTab === 'home' && workspaceMode === 'coach'"
         :roster="coachRoster" :loading="coachRosterLoading" :error="coachRosterError" @navigate="navigateTab"></coach-home>
       <parent-home v-else-if="activeTab === 'home' && workspaceMode === 'family'"
