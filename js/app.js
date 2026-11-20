@@ -266,6 +266,29 @@ createApp({
       activeTab.value='team';
       if (mediaOriginAllowed.value) void privateMedia.selectMediaPlayer(authorized.id);
     };
+    // A parent's profile opens through the existing verified-guardian service,
+    // not from a card's photo URL or a client-side permission toggle.
+    const openFamilyPlayerProfile = player => {
+      if (!auth.isVerifiedGuardian.value || workspaceMode.value !== 'family'
+        || auth.authError.value || !familyPlayers.value.some(p => p.id === player?.id)) return;
+      void submissionWorkspace.showProfile(player.id);
+    };
+    // Admin-only accounts can navigate from their server-filtered player
+    // directory to the same profile, without reading sessions or private video.
+    const openManagedPlayerProfile = player => {
+      if (workspaceMode.value !== 'admin' || !auth.isOrgAdmin.value || auth.authError.value) return;
+      const managed=avatarManager.rows.value.find(p => p.id === player?.id);
+      if (!managed || !avatarManager.canEdit(managed.id)) return;
+      sessions.value=[];drillVideos.value=[];
+      guardianProfileId.value='';guardianProfileSessions.value=[];
+      playerFeature.selectPlayer({...managed,photo_url:avatarForPlayer(managed)});
+      activeTab.value='team';
+    };
+    const leavePlayerProfile = () => {
+      currentView.value='overview';
+      privateMedia.resetMedia();
+      if (workspaceMode.value === 'admin') activeTab.value='me';
+    };
     const saveLanguage = () => {
       localStorage.setItem('swallows_lang', currentLang.value);
       analytics.renderPlayerChart();
@@ -337,7 +360,7 @@ createApp({
 
     return {
       currentLang, t, saveLanguage, loading, isSaving, currentView, overviewTab, activeTab, workspaceMode, familyPlayers, visibleStagingPlayers, coachRosterDisplay, mediaOriginAllowed, statsFamilyCards: submissionWorkspace.cards, navigateTab, changeWorkspace, pendingInvitation, dismissInvitePrompt, searchQuery,
-      selectedPlayer, players, sessions, drillVideos, coachRoster, coachRosterLoading, coachRosterError, selectCoachRosterPlayer, openAuthorizedPlayerVideos, canEditPlayerPhoto: avatarManager.canEdit, avatarManager,
+      selectedPlayer, players, sessions, drillVideos, coachRoster, coachRosterLoading, coachRosterError, selectCoachRosterPlayer, openAuthorizedPlayerVideos, openFamilyPlayerProfile, openManagedPlayerProfile, leavePlayerProfile, canEditPlayerPhoto: avatarManager.canEdit, avatarManager,
       formatImgUrl, triggerPrintReport,
       ...auth, signInAndLoad, signOutAndClear,
       ...coach, ...analytics, ...playerFeature, ...sessionFeature, ...videoFeature, ...csvFeature,
