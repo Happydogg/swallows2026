@@ -108,11 +108,11 @@ createApp({
         ? coachRoster.value
         : workspaceMode.value === 'family' && auth.isVerifiedGuardian.value ? familyPlayers.value : [];
     });
-    // Existing private-media Worker authorizes only these exact browser origins.
-    // A new Pages hostname must never spoof or work around its Origin checks.
+    // Exact browser origins approved by the staging media Worker (SDL-004).
+    // This is only a UI guard; the Worker still authenticates and authorizes reads.
     const mediaOriginAllowed = computed(() =>
-      ['https://sdl-staging.pages.dev','http://127.0.0.1:5500','http://localhost:5500']
-        .includes(window.location.origin)
+      ['https://sdl-staging.pages.dev','https://sdl-ux-live.pages.dev',
+        'http://127.0.0.1:5500','http://localhost:5500'].includes(window.location.origin)
     );
     const changeWorkspace = requested => {
       if (requested !== 'coach' && requested !== 'family') return;
