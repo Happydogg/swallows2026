@@ -9,7 +9,7 @@ export const StagingDataBrowser = {
     error: { type: String, default: '' },
     videoHere: { type: Boolean, default: false }
   },
-  emits: ['navigate'],
+  emits: ['navigate', 'open-video'],
   setup(props) {
     const search = Vue.ref('');
     const visiblePlayers = Vue.computed(() => {
@@ -61,6 +61,11 @@ export const StagingDataBrowser = {
               <p class="mt-1 text-xs text-slate-400">Bats {{ player.bats || '–' }} · Throws {{ player.throws || '–' }}</p>
             </div>
           </div>
+          <button type="button" @click="$emit('open-video', player)"
+            :aria-label="'Open private videos for ' + (player.preferred_name || 'this player')"
+            class="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-sky-500/40 bg-blue-900/35 px-4 py-3 text-sm font-bold text-sky-100 hover:bg-blue-800/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">
+            <span aria-hidden="true">▶</span><span>Open player videos</span>
+          </button>
         </article>
       </div>
       <p class="text-xs text-slate-400">No birth dates, private contact details, or unapproved metrics are added by this browser. Video access is checked separately.</p>
