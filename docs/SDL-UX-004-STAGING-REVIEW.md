@@ -2,6 +2,18 @@
 
 **Owner request:** Build an online page to sign in and view staging Supabase players and private video from a phone, keeping the existing `sdl-ux-preview` synthetic-only design preview.
 
+## Owner-reported phone UAT — 2026-11-20
+
+The project owner reports **"video play"** on the authenticated `sdl-ux-live.pages.dev` workflow. Record this as **user-verified successful playback**, not independent browser/network instrumentation. The existing staging Worker origin, R2 binding, and signed-in media player flow are therefore sufficient for at least one permitted phone playback. The specific iOS model, player and file were not provided, and broad playback compatibility remains unverified.
+
+## SDL-UX-006 | Player-to-video mobile navigation
+
+- Added `Open player videos` action to the staging family player browser; `Watch player videos` to parent cards; `Videos` action to each coach home roster row.
+- All emit `open-video` to a single `openAuthorizedPlayerVideos` controller method. It accepts only rows present in the active server-scoped coach roster or verified-family projection, then invokes the already existing `privateMedia.selectMediaPlayer`, which separately calls the Worker to authorize read/upload.
+- No new Supabase queries, R2 access paths, API endpoints or migrations.
+- Build evidence: Cloudflare Pages commit `4fb0665ef3db5b46644157290378cac0c036475e`, **114/114** targeted automated checks plus **1/1** Vue renderer smoke test; deployment successful.
+- **Acceptance pending:** owner confirms the shortcuts select the correct family/coached player and that the relevant video plays on a physical phone.
+
 ## SDL-004 Worker origin deployed and verified — 2026-11-20
 
 **Status: Implemented, automated-test verified, browser-CORS verified, staging Worker deployed. User-authenticated media playback UAT remains open.**
