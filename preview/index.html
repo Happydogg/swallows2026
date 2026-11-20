@@ -109,6 +109,12 @@
       <coach-home v-if="activeTab==='home' && role==='coach'" :roster="demoRoster" :loading="false" error="" @navigate="activeTab=$event"></coach-home>
       <parent-home v-else-if="activeTab==='home'" :players="demoPlayers" :loading="false" @navigate="activeTab=$event"></parent-home>
       <private-media-panel v-else-if="activeTab==='videos'" :controller="previewMediaControllerState"></private-media-panel>
+      <section v-else-if="activeTab==='stats'" class="space-y-3">
+        <p class="rounded-xl border border-amber-400/30 bg-amber-950/20 p-3 text-xs font-bold text-amber-300">Synthetic design data. These scores are fictional and not real player measurements.</p>
+        <stats-hub :mode="role" :coach-roster="demoRoster" :family-cards="previewFamilyStats"
+          :enabled="true" :loading="false" @navigate="activeTab=$event"
+          @open-player="screen='profile'"></stats-hub>
+      </section>
 
       <section v-else class="space-y-4" :aria-label="'Preview '+activeTab">
         <div class="rounded-2xl border border-blue-400/25 bg-gradient-to-r from-blue-950 to-slate-900 p-6">
