@@ -112,7 +112,7 @@ for (const transition of ['logout', 'account switch', 'same-account relogin']) {
     await until(() => h.calls.some(c => c.table === 'players'));
     if (transition === 'logout') await h.app.signOutAndClear();
     else {
-      h.rows.players = [{ id: 'new-child', jersey: '2' }];
+      h.rows.players = [{ id: 'new-child', athlete_id: 'a1', preferred_name: 'Child', jersey: '2' }];
       h.rows.sessions = []; h.rows.drill_videos = [];
       if (transition === 'same-account relogin') h.emit('SIGNED_OUT', null);
       h.emit('SIGNED_IN', user(transition === 'account switch' ? 'new' : 'parent'));
