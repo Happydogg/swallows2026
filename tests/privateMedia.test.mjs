@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { harness, deferred, user } from './helpers/appHarness.mjs';
 const PLAYER = '11111111-1111-4111-8111-111111111111';
 const OTHER = '22222222-2222-4222-8222-222222222222';
@@ -272,4 +273,52 @@ test('v2 JSON query support does not permit absolute URLs, encoded path traversa
  const {service,requests}=await serviceHarness(t);
  for(const route of['https://example.invalid','//example.invalid','/v2/%2e%2e/v1/media','/v2/admin/organizations#fragment','/v2/admin/enrollments?q=%ZZ'])assert.throws(()=>service.requestJson(route),/Invalid submission route/);
  assert.equal(requests.length,0);
+});
+
+test('visible private clips generate real in-memory thumbnails once and reuse the authorized download',async t=>{
+  let downloads=0,frames=0;
+  const {c}=await controllerHarness(t,{
+    playback:async()=>{downloads++;return new Blob(['mp4-synthetic'],{type:'video/mp4'});}
+  },{
+    thumbnailExtractor:async(blob)=>{frames++;assert.equal(blob.type,'video/mp4');return 'data:image/jpeg;base64,QQ==';}
+  });
+  await c.selectMediaPlayer(PLAYER);
+  c.ensureMediaThumbnail(row);
+  await new Promise(resolve=>setTimeout(resolve,15));
+  assert.equal(c.mediaThumbnails.value[VIDEO],'data:image/jpeg;base64,QQ==');
+  assert.equal(downloads,1);assert.equal(frames,1);
+  c.ensureMediaThumbnail(row);
+  await c.playPrivateMedia(row);
+  assert.equal(downloads,1,'playback reuses the short-lived authorized MP4');
+  c.resetMedia();
+  assert.deepEqual(Object.keys(c.mediaThumbnails.value),[]);
+  assert.deepEqual(Object.keys(c.mediaThumbnailBusy.value),[]);
+});
+test('unauthorized clip thumbnails never fetch bytes or expose stale frames after player switch',async t=>{
+  let downloads=0;
+  const pending=deferred();
+  const {c}=await controllerHarness(t,{
+    playback:async()=>{downloads++;return pending.promise;}
+  },{
+    thumbnailExtractor:async()=> 'data:image/jpeg;base64,QQ=='
+  });
+  await c.selectMediaPlayer(PLAYER);
+  c.ensureMediaThumbnail({...row,id:OTHER});
+  assert.equal(downloads,0);
+  c.ensureMediaThumbnail(row);
+  await new Promise(resolve=>setTimeout(resolve,3));
+  assert.equal(downloads,1);
+  c.resetMedia();
+  pending.resolve(new Blob(['old'],{type:'video/mp4'}));
+  await new Promise(resolve=>setTimeout(resolve,6));
+  assert.equal(c.mediaPlayerId.value,'');
+  assert.deepEqual(Object.keys(c.mediaThumbnails.value),[]);
+});
+test('private thumbnails render real images, not decorative fake video artwork',()=>{
+ const markup=fs.readFileSync(new URL('../components/PrivateMediaPanel.js',import.meta.url),'utf8');
+ assert.ok(markup.includes('v-media-visible="item"'));
+ assert.ok(markup.includes('v-if="mediaThumbnails[item.id]"'));
+ assert.ok(markup.includes(':src="mediaThumbnails[item.id]"'));
+ assert.ok(markup.includes('Preview unavailable'));
+ assert.ok(!markup.includes('image/pseudo'));
 });
