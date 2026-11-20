@@ -10,7 +10,7 @@ export const ParentHome = {
     loading: { type: Boolean, default: false },
     canEditPhoto: { type: Function, default: null }
   },
-  emits: ['navigate', 'edit-photo', 'open-video'],
+  emits: ['navigate', 'edit-photo', 'open-video', 'open-profile'],
   template: `
   <section class="space-y-5" aria-label="Parent home">
     <div class="relative overflow-hidden rounded-3xl border border-blue-400/25 bg-gradient-to-br from-blue-900 via-slate-900 to-slate-950 p-5 sm:p-7">
@@ -41,10 +41,9 @@ export const ParentHome = {
           <p class="text-sm font-semibold">Growth and development</p>
           <p class="mt-1 text-xs leading-relaxed text-slate-400">Verified measurements and progress will appear in the family workspace when available. No estimated values are shown.</p>
           <div class="mt-4 flex flex-col gap-2">
-            <button v-if="canEditPhoto && canEditPhoto(player.id)" type="button" @click="$emit('edit-photo',player.id)"
-              class="w-full rounded-xl border border-cyan-500/50 bg-sky-900/30 px-4 py-3 text-sm font-bold text-cyan-200 hover:bg-sky-800/40">📷 Change profile picture</button>
-            <button type="button" @click="$emit('navigate','team')"
-              class="w-full rounded-xl bg-blue-600 px-4 py-3 font-bold text-white hover:bg-blue-500">Open player workspace</button>
+            <button type="button" @click="$emit('open-profile',player)"
+              :aria-label="'Open '+(player.preferred_name || 'player')+' profile'"
+              class="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white hover:bg-blue-500">View player profile</button>
             <button type="button" @click="$emit('open-video',player)"
               :aria-label="'Open private videos for '+(player.preferred_name || 'this player')"
               class="w-full rounded-xl border border-sky-500/40 bg-blue-950 px-4 py-3 font-bold text-sky-200 hover:bg-blue-900">▶ Watch player videos</button>
