@@ -24,6 +24,7 @@
 
 - Read-only staging Supabase inventory (2026-11-20): 4 player rows, 2 private media metadata rows, 1 verified guardian link, 1 active coach membership. Row counts do not prove content is synthetic; owner reports staging uses mock data.
 - Cloudflare `sdl-ux-live` deployment tested with **89/89** automated targeted tests (auth, guardian scoping, private media, UX routing, packaging) passing, and Pages build published successfully.
+- Additional real Vue 3 compiler/custom-renderer smoke test: **1/1 passed**, covering signed-out/login views, private media, authorized player UI, and role-dependent navigation. The live build now requires this test before export.
 - Browser Rendering returned a loaded sign-in screen with email/password fields on a 390 × 844 mobile viewport; no player data rendered before login.
 - Entire branch and export retain `SUBMISSION_FEATURES_ENABLED=false`. No auth, database, RLS, Worker or credential changes.
 - Original `sdl-staging` Cloudflare Pages project and source branch remain unchanged.
