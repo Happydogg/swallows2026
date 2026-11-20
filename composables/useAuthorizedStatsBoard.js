@@ -1,6 +1,6 @@
 // SDL-004-LIVE-STATS-002: Active-identity, roster-scoped read-only chart state.
 import { fetchAuthorizedPlayerHistory } from '../js/authorizedStatsService.js';
-export function useAuthorizedStatsBoard({auth,coachRoster,familyPlayers,workspaceMode,load=fetchAuthorizedPlayerHistory}){
+export function useAuthorizedStatsBoard({auth,coachRoster,familyPlayers,workspaceMode,activeTab,load=fetchAuthorizedPlayerHistory}){
   const selectedId=Vue.ref('');
   const sessions=Vue.ref([]);
   const busy=Vue.ref(false);
@@ -42,7 +42,15 @@ export function useAuthorizedStatsBoard({auth,coachRoster,familyPlayers,workspac
     const prior=selectedId.value;
     reset();
     const candidate=players.value.some(x=>x.id===prior)?prior:players.value[0]?.id;
-    if(candidate)void select(candidate);
+    if(candidate && activeTab.value==='stats')void select(candidate);
   },{immediate:true});
+  Vue.watch(activeTab,tab=>{
+    // A coach looking at another tab on weak cellular reception should not
+    // download player history until Stats is actually requested.
+    if(tab==='stats' && players.value.length && !busy.value
+      && !sessions.value.length && !error.value){
+      void select(selectedId.value || players.value[0].id);
+    }
+  });
   return {players,selectedId,selected,sessions,busy,error,select,reset};
 }
