@@ -45,16 +45,26 @@ test('restored session loads data and initializes tracker', async t => {
   assert.equal(h.poseCalls, 1);
 });
 
-test('external login and token refresh verify and reload identity', async t => {
+test('initial external session loads once; same-user focus, token refresh and metadata events preserve workspace', async t => {
   const h = await harness(t);
   h.rows.athlete_guardians = [{ athlete_id: 'a1', status: 'verified' }];
-  for (const event of ['INITIAL_SESSION', 'SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED']) {
-    h.rows.players = [{ id: event, athlete_id: 'a1', jersey: '1' }];
-    h.emit(event, user('external'));
-    assert.equal(h.app.authUser.value, null);
-    assert.equal(h.app.authReady.value, false);
-    await until(() => h.app.players.value[0]?.id === event);
-    assert.equal(h.app.authUser.value.id, 'external');
+  h.rows.players = [{ id: 'original', athlete_id: 'a1', jersey: '1' }];
+  h.emit('INITIAL_SESSION', user('external'));
+  await until(() => h.app.players.value[0]?.id === 'original' && h.app.authReady.value);
+  const requests = h.calls.length, pose = h.poseCalls;
+  h.app.currentView.value = 'player';
+  h.app.selectedPlayer.value = {id:'original'};
+  h.app.activeTab.value = 'team';
+  for (const event of ['SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED', 'INITIAL_SESSION']) {
+    h.emit(event,user('external'));
+    await new Promise(resolve => setTimeout(resolve, 2));
+    assert.equal(h.app.authUser.value?.id, 'external');
+    assert.equal(h.app.authReady.value, true);
+    assert.equal(h.app.selectedPlayer.value?.id, 'original');
+    assert.equal(h.app.currentView.value, 'player');
+    assert.equal(h.app.activeTab.value, 'team');
+    assert.equal(h.calls.length,requests,'no re-fetch on '+event);
+    assert.equal(h.poseCalls,pose,'no GPU reinitialization on '+event);
   }
 });
 
@@ -96,7 +106,7 @@ test('late memberships cannot overwrite another account or restore guardian link
 for (const transition of ['logout', 'account switch', 'same-account relogin']) {
   test(`late players, sessions and videos are ignored after ${transition}`, async t => {
     const h = await harness(t); const pending = deferred(); h.queue('players', pending.promise);
-    h.rows.team_memberships = [{ team_id: 't', role: 'coach', status: 'active' }];
+    h.rows.athlete_guardians = [{ athlete_id: 'a1', status: 'verified' }];
     h.rows.sessions = [{ id: 'old-session' }]; h.rows.drill_videos = [{ id: 'old-video' }];
     const login = h.app.signInAndLoad();
     await until(() => h.calls.some(c => c.table === 'players'));
@@ -104,6 +114,7 @@ for (const transition of ['logout', 'account switch', 'same-account relogin']) {
     else {
       h.rows.players = [{ id: 'new-child', jersey: '2' }];
       h.rows.sessions = []; h.rows.drill_videos = [];
+      if (transition === 'same-account relogin') h.emit('SIGNED_OUT', null);
       h.emit('SIGNED_IN', user(transition === 'account switch' ? 'new' : 'parent'));
       await until(() => h.app.players.value[0]?.id === 'new-child');
     }
@@ -353,4 +364,23 @@ test('Fix 5: logout and identity invalidation clear phone, OTP, invitation code 
   assert.equal(h.app.otpSent.value, false);
   assert.equal(h.app.inviteCode.value, '');
   assert.equal(h.app.inviteEmail.value, '');
+});
+
+test('offline tab return does not re-check session or clear loaded data',async t=>{
+  const h=await harness(t,user('coach'));
+  h.app.activeTab.value='videos';
+  h.app.selectedPlayer.value={id:'authorized'};
+  h.app.players.value=[{id:'authorized',jersey:'21'}];
+  const before=h.calls.length;
+  const calls=h.poseCalls;
+  h.queue('getUser',Promise.reject(new Error('offline connectivity')));
+  h.emit('SIGNED_IN',user('coach'));
+  h.emit('TOKEN_REFRESHED',user('coach'));
+  await new Promise(resolve=>setTimeout(resolve,5));
+  assert.equal(h.app.authReady.value,true);
+  assert.equal(h.app.authUser.value.id,'coach');
+  assert.equal(h.app.players.value[0].id,'authorized');
+  assert.equal(h.app.activeTab.value,'videos');
+  assert.equal(h.calls.length,before);
+  assert.equal(h.poseCalls,calls);
 });
