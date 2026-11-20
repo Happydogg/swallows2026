@@ -11,7 +11,13 @@ export const CoachHome = {
   setup(props) {
     const teamCount = Vue.computed(() => new Set(props.roster.map(p => p.team_id).filter(Boolean)).size);
     const preview = Vue.computed(() => props.roster); // Full authorized roster; no five-player truncation.
-    const avatarFor=player => /^DEMO\s/.test(String(player?.preferred_name||'')) && /^(2[1-9]|3[0-5])$/.test(String(player?.jersey||'')) ? '/assets/demo-players/'+player.jersey+'.svg' : '';
+    const avatarFor = player => {
+      const approved=String(player?.photo_url||'');
+      if (/^https:\/\//.test(approved) || /^\/assets\/demo-players\/(2[1-9]|3[0-5])\.svg$/.test(approved)) return approved;
+      const jersey=String(player?.jersey||'');
+      return /^DEMO\s/.test(String(player?.preferred_name||'')) && /^(2[1-9]|3[0-5])$/.test(jersey)
+        ? '/assets/demo-players/'+jersey+'.svg' : '';
+    };
     return { teamCount, preview, avatarFor };
   },
   template: `
