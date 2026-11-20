@@ -6,6 +6,11 @@ test('Pages static export contains only frontend assets, root ES modules, safe h
   for(const file of frontendFiles)fs.cpSync(new URL(file,source),path.join(tmp,file),{recursive:true});fs.mkdirSync(path.join(tmp,'work'));fs.writeFileSync(path.join(tmp,'work/private.backup'),'NEVER COPY');
   const r=buildStagingFrontend(tmp);assert.equal(fs.existsSync(path.join(r.directory,'backend')),false);assert.equal(fs.existsSync(path.join(r.directory,'work')),false);assert.equal(fs.existsSync(path.join(r.directory,'.env')),false);
   assert.match(fs.readFileSync(path.join(r.directory,'index.html'),'utf8'),/src="\.\/js\/app.js"/);assert.match(fs.readFileSync(path.join(r.directory,'_headers'),'utf8'),/no-store|no-referrer/);assert.match(fs.readFileSync(path.join(r.directory,'js/config.js'),'utf8'),/SUBMISSION_FEATURES_ENABLED = false/);
+  for (let n=21;n<=35;n++) {
+    const src=path.join(r.directory,'assets','demo-players',n+'.svg');
+    assert.equal(fs.existsSync(src),true,'missing demo portrait #'+n);
+    assert.match(fs.readFileSync(src,'utf8'),/>DEMO<\/text>/);
+  }
   const config=path.join(tmp,'js/config.js');fs.writeFileSync(config,fs.readFileSync(config,'utf8').replace('SUBMISSION_FEATURES_ENABLED = false','SUBMISSION_FEATURES_ENABLED = true'));assert.throws(()=>buildStagingFrontend(tmp),/disabled frontend gate/);
  }finally{fs.rmSync(tmp,{recursive:true,force:true});}
 });
