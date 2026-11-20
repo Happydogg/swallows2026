@@ -12,6 +12,21 @@ const ALLOWLIST = Object.freeze([
   ['logo.png', 'logo.png'],
   ['components/AppShell.js', 'components/AppShell.js'],
   ['components/CoachHome.js', 'components/CoachHome.js'],
+  ['assets/demo-players/21.svg','assets/demo-players/21.svg'],
+  ['assets/demo-players/22.svg','assets/demo-players/22.svg'],
+  ['assets/demo-players/23.svg','assets/demo-players/23.svg'],
+  ['assets/demo-players/24.svg','assets/demo-players/24.svg'],
+  ['assets/demo-players/25.svg','assets/demo-players/25.svg'],
+  ['assets/demo-players/26.svg','assets/demo-players/26.svg'],
+  ['assets/demo-players/27.svg','assets/demo-players/27.svg'],
+  ['assets/demo-players/28.svg','assets/demo-players/28.svg'],
+  ['assets/demo-players/29.svg','assets/demo-players/29.svg'],
+  ['assets/demo-players/30.svg','assets/demo-players/30.svg'],
+  ['assets/demo-players/31.svg','assets/demo-players/31.svg'],
+  ['assets/demo-players/32.svg','assets/demo-players/32.svg'],
+  ['assets/demo-players/33.svg','assets/demo-players/33.svg'],
+  ['assets/demo-players/34.svg','assets/demo-players/34.svg'],
+  ['assets/demo-players/35.svg','assets/demo-players/35.svg'],
   ['components/ParentHome.js', 'components/ParentHome.js'],
   ['components/PlayerHeroCard.js', 'components/PlayerHeroCard.js'],
   ['components/PrivateMediaPanel.js', 'components/PrivateMediaPanel.js'],
@@ -95,7 +110,7 @@ export function buildUxPreview(root = ROOT) {
 
   const files = fs.readdirSync(out, {recursive:true, withFileTypes:true})
     .filter(entry=>entry.isFile()).map(entry=>entry.name);
-  if (manifest.length !== 17 || !files.length) throw Error('Preview package unexpectedly empty.');
+  if (manifest.length !== 32 || !files.length) throw Error('Preview package unexpectedly empty.');
   return { directory:out, manifest, commit };
 }
 
