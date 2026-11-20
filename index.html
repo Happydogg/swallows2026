@@ -213,7 +213,7 @@
       :remove-session="removeSession" :delete-drill-video="deleteDrillVideo"
       @open-submissions="submissionController.changeTab('submissions'); submissionController.selectPlayer($event)" @back="leavePlayerProfile">
       <template #private-media>
-        <private-media-panel v-if="mediaOriginAllowed && visibleStagingPlayers.some(row => row.id === selectedPlayer.id)"
+        <private-media-panel v-if="activeTab === 'team' && mediaOriginAllowed && visibleStagingPlayers.some(row => row.id === selectedPlayer.id)"
           :controller="privateMediaController"></private-media-panel>
         <p v-else class="rounded-xl border border-slate-700 bg-slate-900 p-4 text-sm text-slate-300">
           Private videos are available only to permitted team coaches or verified family members on the authorized staging site.
