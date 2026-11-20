@@ -245,6 +245,18 @@ createApp({
         if (auth.isCurrentIdentity(identity)) loading.value = false;
       }
     };
+    // A convenience route, never a media permission grant. The existing Worker
+    // checks the signed-in identity and per-player read access independently.
+    const openAuthorizedPlayerVideos = player => {
+      if (!auth.authUser.value || auth.authError.value || !player?.id) return;
+      const currentlyScoped = visibleStagingPlayers.value.some(row =>
+        row.id === player.id && (workspaceMode.value !== 'coach' || row.team_id === player.team_id));
+      if (!currentlyScoped) return;
+      navigateTab('videos');
+      if (mediaOriginAllowed.value && privateMedia.mediaPlayers.value.some(row => row.id === player.id)) {
+        void privateMedia.selectMediaPlayer(player.id);
+      }
+    };
     const selectCoachRosterPlayer = player => {
       if (!auth.isTeamCoach.value || workspaceMode.value !== 'coach' || auth.authError.value) return;
       const authorized = coachRoster.value.find(row => row.id === player?.id && row.team_id === player?.team_id);
@@ -329,7 +341,7 @@ createApp({
 
     return {
       currentLang, t, saveLanguage, loading, isSaving, currentView, overviewTab, activeTab, workspaceMode, familyPlayers, visibleStagingPlayers, coachRosterDisplay, mediaOriginAllowed, statsFamilyCards: submissionWorkspace.cards, navigateTab, changeWorkspace, pendingInvitation, dismissInvitePrompt, searchQuery,
-      selectedPlayer, players, sessions, drillVideos, coachRoster, coachRosterLoading, coachRosterError, selectCoachRosterPlayer, canEditPlayerPhoto: avatarManager.canEdit, avatarManager,
+      selectedPlayer, players, sessions, drillVideos, coachRoster, coachRosterLoading, coachRosterError, selectCoachRosterPlayer, openAuthorizedPlayerVideos, canEditPlayerPhoto: avatarManager.canEdit, avatarManager,
       formatImgUrl, triggerPrintReport,
       ...auth, signInAndLoad, signOutAndClear,
       ...coach, ...analytics, ...playerFeature, ...sessionFeature, ...videoFeature, ...csvFeature,
