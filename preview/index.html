@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="theme-color" content="#020617">
+  <title>SDL UX Review • Synthetic Demo</title>
+  <link rel="icon" type="image/png" href="./logo.png">
+  <script defer src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://unpkg.com/vue@3.5.13/dist/vue.global.prod.js"></script>
+  <script defer src="./meta.js"></script>
+  <script type="module" src="./app.js"></script>
+  <style>
+    [v-cloak]{display:none!important}
+    html{color-scheme:dark}
+    body{background:#020617}
+    button, select, textarea, input{touch-action:manipulation}
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+  </style>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100 antialiased">
+  <div id="preview-app" v-cloak class="mx-auto max-w-screen-2xl px-3 py-3 sm:px-5 sm:py-5">
+    <header class="mb-4 rounded-2xl border border-amber-500/40 bg-slate-900 px-4 py-3 shadow-lg" aria-label="Preview environment">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex min-w-0 items-center gap-3">
+          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-300" aria-hidden="true">✦</div>
+          <div class="min-w-0">
+            <p class="text-sm font-black tracking-tight text-white">SDL UX PREVIEW <span class="rounded-md bg-amber-500/20 px-2 py-1 text-xs text-amber-300">DEMO ONLY</span></p>
+            <p class="mt-1 text-xs text-slate-400">Synthetic data · No authentication · No staging backend</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="rounded-lg bg-slate-800 px-2 py-2 font-mono text-xs text-slate-300" title="Source commit">v {{ version }}</span>
+          <button type="button" @click="reportOpen = !reportOpen" class="rounded-lg bg-amber-500 px-3 py-2.5 text-xs font-bold text-slate-950 hover:bg-amber-400">Report issue</button>
+        </div>
+      </div>
+    </header>
+
+    <section v-if="reportOpen" class="mb-4 rounded-2xl border border-amber-400/50 bg-slate-900 p-4" aria-label="Problem report">
+      <h2 class="text-lg font-bold">Report what you see</h2>
+      <p class="mt-1 text-sm text-slate-400">Describe the layout issue, then copy the report into your SDL ChatGPT conversation. Attach a screenshot separately.</p>
+      <label class="mt-3 block text-sm font-semibold" for="ux-issue">What happened?</label>
+      <textarea id="ux-issue" v-model="issue" rows="3" placeholder="Example: The bottom navigation covers the action button on my iPhone..." class="mt-1 w-full rounded-xl border border-slate-600 bg-slate-950 p-3 text-base text-white focus:border-cyan-400"></textarea>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <button type="button" @click="copyReport" class="rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold">Copy report</button>
+        <button type="button" @click="reportOpen = false" class="rounded-xl border border-slate-600 px-4 py-3 text-sm">Close</button>
+      </div>
+      <p v-if="copyNotice" role="status" class="mt-2 text-xs text-emerald-300">{{ copyNotice }}</p>
+      <textarea v-if="manualReport" readonly :value="reportText" rows="5" aria-label="Manually copy this report" class="mt-3 w-full rounded-lg border border-slate-600 bg-slate-950 p-3 font-mono text-xs"></textarea>
+    </section>
+
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+      <div class="inline-flex gap-1 rounded-xl border border-slate-700 bg-slate-900 p-1" role="group" aria-label="Preview screens">
+        <button v-for="view in previewViews" :key="view.id" type="button" @click="screen=view.id"
+          :aria-pressed="screen===view.id"
+          :class="screen===view.id ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800'"
+          class="rounded-lg px-3 py-2.5 text-xs font-bold sm:text-sm">{{ view.title }}</button>
+      </div>
+      <div v-if="screen==='app'" class="inline-flex items-center gap-1 rounded-xl border border-slate-700 bg-slate-900 p-1" role="group" aria-label="Review as">
+        <button v-for="mode in [{id:'family',title:'Parent'},{id:'coach',title:'Coach'}]" :key="mode.id"
+          type="button" @click="role=mode.id;activeTab='home'" :aria-pressed="role===mode.id"
+          :class="role===mode.id ? 'bg-emerald-600 text-white' : 'text-slate-300'"
+          class="rounded-lg px-3 py-2.5 text-xs font-bold">{{ mode.title }}</button>
+      </div>
+    </div>
+
+    <login-landing v-if="screen==='login'" :controller="loginController"></login-landing>
+
+    <div v-else-if="screen==='invite'" class="mx-auto max-w-4xl">
+      <div class="mb-4 rounded-2xl border border-blue-400/20 bg-slate-900 p-5">
+        <p class="text-xs font-bold uppercase tracking-wider text-cyan-300">Invitation journey · visual review</p>
+        <h1 class="mt-2 text-2xl font-black">From WhatsApp to the team</h1>
+        <p class="mt-2 text-sm text-slate-400">This is the real invitation-handoff layout with synthetic state. No actual invite can be accepted on this site.</p>
+      </div>
+      <invite-onboarding :controller="invitationController" account-email="example-parent@example.invalid" @dismiss="screen='app'"></invite-onboarding>
+    </div>
+
+    <app-shell v-else :active-tab="activeTab" :mode="role" :can-coach="true" :can-family="true"
+      account-email="demo@example.invalid" @navigate="activeTab=$event" @mode-change="role=$event;activeTab='home'"
+      @sign-out="screen='login'">
+      <coach-home v-if="activeTab==='home' && role==='coach'" :roster="demoRoster" :loading="false" error="" @navigate="activeTab=$event"></coach-home>
+      <parent-home v-else-if="activeTab==='home'" :players="demoPlayers" :loading="false" @navigate="activeTab=$event"></parent-home>
+
+      <section v-else class="space-y-4" :aria-label="'Preview '+activeTab">
+        <div class="rounded-2xl border border-blue-400/25 bg-gradient-to-r from-blue-950 to-slate-900 p-6">
+          <p class="text-xs font-bold uppercase tracking-widest text-cyan-300">{{ role==='coach' ? 'Coach workspace' : 'Family workspace' }}</p>
+          <h1 class="mt-2 text-2xl font-black">{{ tabTitle }}</h1>
+          <p class="mt-2 max-w-xl text-sm text-slate-300">This tab is available in the shared navigation. The redesigned screen content is still in development.</p>
+        </div>
+        <div class="rounded-2xl border border-dashed border-slate-600 bg-slate-900 p-6">
+          <p class="text-sm font-bold text-white">Under construction</p>
+          <p class="mt-2 text-sm leading-relaxed text-slate-400">When the next SDL-UX-002 component is integrated into the preview, it will replace this placeholder. No real player data or staging access is available here.</p>
+        </div>
+      </section>
+    </app-shell>
+
+    <footer class="mt-5 border-t border-slate-800 px-2 py-4 text-center text-xs text-slate-500">
+      Swallows DataLab · UX design review only · Build {{ version }} · {{ branch }}
+    </footer>
+  </div>
+</body>
+</html>
