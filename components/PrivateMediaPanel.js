@@ -125,11 +125,31 @@ export const PrivateMediaPanel = {
         </div>
         <video :key="mediaPlaybackUrl" :src="mediaPlaybackUrl" controls playsinline preload="metadata"
           @error="reportPlaybackError" class="aspect-video w-full rounded-xl bg-black object-contain"></video>
-        <button type="button" @click="analyzePrivateMedia"
-          class="w-full rounded-xl bg-amber-500 px-4 py-3.5 text-sm font-black text-slate-950 hover:bg-amber-400 sm:w-auto">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2" aria-label="Video recording metadata for analysis">
+          <label class="block text-sm font-semibold text-slate-300">
+            Movement in this clip
+            <select v-model="analysisCategory" class="mt-2 w-full rounded-xl border border-slate-600 bg-slate-900 px-3 py-3 text-base text-white">
+              <option value="">Choose movement</option>
+              <option value="pitching">Pitching</option>
+              <option value="batting">Batting</option>
+            </select>
+          </label>
+          <label class="block text-sm font-semibold text-slate-300">
+            Original recording FPS
+            <select v-model="analysisFps" class="mt-2 w-full rounded-xl border border-slate-600 bg-slate-900 px-3 py-3 text-base text-white">
+              <option value="">Choose recording FPS</option>
+              <option value="30">30 FPS</option>
+              <option value="60">60 FPS</option>
+              <option value="120">120 FPS</option>
+              <option value="240">240 FPS</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" @click="analyzePrivateMedia" :disabled="!analysisCategory || !analysisFps"
+          class="w-full rounded-xl bg-amber-500 px-4 py-3.5 text-sm font-black text-slate-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
           Analyze privately (AR HUD)
         </button>
-        <p class="text-xs leading-relaxed text-slate-400">Pilot analysis uses default batting / 60 FPS settings; recording metadata is not yet stored.</p>
+        <p class="text-xs leading-relaxed text-slate-400">The original recording FPS and movement type are not stored with older private clips. Choose accurately; automatic motion checkpoints remain experimental pose estimates, not verified ball release or contact measurements.</p>
       </section>
     </div>
 
