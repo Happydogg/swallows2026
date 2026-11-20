@@ -120,7 +120,7 @@ createApp({
       return players.value.filter(player => authorized.has(player.athlete_id)).map(player => ({...player,photo_url:avatarForPlayer(player)}));
     });
     const statsBoard = useAuthorizedStatsBoard({
-      auth,coachRoster:coachRosterDisplay,familyPlayers,workspaceMode
+      auth,coachRoster:coachRosterDisplay,familyPlayers,workspaceMode,activeTab
     });
     // Staging player projection: never promote viewer choice to authorization.
     const visibleStagingPlayers = computed(() => {
