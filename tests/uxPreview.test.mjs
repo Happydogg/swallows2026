@@ -9,12 +9,12 @@ import { buildUxPreview } from '../scripts/build-ux-preview.mjs';
 const EXPECTED = [
   'index.html','app.js','logo.png','components/AppShell.js',
   'components/CoachHome.js','components/ParentHome.js',
-  'components/PlayerHeroCard.js','components/PrivateMediaPanel.js','components/StatsHub.js',
+  'components/PlayerHeroCard.js','components/PrivateMediaPanel.js','components/StatsHub.js','components/DemoGrowthLab.js','js/demoGrowthFixture.js',
   'components/LoginLanding.js','components/InviteOnboarding.js',
   'js/config.js','meta.js','_headers','404.html'
 ];
 
-test('preview build exports exactly 15 allowlisted synthetic files', () => {
+test('preview build exports exactly 17 allowlisted synthetic files', () => {
   const result = buildUxPreview();
   assert.deepEqual([...result.manifest].sort(), [...EXPECTED].sort());
   const exported = [];
@@ -32,7 +32,7 @@ test('preview build exports exactly 15 allowlisted synthetic files', () => {
 test('preview excludes staging credentials, APIs, private media and user records', () => {
   const dir=new URL('../dist-ux-preview/',import.meta.url);
   const refs=['app.js','index.html','components/AppShell.js','components/CoachHome.js',
-    'components/ParentHome.js','components/PlayerHeroCard.js','components/PrivateMediaPanel.js','components/StatsHub.js','components/InviteOnboarding.js','components/LoginLanding.js','js/config.js','meta.js'];
+    'components/ParentHome.js','components/PlayerHeroCard.js','components/PrivateMediaPanel.js','components/StatsHub.js','components/DemoGrowthLab.js','js/demoGrowthFixture.js','components/InviteOnboarding.js','components/LoginLanding.js','js/config.js','meta.js'];
   const values=refs.map(file=>fs.readFileSync(new URL(file,dir),'utf8')).join('\n');
   for (const forbidden of ['SUPABASE_URL','PRIVATE_MEDIA_WORKER_URL','SUPABASE_SERVICE_ROLE_KEY',
     '.supabase.co','workers.dev','sb_secret_','signInWithPassword','createClient(']) {
@@ -69,4 +69,28 @@ test('browser policy blocks network API calls and search indexing', () => {
   assert.match(headers,/X-Robots-Tag: noindex, nofollow/);
   assert.match(headers,/Cache-Control: no-store/);
   assert.match(headers,/frame-ancestors 'none'/);
+});
+
+test('the synthetic staging snapshot contains exactly 15 players and 120 dated measurements', async () => {
+  const { DEMO_GROWTH_SNAPSHOT } = await import('../js/demoGrowthFixture.js');
+  assert.equal(DEMO_GROWTH_SNAPSHOT.synthetic,true);
+  assert.equal(DEMO_GROWTH_SNAPSHOT.live,false);
+  assert.equal(DEMO_GROWTH_SNAPSHOT.players.length,15);
+  const names=new Set(), jerseys=new Set();
+  for(const player of DEMO_GROWTH_SNAPSHOT.players){
+    assert.ok(player.name.startsWith('DEMO '));
+    assert.equal(player.sessions.length,8);
+    assert.equal(names.has(player.name),false);
+    assert.equal(jerseys.has(player.jersey),false);
+    names.add(player.name);jerseys.add(player.jersey);
+    for(let i=1;i<player.sessions.length;i++)assert.ok(player.sessions[i].date>player.sessions[i-1].date);
+    for(const row of player.sessions){
+      for(const metric of ['height_cm','weight_kg','exit_velo_kmh','throwing_velo_kmh','sprint_18m_s','broad_jump_cm'])
+        assert.ok(Number.isFinite(row[metric])&&row[metric]>0,metric);
+    }
+  }
+  const source=fs.readFileSync(new URL('../components/DemoGrowthLab.js',import.meta.url),'utf8');
+  assert.ok(source.includes('Staging fixture snapshot'));
+  assert.equal(source.includes('supabaseClient'),false);
+  assert.equal(source.includes('fetch('),false);
 });
