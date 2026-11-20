@@ -18,6 +18,8 @@ export function usePrivateMedia({ auth, players, coachRoster, analyzer, service 
   const mediaPlaybackUrl = ref('');
   const mediaPlaybackId = ref('');
   const mediaPlaybackLoading = ref(false);
+  const analysisCategory = ref('');
+  const analysisFps = ref('');
   // Real, authorization-checked thumbnails stay in memory only.
   const mediaThumbnails = ref({});
   const mediaThumbnailBusy = ref({});
@@ -100,6 +102,7 @@ export function usePrivateMedia({ auth, players, coachRoster, analyzer, service 
     if (mediaPlaybackUrl.value) urls.revokeObjectURL(mediaPlaybackUrl.value);
     mediaPlaybackUrl.value = '';
     mediaPlaybackId.value = '';
+    analysisCategory.value='';analysisFps.value='';
     analyzer.resetAnalyzer();
   }
   function resetMedia() {
@@ -216,8 +219,20 @@ export function usePrivateMedia({ auth, players, coachRoster, analyzer, service 
   }
   function analyzePrivateMedia() {
     if (!mediaPlaybackUrl.value || !mediaReadAllowed.value) return;
+    if (!['pitching','batting'].includes(analysisCategory.value)
+      || !['30','60','120','240'].includes(String(analysisFps.value))) {
+      mediaError.value='Choose the motion type and original recording FPS before analyzing.';
+      return;
+    }
+    mediaError.value='';
     void analyzer.initPoseTracker();
-    analyzer.openAnalyzer({ id: mediaPlaybackId.value, video_url: mediaPlaybackUrl.value, category: 'batting', fps_mode: 60, is_private: true });
+    analyzer.openAnalyzer({
+      id: mediaPlaybackId.value,
+      video_url: mediaPlaybackUrl.value,
+      category: analysisCategory.value,
+      fps_mode: Number(analysisFps.value),
+      is_private: true
+    });
   }
   function reportPlaybackError() {
     releasePlayback();
@@ -225,7 +240,7 @@ export function usePrivateMedia({ auth, players, coachRoster, analyzer, service 
   }
   return { mediaPlayers, mediaPlayerId, mediaItems, mediaReadAllowed, mediaUploadAllowed, mediaLoading,
     mediaUploading, mediaProgress, mediaError, mediaNotice, mediaFile, mediaPlaybackUrl, mediaPlaybackId,
-    mediaPlaybackLoading, mediaThumbnails, mediaThumbnailBusy, mediaThumbnailFailed,
+    mediaPlaybackLoading, analysisCategory, analysisFps, mediaThumbnails, mediaThumbnailBusy, mediaThumbnailFailed,
     submissionsEnabled, ensureMediaThumbnail,
     selectMediaPlayer, refreshMedia, selectMediaFile, uploadPrivateMedia, playPrivateMedia,
     analyzePrivateMedia, reportPlaybackError, resetMedia };
