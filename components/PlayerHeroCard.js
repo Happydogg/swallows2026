@@ -6,18 +6,39 @@ export const PlayerHeroCard = {
     player: { type: Object, required: true },
     variant: { type: String, default: 'compact' },
     isCoach: { type: Boolean, default: false },
-    t: { type: Function, default: key => key },
+    t: { type: Function, default: null },
     failedImgs: { type: Object, default: () => ({}) },
-    formatImgUrl: { type: Function, default: value => value },
-    markImgFailed: { type: Function, default: () => {} },
-    getPlayerDisplayName: { type: Function, default: player => player?.preferred_name || 'Player' },
-    formatLegalName: { type: Function, default: () => '' },
-    calculateAge: { type: Function, default: () => null },
-    splitPositions: { type: Function, default: value => value ? String(value).split(/[,/]/).map(s => s.trim()).filter(Boolean) : [] },
-    getLatestMetric: { type: Function, default: () => null },
-    formatHeightWeight: { type: Function, default: () => 'Not recorded' },
-    calculateJumpRatio: { type: Function, default: () => null },
-    getJumpRatioColor: { type: Function, default: () => '' }
+    formatImgUrl: { type: Function, default: null },
+    markImgFailed: { type: Function, default: null },
+    getPlayerDisplayName: { type: Function, default: null },
+    formatLegalName: { type: Function, default: null },
+    calculateAge: { type: Function, default: null },
+    splitPositions: { type: Function, default: null },
+    getLatestMetric: { type: Function, default: null },
+    formatHeightWeight: { type: Function, default: null },
+    calculateJumpRatio: { type: Function, default: null },
+    getJumpRatioColor: { type: Function, default: null }
+  },
+  setup(props) {
+    // Never pass function-valued default factories as Vue prop defaults.
+    // Render-safe wrappers preserve legacy helpers when supplied and keep
+    // compact/mock cards functional without exposing additional player data.
+    const call = (name, fallback) => (...args) => (
+      typeof props[name] === 'function' ? props[name](...args) : fallback(...args)
+    );
+    return {
+      t: call('t', key => key),
+      formatImgUrl: call('formatImgUrl', value => value),
+      markImgFailed: call('markImgFailed', () => {}),
+      getPlayerDisplayName: call('getPlayerDisplayName', player => player?.preferred_name || 'Player'),
+      formatLegalName: call('formatLegalName', () => ''),
+      calculateAge: call('calculateAge', () => null),
+      splitPositions: call('splitPositions', value => value ? String(value).split(/[,/]/).map(x => x.trim()).filter(Boolean) : []),
+      getLatestMetric: call('getLatestMetric', () => null),
+      formatHeightWeight: call('formatHeightWeight', () => 'Not recorded'),
+      calculateJumpRatio: call('calculateJumpRatio', () => null),
+      getJumpRatioColor: call('getJumpRatioColor', () => '')
+    };
   },
   template: `
     <div v-if="variant === 'profile'"
