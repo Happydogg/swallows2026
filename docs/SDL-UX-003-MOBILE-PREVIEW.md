@@ -43,3 +43,12 @@ Connect Pages GitHub builds, verify the URL and CSP, then iterate on Player Prof
 ## Cloudflare Pages project configuration
 
 Project `sdl-ux-preview` is GitHub-connected to this exact redesign branch. The build output is strictly `dist-ux-preview`. The initial public preview deployment must still be independently verified before the URL is advertised as live.
+
+## Verified initial deployment (2026-11-20)
+- GitHub-connected separate Cloudflare Pages project `sdl-ux-preview` created.
+- Published URL: `https://sdl-ux-preview.pages.dev/`.
+- Verified successful production deployment of source commit `709b09df9728f8ff1180f990b994bb51549e905e` on the preview project (not on SDL staging or production).
+- Cloudflare build logs confirm **4/4 preview package tests passed**, strict 12-file allowlist, and **1 valid Cloudflare security-header rule**.
+- Cloudflare Browser Rendering verified an iPhone-sized (390 × 844) page executes the Vue application and renders `ParentHome`, synthetic "Sample Player A", and the `SDL UX PREVIEW` banner. No uncompiled `<parent-home>` tag remained.
+- Automatic deployment on GitHub commits is enabled for the exact redesign branch; other preview branches are disabled.
+- **Runtime functional user-acceptance testing remains outstanding:** login and invitation are visual mocks, other tabs are explicitly under construction, and live staging/backend access is intentionally absent.
