@@ -1,59 +1,138 @@
+// SDL-UX-005: Phone-first video hub. The original private-media controller
+// keeps sole ownership of authorization, playback blobs, uploads and cleanup.
 export const PrivateMediaPanel = {
   name: 'PrivateMediaPanel',
   props: { controller: { type: Object, required: true } },
   setup(props) { return { ...props.controller }; },
   template: `
-<section class="my-6 rounded-xl border border-slate-700 bg-slate-800 p-4 space-y-4 no-print" aria-label="Private player videos">
-  <div>
-    <h2 class="text-lg font-bold">Private player videos</h2>
-    <p class="text-sm text-slate-400">Private clips for your linked children or coached players. Upload access is checked by the media service.</p>
-  </div>
-  <label class="block text-sm">Player
-    <select :value="mediaPlayerId" @change="selectMediaPlayer($event.target.value)" class="mt-1 block w-full bg-slate-900 rounded p-3">
-      <option value="">Select a player</option>
-      <option v-for="player in mediaPlayers" :key="player.id" :value="player.id">{{ player.label }}</option>
-    </select>
-  </label>
-  <p v-if="!mediaPlayers.length" class="text-sm text-slate-400">No linked or coached players are available.</p>
-  <p v-if="mediaError" role="alert" class="text-rose-300 text-sm">{{ mediaError }}</p>
-  <p v-if="mediaNotice" role="status" class="text-emerald-300 text-sm">{{ mediaNotice }}</p>
-  <p v-if="mediaLoading" role="status" class="text-slate-400 text-sm">Checking access and loading videos…</p>
-  <template v-if="mediaPlayerId && !mediaLoading">
-    <div v-if="mediaUploadAllowed" class="space-y-3 border border-slate-700 rounded p-3">
-      <label class="block text-sm">Upload a private pilot clip (MP4, up to 20 MiB)
-        <input type="file" accept="video/mp4,.mp4" :disabled="mediaUploading" @change="selectMediaFile" class="block w-full mt-2 text-sm" />
-      </label>
-      <p v-if="mediaFile" class="text-xs text-slate-400">{{ mediaFile.name }}</p>
-      <button @click="uploadPrivateMedia" :disabled="!mediaFile || mediaUploading" class="bg-purple-600 rounded p-3 disabled:opacity-50">
-        {{ mediaUploading ? 'Uploading…' : 'Upload private clip' }}
-      </button>
-      <div v-if="mediaUploading" role="status">
-        <progress :value="mediaProgress" max="100" class="w-full"></progress>
-        <p class="text-xs">{{ mediaProgress }}% — {{ mediaProgress >= 99 ? 'Saving securely…' : 'Sending video…' }}</p>
+<section class="my-5 space-y-5 no-print" aria-label="Private player videos">
+  <div class="relative isolate overflow-hidden rounded-3xl border border-blue-400/30 bg-gradient-to-br from-blue-950 via-slate-900 to-slate-950 p-5 shadow-xl sm:p-7">
+    <div class="pointer-events-none absolute -right-12 -top-16 h-60 w-60 rounded-full bg-blue-500/20 blur-3xl" aria-hidden="true"></div>
+    <div class="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <p class="text-xs font-bold uppercase tracking-widest text-cyan-300">Video Room</p>
+        <h2 class="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">Every rep tells a story.</h2>
+        <p class="mt-2 max-w-2xl text-sm leading-relaxed text-slate-300">Watch private practice clips for the players connected to your account. Permission is checked for every selected athlete.</p>
+      </div>
+      <div class="self-start rounded-xl border border-emerald-500/30 bg-emerald-950/40 px-3 py-2 text-xs font-semibold text-emerald-300">
+        Private staging media
       </div>
     </div>
-    <p v-else class="text-sm text-slate-400">Uploads are unavailable for this player. Verified guardians can view permitted private clips.</p>
-    <div v-if="mediaReadAllowed" class="space-y-3">
-      <button @click="refreshMedia" :disabled="mediaUploading || mediaPlaybackLoading" class="rounded bg-slate-700 p-3 disabled:opacity-50">Refresh videos</button>
-      <p class="text-xs text-slate-400">Showing up to 30 recent private clips. These clips have no approval or sharing status.</p>
-      <p v-if="!mediaItems.length" class="text-sm text-slate-400">No private clips found.</p>
-      <ul class="space-y-2">
-        <li v-for="item in mediaItems" :key="item.id" class="rounded bg-slate-900 p-3 flex flex-wrap justify-between items-center gap-3">
-          <span class="text-sm">{{ item.created_at ? new Date(item.created_at).toLocaleString() : 'New private clip' }} · {{ (item.byte_size / 1048576).toFixed(1) }} MiB</span>
-          <button @click="playPrivateMedia(item)" :disabled="mediaPlaybackLoading" class="rounded bg-blue-600 p-3 disabled:opacity-50">Play privately</button>
+  </div>
+
+  <div class="rounded-2xl border border-slate-700 bg-slate-900/90 p-4 sm:p-5">
+    <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <h3 class="text-lg font-bold text-white">Choose a player</h3>
+        <p class="text-xs text-slate-400">Only authorized family or coached players appear.</p>
+      </div>
+      <span class="rounded-full border border-slate-600 px-3 py-1 text-xs text-slate-300">{{ mediaPlayers.length }} available</span>
+    </div>
+    <label class="block text-sm font-semibold text-slate-300" for="sdl-video-player-picker">
+      Player library
+      <select id="sdl-video-player-picker" :value="mediaPlayerId" @change="selectMediaPlayer($event.target.value)"
+        class="mt-2 block w-full rounded-xl border border-slate-600 bg-slate-950 px-4 py-3 text-base text-white outline-none focus:border-cyan-400">
+        <option value="">Select a player</option>
+        <option v-for="player in mediaPlayers" :key="player.id" :value="player.id">{{ player.label }}</option>
+      </select>
+    </label>
+    <div v-if="mediaPlayers.length > 1" class="mt-3 flex gap-2 overflow-x-auto pb-2" aria-label="Quick player selection">
+      <button v-for="player in mediaPlayers" :key="player.id" type="button" @click="selectMediaPlayer(player.id)"
+        :aria-pressed="mediaPlayerId === player.id"
+        :class="mediaPlayerId === player.id ? 'border-blue-400 bg-blue-700 text-white' : 'border-slate-600 bg-slate-800 text-slate-300 hover:border-blue-500'"
+        class="shrink-0 rounded-xl border px-4 py-2.5 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">
+        {{ player.label }}
+      </button>
+    </div>
+    <p v-if="!mediaPlayers.length" class="mt-4 rounded-xl border border-dashed border-slate-600 p-5 text-sm text-slate-400">No linked or coached players are available. Check your club membership or verified guardian link.</p>
+  </div>
+
+  <p v-if="mediaError" role="alert" class="rounded-xl border border-rose-700/70 bg-rose-950/30 p-4 text-sm text-rose-200">{{ mediaError }}</p>
+  <p v-if="mediaNotice" role="status" class="rounded-xl border border-emerald-700/50 bg-emerald-950/30 p-4 text-sm text-emerald-200">{{ mediaNotice }}</p>
+  <div v-if="mediaLoading" class="flex items-center gap-3 rounded-2xl border border-slate-700 bg-slate-900 p-5 text-sm text-slate-300" role="status">
+    <span class="h-4 w-4 animate-pulse rounded-full bg-cyan-400" aria-hidden="true"></span>
+    Checking access and loading videos…
+  </div>
+
+  <template v-if="mediaPlayerId && !mediaLoading">
+    <div v-if="mediaReadAllowed" class="space-y-4 rounded-2xl border border-slate-700 bg-slate-900/90 p-4 sm:p-5">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 class="text-lg font-bold text-white">Private clips</h3>
+          <p class="mt-1 text-xs text-slate-400">Up to 30 recent private clips · Not automatically shared or coach-approved</p>
+        </div>
+        <button type="button" @click="refreshMedia" :disabled="mediaUploading || mediaPlaybackLoading"
+          class="rounded-xl border border-blue-500/50 bg-blue-900/40 px-4 py-3 text-sm font-bold text-sky-200 hover:bg-blue-800/60 disabled:cursor-not-allowed disabled:opacity-50">Refresh videos</button>
+      </div>
+      <div v-if="!mediaItems.length" class="rounded-xl border border-dashed border-slate-600 bg-slate-950/60 p-6 text-center">
+        <p class="text-2xl" aria-hidden="true">🎞️</p>
+        <p class="mt-2 text-sm font-bold text-white">No private clips found</p>
+        <p class="mt-1 text-xs text-slate-400">Select another player or check again after a private video has been uploaded.</p>
+      </div>
+      <ul v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <li v-for="(item, index) in mediaItems" :key="item.id"
+          class="overflow-hidden rounded-2xl border border-slate-700 bg-slate-950/80">
+          <div class="flex aspect-video items-center justify-center bg-gradient-to-br from-blue-950 via-slate-900 to-slate-950" aria-hidden="true">
+            <span class="rounded-full border border-sky-300/40 bg-slate-900/60 px-5 py-3 text-3xl text-cyan-300">▶</span>
+          </div>
+          <div class="space-y-3 p-4">
+            <p class="text-sm font-bold text-white">Practice clip {{ index + 1 }}</p>
+            <p class="text-xs text-slate-400">{{ item.created_at ? new Date(item.created_at).toLocaleString() : 'New private clip' }} · {{ (item.byte_size / 1048576).toFixed(1) }} MiB</p>
+            <button type="button" @click="playPrivateMedia(item)" :disabled="mediaPlaybackLoading"
+              class="w-full rounded-xl bg-blue-600 px-4 py-3.5 text-sm font-bold text-white hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:opacity-50">
+              Play privately
+            </button>
+          </div>
         </li>
       </ul>
-      <p v-if="mediaPlaybackLoading" role="status" class="text-sm">Loading private playback…</p>
-      <div v-if="mediaPlaybackUrl" class="space-y-2">
-        <video :key="mediaPlaybackUrl" :src="mediaPlaybackUrl" controls playsinline preload="metadata" @error="reportPlaybackError" class="w-full max-h-96 bg-black rounded"></video>
-        <button @click="analyzePrivateMedia" class="rounded bg-amber-500 text-black p-3">Analyze privately (AR HUD)</button>
-        <p class="text-xs text-slate-400">Pilot analysis uses default batting / 60 FPS settings; recording metadata is not yet stored.</p>
+      <p v-if="mediaPlaybackLoading" role="status" class="rounded-xl border border-slate-700 bg-slate-950 p-4 text-sm text-slate-300">Loading private playback…</p>
+      <section v-if="mediaPlaybackUrl" class="space-y-3 rounded-2xl border border-cyan-400/30 bg-slate-950 p-3 sm:p-4" aria-label="Selected private video player">
+        <div class="flex flex-wrap items-center justify-between gap-2 px-1">
+          <h4 class="text-sm font-bold text-white">Now watching</h4>
+          <span class="text-xs font-semibold text-emerald-300">Authorized playback</span>
+        </div>
+        <video :key="mediaPlaybackUrl" :src="mediaPlaybackUrl" controls playsinline preload="metadata"
+          @error="reportPlaybackError" class="aspect-video w-full rounded-xl bg-black object-contain"></video>
+        <button type="button" @click="analyzePrivateMedia"
+          class="w-full rounded-xl bg-amber-500 px-4 py-3.5 text-sm font-black text-slate-950 hover:bg-amber-400 sm:w-auto">
+          Analyze privately (AR HUD)
+        </button>
+        <p class="text-xs leading-relaxed text-slate-400">Pilot analysis uses default batting / 60 FPS settings; recording metadata is not yet stored.</p>
+      </section>
+    </div>
+
+    <div v-else class="rounded-2xl border border-amber-600/30 bg-amber-950/20 p-5 text-sm text-amber-200">
+      You do not have permission to view private clips for this player.
+    </div>
+
+    <div v-if="mediaUploadAllowed" class="space-y-3 rounded-2xl border border-slate-700 bg-slate-900/90 p-4 sm:p-5">
+      <div>
+        <h3 class="text-lg font-bold text-white">Add a practice clip</h3>
+        <p class="mt-1 text-xs text-slate-400">Uploads remain private. Supported format: MP4, maximum 20 MiB.</p>
+      </div>
+      <label class="block text-sm font-semibold text-slate-300" for="sdl-private-upload">
+        Upload a private pilot clip (MP4, up to 20 MiB)
+        <input id="sdl-private-upload" type="file" accept="video/mp4,.mp4"
+          :disabled="mediaUploading" @change="selectMediaFile"
+          class="mt-2 block w-full rounded-xl border border-slate-600 bg-slate-950 px-3 py-3 text-sm text-slate-200"/>
+      </label>
+      <p v-if="mediaFile" class="text-xs text-slate-400">{{ mediaFile.name }}</p>
+      <button type="button" @click="uploadPrivateMedia" :disabled="!mediaFile || mediaUploading"
+        class="w-full rounded-xl bg-purple-600 px-4 py-3 text-sm font-bold text-white hover:bg-purple-500 disabled:opacity-50 sm:w-auto">
+        {{ mediaUploading ? 'Uploading…' : 'Upload private clip' }}
+      </button>
+      <div v-if="mediaUploading" role="status" class="space-y-2">
+        <progress :value="mediaProgress" max="100" class="h-2 w-full"></progress>
+        <p class="text-xs text-slate-300">{{ mediaProgress }}% · {{ mediaProgress >= 99 ? 'Saving securely…' : 'Sending video…' }}</p>
       </div>
     </div>
+    <p v-else class="rounded-xl border border-slate-700 bg-slate-900 p-4 text-xs text-slate-400">Uploads are unavailable for this player. Verified guardians can view permitted private clips.</p>
   </template>
-  <details class="text-sm border-t border-slate-700 pt-3">
-    <summary class="cursor-pointer py-2">Parent submissions and Team Clubhouse</summary>
-    <p class="text-slate-400 py-2">Use the workspace above for parent submissions, coach review and team sharing after backend verification. Private pilot clips are never automatically approved or shared with teammates.</p>
+
+  <details class="rounded-2xl border border-slate-700 bg-slate-900/75 p-4 text-sm">
+    <summary class="cursor-pointer py-2 font-bold text-white">Parent submissions and Team Clubhouse</summary>
+    <p class="pt-2 text-sm leading-relaxed text-slate-400">The separate submissions and coach-review workspace remains available through the existing controls. Private clips are never automatically approved or shared.</p>
   </details>
-</section>`
+</section>
+  `
 };
