@@ -7,7 +7,7 @@ export const CoachHome = {
     loading: { type: Boolean, default: false },
     error: { type: String, default: '' }
   },
-  emits: ['navigate', 'open-profile'],
+  emits: ['navigate', 'open-profile', 'open-video'],
   setup(props) {
     const teamCount = Vue.computed(() => new Set(props.roster.map(p => p.team_id).filter(Boolean)).size);
     const preview = Vue.computed(() => props.roster); // Full authorized roster; no five-player truncation.
@@ -72,7 +72,12 @@ export const CoachHome = {
               <button type="button" @click="$emit('open-profile',player)" class="block max-w-full truncate text-left text-sm font-semibold text-cyan-100 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">{{ player.preferred_name }}</button>
               <p class="truncate text-xs text-slate-400">{{ player.team_name || 'Assigned team' }} · {{ player.position || 'Position pending' }}</p>
             </div>
-            <span class="text-xs text-slate-400">B {{ player.bats || '–' }} / T {{ player.throws || '–' }}</span>
+            <div class="flex shrink-0 flex-col items-end gap-2">
+              <span class="text-xs text-slate-400">B {{ player.bats || '–' }} / T {{ player.throws || '–' }}</span>
+              <button type="button" @click="$emit('open-video',player)"
+                :aria-label="'Open private videos for '+(player.preferred_name || 'this player')"
+                class="rounded-lg border border-sky-500/40 bg-blue-900/35 px-3 py-2 text-xs font-bold text-sky-200 hover:bg-blue-800/50">▶ Videos</button>
+            </div>
           </li>
         </ul>
         <p class="mt-4 text-xs text-slate-500">Only fields returned by the authorized coach-roster service are shown.</p>
