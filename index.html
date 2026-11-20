@@ -112,7 +112,7 @@
         <p class="mt-2 text-sm text-slate-300">Your membership and permissions determine which team, family and administrative tools are available.</p>
         <button type="button" @click="navigateTab('me')" class="mt-4 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold">Open account workspace</button>
       </section>
-      <section v-show="activeTab === 'me'" class="mb-4 flex flex-wrap items-center justify-between gap-3 bg-slate-800 border border-slate-700 p-3 rounded-lg no-print">
+      <section :class="activeTab === 'me' ? '' : 'hidden'" class="mb-4 flex flex-wrap items-center justify-between gap-3 bg-slate-800 border border-slate-700 p-3 rounded-lg no-print">
         <div class="text-sm">
           <div class="font-semibold">{{ authUser.email }}</div>
           <div class="text-slate-400">{{ isTeamCoach ? 'Team coach (read-only pilot)' : isVerifiedGuardian ? 'My Players (guardian)' : 'No team or family access' }}</div>
@@ -122,17 +122,17 @@
       </section>
       <p v-if="authError" role="alert" class="mb-3 text-rose-300 text-sm no-print">{{ authError }}</p>
     <!-- Top Header Bar (Hidden during printing) -->
-    <app-header v-show="activeTab === 'team' || activeTab === 'stats'" :t="t" :current-lang="currentLang" :current-view="currentView" :is-coach="isCoach"
+    <app-header :class="activeTab === 'team' || activeTab === 'stats' ? '' : 'hidden'" :t="t" :current-lang="currentLang" :current-view="currentView" :is-coach="isCoach"
       @change-language="currentLang = $event; saveLanguage()"
       @navigate-overview="currentView = 'overview'; if (isVerifiedGuardian && !isTeamCoach) submissionController.changeTab('players')"
       @export-csv="exportTeamCSV" @import-csv="importTeamCSV($event)"
       @add-player="openAddPlayerModal" @lock-coach="lockCoachMode"
       @unlock-coach="unlockCoachMode"></app-header>
 
-    <pilot-workspace v-show="activeTab === 'me'" :controller="pilotController"></pilot-workspace>
-    <submission-workspace v-show="(activeTab === 'team' || activeTab === 'stats' || activeTab === 'videos') && currentView !== 'player'" :controller="submissionController" :pilot-controller="pilotController" :t="t"></submission-workspace>
-    <club-enrollment-admin v-show="activeTab === 'me'" :controller="enrollmentAdminController"></club-enrollment-admin>
-    <private-media-panel v-show="activeTab === 'videos'" :controller="privateMediaController"></private-media-panel>
+    <pilot-workspace :class="activeTab === 'me' ? '' : 'hidden'" :controller="pilotController"></pilot-workspace>
+    <submission-workspace :class="(activeTab === 'team' || activeTab === 'stats' || activeTab === 'videos') && currentView !== 'player' ? '' : 'hidden'" :controller="submissionController" :pilot-controller="pilotController" :t="t"></submission-workspace>
+    <club-enrollment-admin :class="activeTab === 'me' ? '' : 'hidden'" :controller="enrollmentAdminController"></club-enrollment-admin>
+    <private-media-panel :class="activeTab === 'videos' ? '' : 'hidden'" :controller="privateMediaController"></private-media-panel>
 
     <!-- Loading Indicator -->
     <div v-if="loading" class="p-8 text-center text-slate-400 font-mono text-sm no-print">
@@ -140,9 +140,9 @@
     </div>
 
     <!-- SDL-001 / SDL-004: Verified parents land on My Players above, not the legacy Coach Overview -->
-    <coach-team-roster v-else-if="currentView === 'overview' && isTeamCoach && workspaceMode === 'coach'" v-show="activeTab === 'team'"
+    <coach-team-roster v-else-if="currentView === 'overview' && isTeamCoach && workspaceMode === 'coach'" :class="activeTab === 'team' ? '' : 'hidden'"
       :roster="coachRoster" :loading="coachRosterLoading" :error="coachRosterError" @open-review="submissionController.enterReview($event)"></coach-team-roster>
-    <team-overview v-else-if="currentView === 'overview' && isCoach && workspaceMode === 'coach'" v-show="activeTab === 'team' || activeTab === 'stats'"
+    <team-overview v-else-if="currentView === 'overview' && isCoach && workspaceMode === 'coach'" :class="activeTab === 'team' || activeTab === 'stats' ? '' : 'hidden'"
       :t="t"
       :players="players"
       :get-club-count="getClubCount"
@@ -174,7 +174,7 @@
 
 
     <!-- VIEW 2: Individual Player Profile & Dated Session History -->
-    <player-profile v-if="currentView === 'player' && selectedPlayer" v-show="activeTab === 'team'"
+    <player-profile v-if="currentView === 'player' && selectedPlayer" :class="activeTab === 'team' ? '' : 'hidden'"
       :t="t" :selected-player="selectedPlayer" :is-coach="isCoach"
       :failed-imgs="failedImgs" :format-img-url="formatImgUrl" :mark-img-failed="markImgFailed"
       :format-legal-name="formatLegalName" :get-player-display-name="getPlayerDisplayName"
