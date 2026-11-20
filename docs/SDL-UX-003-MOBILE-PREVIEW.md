@@ -52,3 +52,16 @@ Project `sdl-ux-preview` is GitHub-connected to this exact redesign branch. The 
 - Cloudflare Browser Rendering verified an iPhone-sized (390 × 844) page executes the Vue application and renders `ParentHome`, synthetic "Sample Player A", and the `SDL UX PREVIEW` banner. No uncompiled `<parent-home>` tag remained.
 - Automatic deployment on GitHub commits is enabled for the exact redesign branch; other preview branches are disabled.
 - **Runtime functional user-acceptance testing remains outstanding:** login and invitation are visual mocks, other tabs are explicitly under construction, and live staging/backend access is intentionally absent.
+
+## Owner Design Approval — 2026-11-20
+
+**Decision:** The SDL-UX-003 mobile UX preview design and review workflow are **Approved** by the project owner.
+
+- Owner confirms that data currently in the staging environment is mock data. This is an owner-reported statement, not an independent verification of every record or storage object.
+- Continue with the phone-based, GitHub-to-Cloudflare preview workflow, synthetic-demo presentation, and in-app issue reporting.
+- Continue SDL-UX-002 frontend component implementation and review without requiring approval for each visual detail.
+- Preserve the distinction between design approval, implementation, automated testing, staging verification, and production authorization.
+- This approval does **not** authorize removing server-side auth/RLS/media controls, turning on disabled pilot features, changing databases, or deploying the full application to staging/production.
+- The public mobile UX preview remains synthetic-only by design and stays isolated from staging credentials and private media services.
+
+**Next action:** Add the remaining Player Profile, Team, Stats, Videos and Me presentation components incrementally to the mobile UX preview.
