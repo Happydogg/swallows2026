@@ -9,12 +9,12 @@ import { buildUxPreview } from '../scripts/build-ux-preview.mjs';
 const EXPECTED = [
   'index.html','app.js','logo.png','components/AppShell.js',
   'components/CoachHome.js','components/ParentHome.js',
-  'components/PlayerHeroCard.js','components/PrivateMediaPanel.js',
+  'components/PlayerHeroCard.js','components/PrivateMediaPanel.js','components/StatsHub.js',
   'components/LoginLanding.js','components/InviteOnboarding.js',
   'js/config.js','meta.js','_headers','404.html'
 ];
 
-test('preview build exports exactly 14 allowlisted synthetic files', () => {
+test('preview build exports exactly 15 allowlisted synthetic files', () => {
   const result = buildUxPreview();
   assert.deepEqual([...result.manifest].sort(), [...EXPECTED].sort());
   const exported = [];
@@ -32,7 +32,7 @@ test('preview build exports exactly 14 allowlisted synthetic files', () => {
 test('preview excludes staging credentials, APIs, private media and user records', () => {
   const dir=new URL('../dist-ux-preview/',import.meta.url);
   const refs=['app.js','index.html','components/AppShell.js','components/CoachHome.js',
-    'components/ParentHome.js','components/PlayerHeroCard.js','components/PrivateMediaPanel.js','components/InviteOnboarding.js','components/LoginLanding.js','js/config.js','meta.js'];
+    'components/ParentHome.js','components/PlayerHeroCard.js','components/PrivateMediaPanel.js','components/StatsHub.js','components/InviteOnboarding.js','components/LoginLanding.js','js/config.js','meta.js'];
   const values=refs.map(file=>fs.readFileSync(new URL(file,dir),'utf8')).join('\n');
   for (const forbidden of ['SUPABASE_URL','PRIVATE_MEDIA_WORKER_URL','SUPABASE_SERVICE_ROLE_KEY',
     '.supabase.co','workers.dev','sb_secret_','signInWithPassword','createClient(']) {
