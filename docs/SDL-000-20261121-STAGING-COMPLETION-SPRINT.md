@@ -76,3 +76,17 @@ Owner supplied five images: desktop/tablet coach and player dashboards, SDL-UX-0
 - Live R2/Worker, existing Supabase migration ledger and audit records must remain preserved. Disable any future v2 feature gates before rolling back their Worker implementation.
 
 **Governance conclusion:** The new user-visible core has been implemented and passed automated checks in staging, but it is **not yet independently verified as a fully functional production-ready platform**. The unverified v2 workflows and real-account UAT remain explicit release blockers.
+
+## Follow-up: private video is now embedded inside the player profile
+
+- Updated `components/PlayerProfile.js` with a named `private-media` slot. In the authenticated staging app, that slot displays the **same authorized R2 video room and its actual decoded previews** directly where the player's recent videos belong.
+- The original video gallery implementation remains intact as the slot fallback, preserving the source API and legacy workflows.
+- Updated `index.html` to show the player-specific private room only when the selected athlete is in the permitted coach/guardian player projection, the current tab is Team, and the Worker origin is approved. The standalone Videos tab uses the same controller and only mounts on that tab. Admin-only/nonlinked accounts are not given private video cards.
+- Updated `tests/uxShell.test.mjs` and `tests/vueBindings.test.mjs` for the tighter visible-only lifecycle. The latest successful authenticated build passed **129/129 focused tests and 1/1 Vue renderer test**; the synthetic preview passed **7/7**.
+- Tested source checkpoint: `20f74d292ad3f9f34a000aff91c49a9e4d099d00`.
+- Cloudflare Pages UX Live and UX Preview both deployed that checkpoint. No R2 Worker or Supabase permissions changed for the player-video integration.
+- **Still owner-UAT pending:** Verify on an actually signed-in coach and guardian iPhone that the video appears immediately inside the intended player's profile, extracts an actual thumbnail, plays privately, and does not appear for unrelated players.
+
+### Release-gate reminder
+
+The submission/review/Clubhouse v2 feature gates remain off. Full pilot completion has **not** been independently verified; a successful frontend build must not be presented as full production release readiness.

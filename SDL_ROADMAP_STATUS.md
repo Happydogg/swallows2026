@@ -10,7 +10,7 @@
 | SDL-004 R2 | Private videos in staging R2 with authorized playback | Staging deployed; user previously reported playback | Thumbnail/video owner UAT, retry and bandwidth tests |
 | SDL-004 Pilot v2 | Invites, growth corrections, performance submissions, coach approval, Clubhouse | Migration ledger shows workflow objects installed; source/isolated tests exist; **both v2 gates remain OFF** | Recoverable backup, Worker activation QA, Auth confirmation, role tests and approval |
 | SDL-004 Demo | 15 mocked players, 8 growth sessions each, permission-scoped live stats | 15 club enrollments and 120 sessions in staging; live stats UI deployed | Signed-in coach/guardian test on live site |
-| SDL-UX | Role-adaptive dashboard, scrolling roster, hero card and unified Edit Player | Two UX review sites deployed, automated passing | Real device fidelity, authorized photo update, field use acceptance |
+| SDL-UX | Role-adaptive dashboard, scrolling roster, hero card, unified Edit Player and authorized player video section | Two UX review sites deployed, automated passing | Real device fidelity, private thumbnail/video and photo UAT, field use acceptance |
 | SDL-005 | Capture high-FPS video, visual mechanics, drill review, genuine previews | Pose-overlay analyzer and lazy genuine previews implemented | Captured frame-rate validation, recorded media metadata, persistent secure posters, high-FPS optimization |
 | SDL-006 | Independent science QA and evidence-gated AI Coach | Research/integration requirements organized | Claim-level independent QA and validated coaching requirements |
 | SDL-GOV | Documentation, rollback, release gating, feature parity | New staging sprint record and decision mirror established | Verify backup restore, master directory reconciliation and production release approval |
@@ -19,7 +19,7 @@
 
 - `docs/SDL-000-20261121-STAGING-COMPLETION-SPRINT.md`: detailed mutation, tests and rollback.
 - GitHub code checkpoint `05fc32a67079973b435591a994396e68e5ec408a`.
-- `sdl-ux-live`: 128/128 focused tests and 1/1 Vue renderer test; Cloudflare deploy succeeded.
+- `sdl-ux-live`: 129/129 focused tests and 1/1 Vue renderer test; Cloudflare deploy succeeded.
 - `sdl-ux-preview`: 7/7 package isolation tests; Cloudflare deploy succeeded.
 - Staging SQL: verified 15 active synthetic enrollment records, all recording/storage not authorized. Database JWT-claim QA: coach 8 rows; no JWT denied.
 - No production mutation. No new Worker deployed or setting changed in this sprint.

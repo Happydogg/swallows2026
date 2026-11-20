@@ -12,5 +12,6 @@
 | SDL-D-20261121-06 | Replace confusing mobile Team/Stats text-symbol icons with static SVGs, keep five tabs and desktop sticky sidebar. | Implemented, automated-tested, deployed to UX review sites | `components/AppShell.js`, source checkpoint `05fc32a6` |
 | SDL-D-20261121-07 | Preserve SDL-004 v2 backend and frontend feature gates **off** until validated backup/restore, exact Auth confirmation and live role tests. | Release hold, not completed | Worker `SUBMISSIONS_ENABLED=false`; frontend `SUBMISSION_FEATURES_ENABLED=false` |
 | SDL-D-20261121-08 | Keep scientific QA independent: no unsupported injury predictions, simulated velocities, or fixed thresholds promoted into AI Coach. | Approved architecture requirement, not implementation | SDL-006 research/integration workstreams |
+| SDL-D-20261121-09 | Present the **same private, permission-enforced video room inside Player Profile** and retain Videos tab; never present the disabled legacy empty gallery in place of actual R2 clips. | Implemented, automated-tested, deployed to UX Live | `PlayerProfile.js` named slot and `index.html`; real coach/parent UAT pending |
 
 **Non-decisions:** No permission to merge `main`, deploy production, auto-delete seeded enrollments, weaken player RLS or publish private media. A successful unit test is not a final owner acceptance test.
