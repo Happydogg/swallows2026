@@ -1,7 +1,10 @@
 // SDL-UX-002: Personal-first family home. Scoped guardian players only.
 // Deliberately excludes private identity, contact, photo and unverified metrics.
+import { PlayerHeroCard } from './PlayerHeroCard.js';
+
 export const ParentHome = {
   name: 'ParentHome',
+  components: { PlayerHeroCard },
   props: {
     players: { type: Array, required: true },
     loading: { type: Boolean, default: false }
@@ -32,15 +35,7 @@ export const ParentHome = {
     </div>
     <div v-else class="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <article v-for="player in players" :key="player.id" class="overflow-hidden rounded-2xl border border-blue-400/25 bg-slate-900 shadow-xl">
-        <div class="flex gap-4 bg-gradient-to-r from-blue-900/75 to-slate-900 p-5">
-          <div class="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-blue-400/30 bg-blue-950 text-2xl font-black text-cyan-300" aria-hidden="true">#{{ player.jersey || '–' }}</div>
-          <div class="min-w-0 flex-1">
-            <p class="text-xs font-semibold uppercase tracking-wider text-sky-300">Player profile</p>
-            <h3 class="mt-1 truncate text-xl font-black text-white">{{ player.preferred_name }}</h3>
-            <p class="mt-1 text-sm text-slate-300">{{ player.position || 'Position pending' }}</p>
-            <p class="mt-1 text-xs text-slate-400">Bats {{ player.bats || '–' }} · Throws {{ player.throws || '–' }}</p>
-          </div>
-        </div>
+        <player-hero-card :player="player" variant="compact"></player-hero-card>
         <div class="p-5">
           <p class="text-sm font-semibold">Growth and development</p>
           <p class="mt-1 text-xs leading-relaxed text-slate-400">Verified measurements and progress will appear in the family workspace when available. No estimated values are shown.</p>
