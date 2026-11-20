@@ -10,7 +10,7 @@ export const CoachHome = {
   emits: ['navigate', 'open-profile'],
   setup(props) {
     const teamCount = Vue.computed(() => new Set(props.roster.map(p => p.team_id).filter(Boolean)).size);
-    const preview = Vue.computed(() => props.roster.slice(0, 5));
+    const preview = Vue.computed(() => props.roster); // Full authorized roster; no five-player truncation.
     const avatarFor=player => /^DEMO\s/.test(String(player?.preferred_name||'')) && /^(2[1-9]|3[0-5])$/.test(String(player?.jersey||'')) ? '/assets/demo-players/'+player.jersey+'.svg' : '';
     return { teamCount, preview, avatarFor };
   },
@@ -49,17 +49,19 @@ export const CoachHome = {
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-5">
       <div class="rounded-2xl border border-slate-700 bg-slate-900/90 p-5 lg:col-span-3">
         <div class="mb-4 flex items-center justify-between gap-2">
-          <h2 class="text-lg font-bold">Team roster</h2>
+          <h2 class="text-lg font-bold">Full team roster</h2>
           <button type="button" @click="$emit('navigate','team')" class="text-sm font-semibold text-cyan-300">View all</button>
         </div>
         <p v-if="loading" class="text-sm text-slate-400" role="status">Loading authorized players…</p>
         <p v-else-if="!roster.length" class="rounded-xl border border-dashed border-slate-700 p-5 text-sm text-slate-400">No players are available in your verified team roster yet.</p>
         <ul v-else class="divide-y divide-slate-800">
           <li v-for="player in preview" :key="player.team_id + ':' + player.id" class="flex items-center gap-3 py-3">
-            <div class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-blue-950 text-sm font-black text-blue-200">
+            <button type="button" @click="$emit('open-profile',player)"
+              :aria-label="'Open '+player.preferred_name+' player profile'"
+              class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-blue-950 text-sm font-black text-blue-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">
               <img v-if="avatarFor(player)" :src="avatarFor(player)" alt="" class="h-full w-full object-cover"/>
               <span v-else>#{{ player.jersey || '–' }}</span>
-            </div>
+            </button>
             <div class="min-w-0 flex-1">
               <button type="button" @click="$emit('open-profile',player)" class="block max-w-full truncate text-left text-sm font-semibold text-cyan-100 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">{{ player.preferred_name }}</button>
               <p class="truncate text-xs text-slate-400">{{ player.team_name || 'Assigned team' }} · {{ player.position || 'Position pending' }}</p>
