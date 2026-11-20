@@ -9,7 +9,7 @@ export const ParentHome = {
     players: { type: Array, required: true },
     loading: { type: Boolean, default: false }
   },
-  emits: ['navigate'],
+  emits: ['navigate', 'edit-photo'],
   template: `
   <section class="space-y-5" aria-label="Parent home">
     <div class="relative overflow-hidden rounded-3xl border border-blue-400/25 bg-gradient-to-br from-blue-900 via-slate-900 to-slate-950 p-5 sm:p-7">
@@ -39,7 +39,12 @@ export const ParentHome = {
         <div class="p-5">
           <p class="text-sm font-semibold">Growth and development</p>
           <p class="mt-1 text-xs leading-relaxed text-slate-400">Verified measurements and progress will appear in the family workspace when available. No estimated values are shown.</p>
-          <button type="button" @click="$emit('navigate','team')" class="mt-4 w-full rounded-xl bg-blue-600 px-4 py-3 font-bold text-white hover:bg-blue-500">Open player workspace</button>
+          <div class="mt-4 flex flex-col gap-2">
+            <button type="button" @click="$emit('edit-photo',player.id)"
+              class="w-full rounded-xl border border-cyan-500/50 bg-sky-900/30 px-4 py-3 text-sm font-bold text-cyan-200 hover:bg-sky-800/40">📷 Change profile picture</button>
+            <button type="button" @click="$emit('navigate','team')"
+              class="w-full rounded-xl bg-blue-600 px-4 py-3 font-bold text-white hover:bg-blue-500">Open player workspace</button>
+          </div>
         </div>
       </article>
     </div>
