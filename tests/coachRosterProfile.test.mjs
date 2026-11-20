@@ -21,3 +21,24 @@ test('synthetic growth is marked nonofficial and private videos keep their origi
  assert.match(index,/:controller="privateMediaController"/);
  assert.match(index,/mediaOriginAllowed &&/);
 });
+
+test('Coach Home renders entire authorized roster with direct photo and name navigation',()=>{
+ const home=read('components/CoachHome.js'),detail=read('components/CoachTeamRoster.js');
+ const index=read('index.html'),app=read('js/app.js');
+ assert.match(home,/const preview = Vue.computed\(\(\) => props.roster\)/);
+ assert.doesNotMatch(home,/roster\.slice\(/);
+ assert.match(home,/<button type="button" @click="\$emit\('open-profile',player\)"/);
+ assert.match(home,/<img v-if="avatarFor\(player\)"/);
+ assert.match(index,/<coach-home[\s\S]*?@open-profile="selectCoachRosterPlayer"/);
+ assert.match(detail,/<article v-for="player in displayedRoster"/);
+ assert.match(detail, /@click="\$emit\('open-profile',player\)"/);
+ assert.match(app,/playerFeature\.selectPlayer\(projected\)/);
+ assert.match(app,/privateMedia\.selectMediaPlayer\(authorized\.id\)/);
+});
+
+test('both Cloudflare preview packages contain all fifteen mock portraits',()=>{
+ const staging=read('backend/release/build-staging-frontend.mjs');
+ const preview=read('scripts/build-ux-preview.mjs');
+ assert.ok(staging.includes("'assets/demo-players'"));
+ for(let jersey=21;jersey<=35;jersey++)assert.ok(preview.includes("'assets/demo-players/"+jersey+".svg'"));
+});
