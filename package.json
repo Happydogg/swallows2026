@@ -6,7 +6,8 @@
     "test": "node tests/run.mjs",
     "check:worker": "npm run build --prefix backend/worker && npm run check:package --prefix backend/worker",
     "build:staging": "node backend/release/build-staging-frontend.mjs",
-    "build:ux-preview": "node --test tests/uxPreview.test.mjs"
+    "build:ux-preview": "node --test tests/uxPreview.test.mjs",
+    "build:ux-live": "node --experimental-vm-modules --test tests/uxShell.test.mjs tests/authLifecycle.test.mjs tests/parentDataScope.test.mjs tests/privateMedia.test.mjs tests/stagingFrontend.test.mjs && node backend/release/build-staging-frontend.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.16",
