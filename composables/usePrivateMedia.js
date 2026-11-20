@@ -1,4 +1,5 @@
 import { createPrivateMediaService, validateMediaFile } from '../js/privateMediaService.js';
+import { extractVideoThumbnail } from '../js/videoThumbnail.js';
 const { ref, computed } = Vue;
 
 // Separate media permissions from isCoach: media access never unlocks official stats.
@@ -17,6 +18,66 @@ export function usePrivateMedia({ auth, players, coachRoster, analyzer, service 
   const mediaPlaybackUrl = ref('');
   const mediaPlaybackId = ref('');
   const mediaPlaybackLoading = ref(false);
+  // Real, authorization-checked thumbnails stay in memory only.
+  const mediaThumbnails = ref({});
+  const mediaThumbnailBusy = ref({});
+  const mediaThumbnailFailed = ref({});
+  const thumbnailQueue=[];
+  const thumbnailQueued=new Set();
+  const playbackBlobCache=new Map();
+  let thumbnailEpoch=0, thumbnailWorkerRunning=false;
+  const putCachedBlob=(id,blob)=>{
+    playbackBlobCache.delete(id);
+    playbackBlobCache.set(id,blob);
+    while(playbackBlobCache.size>2)playbackBlobCache.delete(playbackBlobCache.keys().next().value);
+  };
+  function discardThumbnails(){
+    thumbnailEpoch++;
+    thumbnailQueue.length=0;thumbnailQueued.clear();
+    mediaThumbnails.value={};mediaThumbnailBusy.value={};mediaThumbnailFailed.value={};
+    playbackBlobCache.clear();
+  }
+  function ensureMediaThumbnail(item){
+    if(!mediaReadAllowed.value || !mediaPlayerId.value || !item
+      || !mediaItems.value.some(x=>x.id===item.id)
+      || mediaThumbnails.value[item.id] || mediaThumbnailFailed.value[item.id]
+      || thumbnailQueued.has(item.id) || thumbnailQueue.length>=6)return;
+    thumbnailQueued.add(item.id);
+    thumbnailQueue.push({id:item.id,epoch:thumbnailEpoch});
+    void runThumbnailQueue();
+  }
+  async function runThumbnailQueue(){
+    if(thumbnailWorkerRunning)return;
+    thumbnailWorkerRunning=true;
+    try{
+      while(thumbnailQueue.length){
+        const {id,epoch}=thumbnailQueue.shift();
+        if(epoch!==thumbnailEpoch || !mediaReadAllowed.value || !mediaItems.value.some(x=>x.id===id)){
+          thumbnailQueued.delete(id);continue;
+        }
+        const op=operation();
+        mediaThumbnailBusy.value={...mediaThumbnailBusy.value,[id]:true};
+        try{
+          const blob=playbackBlobCache.get(id)||await service.playback(id,{signal:op.signal});
+          if(!op.current()||epoch!==thumbnailEpoch)continue;
+          putCachedBlob(id,blob);
+          const preview=await extractVideoThumbnail(blob,{onSignal:op.signal});
+          if(op.current() && epoch===thumbnailEpoch)mediaThumbnails.value={...mediaThumbnails.value,[id]:preview};
+        }catch(error){
+          if(op.ownsState() && epoch===thumbnailEpoch){
+            if(error.status===401||error.status===403)op.failed(error);
+            else if(error.name!=='AbortError')mediaThumbnailFailed.value={...mediaThumbnailFailed.value,[id]:true};
+          }
+        }finally{
+          thumbnailQueued.delete(id);
+          if(op.ownsState()&&epoch===thumbnailEpoch){
+            const pending={...mediaThumbnailBusy.value};delete pending[id];mediaThumbnailBusy.value=pending;
+          }
+          op.finish();
+        }
+      }
+    }finally{thumbnailWorkerRunning=false;}
+  }
   // No parent-upload/review/Clubhouse API is deployed. Never infer approval from a private clip.
   const submissionsEnabled = false;
   let generation = 0;
@@ -45,6 +106,7 @@ export function usePrivateMedia({ auth, players, coachRoster, analyzer, service 
     generation++;
     for (const controller of pending) controller.abort();
     pending.clear();
+    discardThumbnails();
     releasePlayback();
     mediaPlayerId.value = '';
     mediaItems.value = [];
@@ -84,7 +146,7 @@ export function usePrivateMedia({ auth, players, coachRoster, analyzer, service 
     const op = operation();
     mediaLoading.value = true; mediaError.value = '';
     // Do not retain a previously playable URL while rechecking permissions.
-    releasePlayback(); mediaItems.value = [];
+    releasePlayback(); discardThumbnails(); mediaItems.value = [];
     try {
       const rows = await service.list(mediaPlayerId.value, { signal: op.signal });
       if (op.current()) mediaItems.value = rows;
@@ -137,8 +199,9 @@ export function usePrivateMedia({ auth, players, coachRoster, analyzer, service 
     const playback = playbackGeneration;
     const op = operation(); mediaPlaybackLoading.value = true; mediaError.value = '';
     try {
-      const blob = await service.playback(item.id, { signal: op.signal });
+      const blob = playbackBlobCache.get(item.id) || await service.playback(item.id, { signal: op.signal });
       if (!op.current() || playback !== playbackGeneration) return;
+      putCachedBlob(item.id,blob);
       mediaPlaybackUrl.value = urls.createObjectURL(blob);
       mediaPlaybackId.value = item.id;
     } catch (error) {
@@ -162,7 +225,8 @@ export function usePrivateMedia({ auth, players, coachRoster, analyzer, service 
   }
   return { mediaPlayers, mediaPlayerId, mediaItems, mediaReadAllowed, mediaUploadAllowed, mediaLoading,
     mediaUploading, mediaProgress, mediaError, mediaNotice, mediaFile, mediaPlaybackUrl, mediaPlaybackId,
-    mediaPlaybackLoading, submissionsEnabled,
+    mediaPlaybackLoading, mediaThumbnails, mediaThumbnailBusy, mediaThumbnailFailed,
+    submissionsEnabled, ensureMediaThumbnail,
     selectMediaPlayer, refreshMedia, selectMediaFile, uploadPrivateMedia, playPrivateMedia,
     analyzePrivateMedia, reportPlaybackError, resetMedia };
 }
