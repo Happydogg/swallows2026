@@ -30,6 +30,8 @@ import { AppShell } from '../components/AppShell.js';
 import { CoachHome } from '../components/CoachHome.js';
 import { ParentHome } from '../components/ParentHome.js';
 import { StatsHub } from '../components/StatsHub.js';
+import { AuthorizedStatsBoard } from '../components/AuthorizedStatsBoard.js';
+import { useAuthorizedStatsBoard } from '../composables/useAuthorizedStatsBoard.js';
 import { StagingDataBrowser } from '../components/StagingDataBrowser.js';
 import { AvatarManager } from '../components/AvatarManager.js';
 import { useAvatarManager } from '../composables/useAvatarManager.js';
@@ -48,7 +50,7 @@ const { createApp, ref, onMounted, onUnmounted, markRaw, computed } = Vue;
 
 createApp({
   components: {
-    PilotWorkspace, PerformanceInbox, LoginLanding, AppShell, CoachHome, ParentHome, StatsHub, StagingDataBrowser, AvatarManager, InviteOnboarding, AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
+    PilotWorkspace, PerformanceInbox, LoginLanding, AppShell, CoachHome, ParentHome, StatsHub, AuthorizedStatsBoard, StagingDataBrowser, AvatarManager, InviteOnboarding, AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
     SessionFormModal, UploadVideoModal, ArAnalyzerModal
   },
   setup() {
@@ -116,6 +118,9 @@ createApp({
       if (!auth.isVerifiedGuardian.value || auth.authError.value) return [];
       const authorized = new Set(auth.guardianLinks.value.filter(link => link.status === 'verified').map(link => link.athlete_id));
       return players.value.filter(player => authorized.has(player.athlete_id)).map(player => ({...player,photo_url:avatarForPlayer(player)}));
+    });
+    const statsBoard = useAuthorizedStatsBoard({
+      auth,coachRoster:coachRosterDisplay,familyPlayers,workspaceMode
     });
     // Staging player projection: never promote viewer choice to authorization.
     const visibleStagingPlayers = computed(() => {
@@ -342,6 +347,7 @@ createApp({
       coach.lockCoachMode();
       privateMedia.resetMedia();
       avatarManager.reset();
+      statsBoard.reset();
       submissionWorkspace.reset();
       enrollmentAdmin.reset();
       pilotWorkspace.reset();
@@ -409,6 +415,7 @@ createApp({
       submissionController: markRaw(submissionWorkspace),
       enrollmentAdminController: markRaw(enrollmentAdmin),
       privateMediaController: markRaw(privateMedia),
+      statsBoardController: markRaw(statsBoard),
        avatarController: markRaw(avatarManager),
       analyzerController: markRaw(arAnalyzer)
     };
