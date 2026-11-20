@@ -224,7 +224,7 @@ test('compact mobile player editing is reached only from the dedicated Player Pr
   assert.ok(editor.includes('>Edit Player</h2>'));
   assert.ok(editor.includes('Other player details remain read-only'));
   assert.ok(!editor.includes('>Change photo'));
-  assert.ok(app.includes('submissionWorkspace.showProfile(player.id)'));
+  assert.ok(app.includes("loadAuthorizedHistory(selected.id,'guardian')"), 'family profile uses pre-existing guardian-protected history RPC');
   assert.ok(app.includes('avatarManager.rows.value.find'));
   assert.ok(index.includes('@open-profile="openFamilyPlayerProfile"'));
   assert.ok(index.includes('@open-profile="openManagedPlayerProfile"'));
