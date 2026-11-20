@@ -1,7 +1,10 @@
 // SDL-UX-005: Stats presentation from the existing guardian-safe projection.
 // No database queries, calculations, medical thresholds, or permission changes.
+import { DemoGrowthLab } from './DemoGrowthLab.js';
+
 export const StatsHub = {
   name: 'StatsHub',
+  components: { DemoGrowthLab },
   props: {
     mode: { type: String, required: true },
     familyCards: { type: Array, default: () => [] },
@@ -98,6 +101,7 @@ export const StatsHub = {
         </div>
       </template>
       <p v-else class="rounded-xl border border-slate-700 bg-slate-900 p-5 text-sm text-slate-400">Your account needs verified team or family access to view athlete statistics.</p>
+      <demo-growth-lab></demo-growth-lab>
     </section>
   `
 };
