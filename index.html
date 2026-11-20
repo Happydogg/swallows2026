@@ -113,9 +113,11 @@
         <button type="button" @click="navigateTab('me')" class="mt-4 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold">Open account workspace</button>
       </section>
       <stats-hub v-if="activeTab === 'stats' && currentView === 'overview'"
-        :mode="workspaceMode" :coach-roster="coachRoster" :family-cards="statsFamilyCards"
-        :loading="loading" :enabled="submissionController.enabled"
+        :mode="workspaceMode" :coach-roster="coachRosterDisplay" :family-cards="statsFamilyCards"
+        :loading="loading" :enabled="submissionController.enabled" :show-synthetic="false"
         @navigate="navigateTab" @open-player="submissionController.showProfile($event)"></stats-hub>
+      <authorized-stats-board v-if="activeTab === 'stats' && currentView === 'overview' && (workspaceMode === 'coach' || workspaceMode === 'family')"
+        :controller="statsBoardController"></authorized-stats-board>
 
       <staging-data-browser v-if="activeTab === 'team' && currentView === 'overview' && workspaceMode === 'family'"
         :players="visibleStagingPlayers" :mode="workspaceMode" :loading="loading || (workspaceMode === 'coach' && coachRosterLoading)"
