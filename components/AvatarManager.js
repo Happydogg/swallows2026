@@ -2,6 +2,7 @@
 // Pure UI over useAvatarManager; all writes use private storage and RPC checks.
 export const AvatarManager = {
   name: 'AvatarManager',
+  emits: ['open-profile'],
   props: {
     controller: { type: Object, required: true },
     showList: { type: Boolean, default: false }
@@ -10,12 +11,12 @@ export const AvatarManager = {
   template: `
   <div class="no-print">
     <section v-if="showList" class="my-5 space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-4 sm:p-6"
-      aria-label="Manage player profile pictures">
+      aria-label="Authorized player directory">
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p class="text-xs font-bold uppercase tracking-wider text-sky-300">Player identity</p>
-          <h2 class="mt-1 text-xl font-black text-white">Profile pictures</h2>
-          <p class="mt-2 text-sm leading-relaxed text-slate-400">Change pictures for players you are authorized to manage. Photos are stored privately and do not alter official statistics.</p>
+          <h2 class="mt-1 text-xl font-black text-white">Manage players</h2>
+          <p class="mt-2 text-sm leading-relaxed text-slate-400">Open a permitted player profile to edit its picture. The official statistics remain protected.</p>
         </div>
         <button type="button" :disabled="loading || busy" @click="load"
           class="self-start rounded-lg border border-blue-500/40 bg-blue-900/30 px-4 py-3 text-sm font-bold text-cyan-200 disabled:opacity-50">
@@ -36,9 +37,9 @@ export const AvatarManager = {
           <div class="min-w-0 flex-1">
             <p class="truncate text-sm font-bold text-white">{{ player.preferred_name }}</p>
             <p class="text-xs text-slate-400">#{{ player.jersey || '–' }} · {{ player.position || 'Player' }}</p>
-            <button type="button" @click="choose(player.id)"
+            <button type="button" @click="$emit('open-profile',player)"
               class="mt-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-500">
-              Change photo
+              View profile
             </button>
           </div>
         </li>
@@ -52,17 +53,20 @@ export const AvatarManager = {
         class="my-auto w-full max-w-md space-y-4 rounded-2xl border border-slate-600 bg-slate-900 p-5 shadow-2xl">
         <div class="flex items-start justify-between gap-3">
           <div>
-            <h2 id="sdl-avatar-edit-title" class="text-xl font-black text-white">Change player photo</h2>
+            <h2 id="sdl-avatar-edit-title" class="text-xl font-black text-white">Edit Player</h2>
             <p class="mt-1 text-sm text-slate-300">{{ selectedPlayer.preferred_name }} · #{{ selectedPlayer.jersey }}</p>
           </div>
-          <button type="button" :disabled="busy" @click="close" aria-label="Close photo editor"
+          <button type="button" :disabled="busy" @click="close" aria-label="Close player editor"
             class="rounded-lg border border-slate-600 px-3 py-2 text-sm text-slate-300 disabled:opacity-50">✕</button>
         </div>
         <div class="flex items-center gap-4 rounded-xl bg-slate-950 p-3">
           <img v-if="selectedPlayer.display_photo_url" :src="selectedPlayer.display_photo_url" alt="Current player profile photo"
             class="h-20 w-20 shrink-0 rounded-xl object-cover" referrerpolicy="no-referrer">
           <span v-else class="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-blue-950 font-black text-white">#{{ selectedPlayer.jersey }}</span>
-          <p class="text-xs leading-relaxed text-slate-400">Upload a JPEG, PNG, WebP or supported iPhone image. It will be compressed to a private JPEG up to 500 px.</p>
+          <div>
+            <p class="text-sm font-bold text-white">Profile picture</p>
+            <p class="mt-1 text-xs leading-relaxed text-slate-400">JPEG, PNG, WebP or supported iPhone photo. Stored privately after compression.</p>
+          </div>
         </div>
         <label class="block text-sm font-bold text-slate-300" for="sdl-player-avatar-upload">
           Select new picture
@@ -80,7 +84,7 @@ export const AvatarManager = {
           <button type="button" :disabled="busy" @click="close"
             class="min-h-12 rounded-xl border border-slate-600 px-4 py-3 text-sm text-white disabled:opacity-50">Cancel</button>
         </div>
-        <p class="text-xs text-slate-400">Only authorized users can upload. The original player statistics and videos are unchanged.</p>
+        <p class="text-xs text-slate-400">Other player details remain read-only during the staging pilot. Authorized photo updates do not change official performance records or videos.</p>
       </section>
     </div>
   </div>
