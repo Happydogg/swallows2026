@@ -112,6 +112,11 @@
         <p class="mt-2 text-sm text-slate-300">Your membership and permissions determine which team, family and administrative tools are available.</p>
         <button type="button" @click="navigateTab('me')" class="mt-4 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold">Open account workspace</button>
       </section>
+      <stats-hub v-if="activeTab === 'stats' && currentView === 'overview'"
+        :mode="workspaceMode" :coach-roster="coachRoster" :family-cards="statsFamilyCards"
+        :loading="loading" :enabled="submissionController.enabled"
+        @navigate="navigateTab" @open-player="submissionController.showProfile($event)"></stats-hub>
+
       <staging-data-browser v-if="activeTab === 'team' && currentView === 'overview' && (workspaceMode === 'coach' || workspaceMode === 'family')"
         :players="visibleStagingPlayers" :mode="workspaceMode" :loading="loading || (workspaceMode === 'coach' && coachRosterLoading)"
         :error="workspaceMode === 'coach' ? coachRosterError : ''" :video-here="mediaOriginAllowed"
