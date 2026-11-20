@@ -4,7 +4,7 @@ const { ref, computed } = Vue;
 
 // Separate media permissions from isCoach: media access never unlocks official stats.
 export function usePrivateMedia({ auth, players, coachRoster, analyzer, service = createPrivateMediaService({ auth }),
-  urls = URL, timeoutMs = 65000 }) {
+  urls = URL, timeoutMs = 65000, thumbnailExtractor = extractVideoThumbnail }) {
   const mediaPlayerId = ref('');
   const mediaItems = ref([]);
   const mediaReadAllowed = ref(false);
@@ -61,7 +61,7 @@ export function usePrivateMedia({ auth, players, coachRoster, analyzer, service 
           const blob=playbackBlobCache.get(id)||await service.playback(id,{signal:op.signal});
           if(!op.current()||epoch!==thumbnailEpoch)continue;
           putCachedBlob(id,blob);
-          const preview=await extractVideoThumbnail(blob,{onSignal:op.signal});
+          const preview=await thumbnailExtractor(blob,{onSignal:op.signal});
           if(op.current() && epoch===thumbnailEpoch)mediaThumbnails.value={...mediaThumbnails.value,[id]:preview};
         }catch(error){
           if(op.ownsState() && epoch===thumbnailEpoch){
