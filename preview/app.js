@@ -12,10 +12,6 @@ import { DemoGrowthLab } from './components/DemoGrowthLab.js';
 import { DEMO_GROWTH_SNAPSHOT } from './js/demoGrowthFixture.js';
 
 const { createApp, ref, computed } = Vue;
-const demoPlayers = Object.freeze([
-  { id: 'demo-player-1', athlete_id: 'demo-athlete-1', preferred_name: 'Sample Player A', jersey: '12', position: 'SS / P', bats: 'R', throws: 'R' },
-  { id: 'demo-player-2', athlete_id: 'demo-athlete-2', preferred_name: 'Sample Player B', jersey: '08', position: 'OF', bats: 'L', throws: 'R' }
-]);
 // The same fifteen fictional names and jerseys used by the staging fixture.
 const demoRoster = Object.freeze(DEMO_GROWTH_SNAPSHOT.players.map((player, i) => ({
   id: 'demo-player-'+player.jersey,
@@ -28,6 +24,8 @@ const demoRoster = Object.freeze(DEMO_GROWTH_SNAPSHOT.players.map((player, i) =>
   bats: i % 3 === 0 ? 'L' : 'R',
   photo_url: '/assets/demo-players/'+player.jersey+'.svg'
 })));
+const demoPlayers = Object.freeze(demoRoster.slice(0,2).map((player,i) => ({ ...player, athlete_id:'demo-athlete-'+(i+1) })));
+
 
 function previewAuthController() {
   const c = {
@@ -99,6 +97,7 @@ createApp({
     const invitationController = previewInviteController();
     const previewMediaControllerState = previewMediaController();
     const previewSelectedPlayer = ref(demoRoster[0]);
+    const previewEditOpen = ref(false);
     const openPreviewProfile = player => {
       const allowed=demoRoster.find(p=>p.id===player?.id && p.team_id===player?.team_id);
       if (!allowed) return;
@@ -160,7 +159,7 @@ createApp({
     }
     return {
       previewViews, screen, role, activeTab, tabTitle, version, branch,
-      demoPlayers, demoRoster, previewSelectedPlayer, openPreviewProfile, loginController, invitationController,
+      demoPlayers, demoRoster, previewSelectedPlayer, previewEditOpen, openPreviewProfile, loginController, invitationController,
       previewMediaControllerState, previewFamilyStats, previewTranslate, demoMeasurements,
       reportOpen, issue, reportText, copyReport, copyNotice, manualReport
     };
