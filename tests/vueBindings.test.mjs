@@ -50,7 +50,13 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   app.config.errorHandler = error => errors.push(error);
   const host = node('root'); app.mount(host); t.after(() => app.unmount());
   const flatten = n => `${n.text} ${n.children.map(flatten).join(' ')}`;
-  assert.match(flatten(host), /Video Room/);
+  // Video Room now mounts only when the Videos tab is visible, and private
+  // media remains hidden behind the approved-origin gate.
+  h.app.activeTab.value='videos';
+  await Vue.nextTick();
+  assert.match(flatten(host),/Video Room|Open the authorized video viewer/);
+  h.app.activeTab.value='home';
+  await Vue.nextTick();
   assert.match(flatten(host), /Choose a player/);
   const submissions=h.app.submissionController;
   submissions.changeTab('submissions');await Vue.nextTick();assert.match(flatten(host),/Submit for coach review/);
