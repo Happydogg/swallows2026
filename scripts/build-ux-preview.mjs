@@ -13,6 +13,8 @@ const ALLOWLIST = Object.freeze([
   ['components/AppShell.js', 'components/AppShell.js'],
   ['components/CoachHome.js', 'components/CoachHome.js'],
   ['components/ParentHome.js', 'components/ParentHome.js'],
+  ['components/PlayerHeroCard.js', 'components/PlayerHeroCard.js'],
+  ['components/PrivateMediaPanel.js', 'components/PrivateMediaPanel.js'],
   ['components/LoginLanding.js', 'components/LoginLanding.js'],
   ['components/InviteOnboarding.js', 'components/InviteOnboarding.js']
 ]);
@@ -90,7 +92,7 @@ export function buildUxPreview(root = ROOT) {
 
   const files = fs.readdirSync(out, {recursive:true, withFileTypes:true})
     .filter(entry=>entry.isFile()).map(entry=>entry.name);
-  if (manifest.length !== 12 || !files.length) throw Error('Preview package unexpectedly empty.');
+  if (manifest.length !== 14 || !files.length) throw Error('Preview package unexpectedly empty.');
   return { directory:out, manifest, commit };
 }
 
