@@ -10,7 +10,8 @@ export const StatsHub = {
     familyCards: { type: Array, default: () => [] },
     coachRoster: { type: Array, default: () => [] },
     loading: { type: Boolean, default: false },
-    enabled: { type: Boolean, default: false }
+    enabled: { type: Boolean, default: false },
+    showSynthetic: { type: Boolean, default: true }
   },
   emits: ['navigate', 'open-player'],
   setup(props) {
@@ -52,7 +53,7 @@ export const StatsHub = {
           </div>
         </div>
         <p v-if="!enabled" role="status" class="rounded-xl border border-amber-500/30 bg-amber-950/20 p-4 text-sm text-amber-200">
-          Parent-safe statistics services are currently disabled in staging. The live dashboard does not infer values from unapproved raw sessions.
+          The newer approval and sharing workflow is currently disabled. Linked-player private measurement history remains accessible through the separate authorized history reader below.
         </p>
         <div v-if="!profiles.length" class="rounded-2xl border border-dashed border-slate-600 bg-slate-900 p-6">
           <h2 class="text-lg font-bold text-white">No accessible statistics profiles</h2>
@@ -101,7 +102,7 @@ export const StatsHub = {
         </div>
       </template>
       <p v-else class="rounded-xl border border-slate-700 bg-slate-900 p-5 text-sm text-slate-400">Your account needs verified team or family access to view athlete statistics.</p>
-      <demo-growth-lab></demo-growth-lab>
+      <demo-growth-lab v-if="showSynthetic"></demo-growth-lab>
     </section>
   `
 };
