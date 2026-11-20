@@ -6,6 +6,7 @@ export const PlayerHeroCard = {
     player: { type: Object, required: true },
     variant: { type: String, default: 'compact' },
     isCoach: { type: Boolean, default: false },
+    canEditPhoto: { type: Boolean, default: false },
     t: { type: Function, default: null },
     failedImgs: { type: Object, default: () => ({}) },
     formatImgUrl: { type: Function, default: null },
@@ -19,6 +20,7 @@ export const PlayerHeroCard = {
     calculateJumpRatio: { type: Function, default: null },
     getJumpRatioColor: { type: Function, default: null }
   },
+  emits: ['edit-photo'],
   setup(props) {
     // Never pass function-valued default factories as Vue prop defaults.
     // Render-safe wrappers preserve legacy helpers when supplied and keep
@@ -64,6 +66,10 @@ export const PlayerHeroCard = {
             </div>
             <h2 class="mt-2 break-words text-2xl font-black tracking-tight text-white sm:text-3xl">{{ getPlayerDisplayName(player) }}</h2>
             <p class="mt-2 text-sm font-medium text-slate-300">{{ t('throws') }}: {{ player.throws || '–' }} <span class="text-slate-600">|</span> {{ t('bats') }}: {{ player.bats || '–' }}</p>
+            <button v-if="canEditPhoto" type="button" @click="$emit('edit-photo',player.id)"
+              class="mt-3 rounded-lg border border-cyan-400/50 bg-sky-900/40 px-3 py-2 text-xs font-bold text-cyan-200 hover:bg-sky-800/70">
+              <span aria-hidden="true">📷</span> Change profile picture
+            </button>
             <p v-if="isCoach" class="mt-2 break-words text-xs text-slate-400">
               {{ t('officialName') }}: <span class="text-slate-200">{{ formatLegalName(player) }}</span>
               <span v-if="player.hkll_reg_no"> · HKLL: <span class="text-blue-300">{{ player.hkll_reg_no }}</span></span>
@@ -85,7 +91,10 @@ export const PlayerHeroCard = {
     </div>
 
     <div v-else class="flex min-w-0 items-center gap-4 rounded-t-2xl bg-gradient-to-r from-blue-900/80 to-slate-900 p-5" aria-label="Player card">
-      <div class="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-blue-400/30 bg-blue-950 text-2xl font-black text-cyan-200" aria-hidden="true">#{{ player.jersey || '–' }}</div>
+      <div class="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-blue-400/30 bg-blue-950 text-2xl font-black text-cyan-200" aria-hidden="true">
+        <img v-if="player.photo_url" :src="formatImgUrl(player.photo_url)" alt="" class="h-full w-full object-cover" referrerpolicy="no-referrer">
+        <span v-else>#{{ player.jersey || '–' }}</span>
+      </div>
       <div class="min-w-0 flex-1">
         <p class="text-xs font-bold uppercase tracking-widest text-sky-300">Player profile</p>
         <h3 class="mt-1 truncate text-xl font-black text-white">{{ player.preferred_name || 'Player' }}</h3>
