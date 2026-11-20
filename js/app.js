@@ -9,6 +9,7 @@ import { clearPlayerChart } from './chartManager.js';
 import { formatImgUrl } from './mediaStorage.js';
 import { fetchAllCloudData, fetchVerifiedGuardianPlayers } from './supabaseService.js';
 import { fetchCoachRoster } from './coachRosterService.js';
+import { fetchAuthorizedPlayerHistory } from './authorizedStatsService.js';
 import { createArAnalyzerController } from './arAnalyzer.js';
 import { compareJerseys } from '../utils/jerseyUtils.js';
 import { useCoachMode } from '../composables/useCoachMode.js';
@@ -65,6 +66,8 @@ createApp({
     const selectedPlayer = ref(null);
     const players = ref([]);
     const sessions = ref([]);
+    const profileHistoryLoading=ref(false),profileHistoryError=ref('');
+    let historyRevision=0;
     const drillVideos = ref([]);
     const guardianProfileId=ref(''),guardianProfileSessions=ref([]);
     const analyticsSessions=computed(()=>currentView.value==='player'&&guardianProfileId.value===selectedPlayer.value?.id?guardianProfileSessions.value:sessions.value);
@@ -243,6 +246,25 @@ createApp({
     };
     // A convenience route, never a media permission grant. The existing Worker
     // checks the signed-in identity and per-player read access independently.
+    const loadAuthorizedHistory = async (id,role) => {
+      const version=++historyRevision, identity=auth.captureIdentity();
+      if(!auth.isCurrentIdentity(identity)||selectedPlayer.value?.id!==id)return;
+      profileHistoryError.value='';profileHistoryLoading.value=true;
+      sessions.value=[];guardianProfileId.value='';guardianProfileSessions.value=[];
+      try{
+        const result=await fetchAuthorizedPlayerHistory(id,role);
+        if(version===historyRevision && auth.isCurrentIdentity(identity) && selectedPlayer.value?.id===id){
+          sessions.value=result;Vue.nextTick(()=>analytics.renderPlayerChart());
+        }
+      }catch(error){
+        if(version===historyRevision && auth.isCurrentIdentity(identity) && selectedPlayer.value?.id===id){
+          profileHistoryError.value=error.message||'Statistics unavailable.';
+          sessions.value=[];
+        }
+      }finally{
+        if(version===historyRevision && auth.isCurrentIdentity(identity))profileHistoryLoading.value=false;
+      }
+    };
     const openAuthorizedPlayerVideos = player => {
       if (!auth.authUser.value || auth.authError.value || !player?.id) return;
       const currentlyScoped = visibleStagingPlayers.value.some(row =>
@@ -265,13 +287,18 @@ createApp({
       playerFeature.selectPlayer(projected);
       activeTab.value='team';
       if (mediaOriginAllowed.value) void privateMedia.selectMediaPlayer(authorized.id);
+      void loadAuthorizedHistory(authorized.id,'coach');
     };
     // A parent's profile opens through the existing verified-guardian service,
     // not from a card's photo URL or a client-side permission toggle.
     const openFamilyPlayerProfile = player => {
       if (!auth.isVerifiedGuardian.value || workspaceMode.value !== 'family'
         || auth.authError.value || !familyPlayers.value.some(p => p.id === player?.id)) return;
-      void submissionWorkspace.showProfile(player.id);
+      const selected=familyPlayers.value.find(p=>p.id===player.id);
+      playerFeature.selectPlayer({...selected,photo_url:avatarForPlayer(selected)});
+      activeTab.value='team';
+      if(mediaOriginAllowed.value)void privateMedia.selectMediaPlayer(selected.id);
+      void loadAuthorizedHistory(selected.id,'guardian');
     };
     // Admin-only accounts can navigate from their server-filtered player
     // directory to the same profile, without reading sessions or private video.
@@ -286,6 +313,8 @@ createApp({
     };
     const leavePlayerProfile = () => {
       currentView.value='overview';
+      historyRevision++;profileHistoryLoading.value=false;profileHistoryError.value='';
+      sessions.value=[];
       privateMedia.resetMedia();
       if (workspaceMode.value === 'admin') activeTab.value='me';
     };
@@ -305,6 +334,7 @@ createApp({
       coachRosterError.value = '';
       guardianProfileId.value='';guardianProfileSessions.value=[];
       selectedPlayer.value = null;
+      historyRevision++;profileHistoryLoading.value=false;profileHistoryError.value='';
       currentView.value = 'overview';
       loading.value = false;
       coachRosterLoading.value = false;
@@ -360,19 +390,18 @@ createApp({
 
     return {
       currentLang, t, saveLanguage, loading, isSaving, currentView, overviewTab, activeTab, workspaceMode, familyPlayers, visibleStagingPlayers, coachRosterDisplay, mediaOriginAllowed, statsFamilyCards: submissionWorkspace.cards, navigateTab, changeWorkspace, pendingInvitation, dismissInvitePrompt, searchQuery,
-      selectedPlayer, players, sessions, drillVideos, coachRoster, coachRosterLoading, coachRosterError, selectCoachRosterPlayer, openAuthorizedPlayerVideos, openFamilyPlayerProfile, openManagedPlayerProfile, leavePlayerProfile, canEditPlayerPhoto: avatarManager.canEdit, avatarManager,
+      selectedPlayer, players, sessions, profileHistoryLoading, profileHistoryError, drillVideos, coachRoster, coachRosterLoading, coachRosterError, selectCoachRosterPlayer, openAuthorizedPlayerVideos, openFamilyPlayerProfile, openManagedPlayerProfile, leavePlayerProfile, canEditPlayerPhoto: avatarManager.canEdit, avatarManager,
       formatImgUrl, triggerPrintReport,
       ...auth, signInAndLoad, signOutAndClear,
       ...coach, ...analytics, ...playerFeature, ...sessionFeature, ...videoFeature, ...csvFeature,
       ...arAnalyzer,
-      selectPlayer: async player=>{
-        guardianProfileId.value='';guardianProfileSessions.value=[];playerFeature.selectPlayer(player);
-        if(pilotWorkspace.enabled){
-          const identity=auth.captureIdentity();sessions.value=[];
-          try{const rows=await createPilotWorkflowService({auth}).coachStatistics(player.id);
-          if(auth.isCurrentIdentity(identity)&&selectedPlayer.value?.id===player.id){sessions.value=rows;analytics.renderPlayerChart();}}
-          catch(error){if(auth.isCurrentIdentity(identity)&&selectedPlayer.value?.id===player.id){sessions.value=[];auth.authError.value=error.message;}}
-        }
+      selectPlayer: player=>{
+        guardianProfileId.value='';guardianProfileSessions.value=[];
+        playerFeature.selectPlayer(player);
+        const allowedCoach=auth.isTeamCoach.value && coachRoster.value.some(p=>p.id===player?.id);
+        const allowedGuardian=auth.isVerifiedGuardian.value && familyPlayers.value.some(p=>p.id===player?.id);
+        if(allowedCoach)void loadAuthorizedHistory(player.id,'coach');
+        else if(allowedGuardian)void loadAuthorizedHistory(player.id,'guardian');
       },
       // Passing the original refs (not Vue-unwrapped copies) maintains DOM/video ownership.
       loginController: markRaw(auth),
