@@ -50,7 +50,8 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   app.config.errorHandler = error => errors.push(error);
   const host = node('root'); app.mount(host); t.after(() => app.unmount());
   const flatten = n => `${n.text} ${n.children.map(flatten).join(' ')}`;
-  assert.match(flatten(host), /Private player videos/);
+  assert.match(flatten(host), /Video Room/);
+  assert.match(flatten(host), /Choose a player/);
   const submissions=h.app.submissionController;
   submissions.changeTab('submissions');await Vue.nextTick();assert.match(flatten(host),/Submit for coach review/);
   submissions.clubEnrollments.value=[{id:'test-enrollment',generation:'gen',organization_name:'Test club',status:'active',consent_active:false,history:[]}];
