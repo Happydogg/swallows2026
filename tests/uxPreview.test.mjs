@@ -9,12 +9,27 @@ import { buildUxPreview } from '../scripts/build-ux-preview.mjs';
 const EXPECTED = [
   'index.html','app.js','logo.png','components/AppShell.js',
   'components/CoachHome.js','components/ParentHome.js',
+  'assets/demo-players/21.svg',
+  'assets/demo-players/22.svg',
+  'assets/demo-players/23.svg',
+  'assets/demo-players/24.svg',
+  'assets/demo-players/25.svg',
+  'assets/demo-players/26.svg',
+  'assets/demo-players/27.svg',
+  'assets/demo-players/28.svg',
+  'assets/demo-players/29.svg',
+  'assets/demo-players/30.svg',
+  'assets/demo-players/31.svg',
+  'assets/demo-players/32.svg',
+  'assets/demo-players/33.svg',
+  'assets/demo-players/34.svg',
+  'assets/demo-players/35.svg',
   'components/PlayerHeroCard.js','components/PrivateMediaPanel.js','components/StatsHub.js','components/DemoGrowthLab.js','js/demoGrowthFixture.js',
   'components/LoginLanding.js','components/InviteOnboarding.js',
   'js/config.js','meta.js','_headers','404.html'
 ];
 
-test('preview build exports exactly 17 allowlisted synthetic files', () => {
+test('preview build exports exactly 32 allowlisted synthetic files', () => {
   const result = buildUxPreview();
   assert.deepEqual([...result.manifest].sort(), [...EXPECTED].sort());
   const exported = [];
