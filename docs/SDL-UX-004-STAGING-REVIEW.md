@@ -2,6 +2,25 @@
 
 **Owner request:** Build an online page to sign in and view staging Supabase players and private video from a phone, keeping the existing `sdl-ux-preview` synthetic-only design preview.
 
+## SDL-004 Worker origin deployed and verified — 2026-11-20
+
+**Status: Implemented, automated-test verified, browser-CORS verified, staging Worker deployed. User-authenticated media playback UAT remains open.**
+
+Owner explicitly approved using the existing `sdl-media-staging` R2 bucket from `https://sdl-ux-live.pages.dev`. The existing `sdl-r2-staging-gate` Worker already had the bucket binding, so no new bucket, public link, migration, Worker secret, or media-copy process was needed.
+
+- **Source change:** `backend/worker/pilot.mjs` now permits exactly `https://sdl-ux-live.pages.dev` alongside `https://sdl-staging.pages.dev` and both original localhost origins.
+- **Worker artifact deployment:** Cloudflare Worker version `c764d3e4-2351-4416-8eb0-793e412d9d54` (deployment `196d31c4-3f1c-40d2-a90c-74111e446978`, 100%). This was prepared from the then-current, deployed Worker bundle with only the exact new origin added, not from an older baseline.
+- **Preserved Worker bindings:** `MEDIA_BUCKET` remains `sdl-media-staging`; `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` remain bound; `SUBMISSIONS_ENABLED=false`; compatibility date `2026-11-16`; observability preserved.
+- **Rollback reference:** immediately previous deployed version `d7639565-23ee-46f3-b8fe-8ea93ce21156`, previous deployment `ced69703-0f74-496c-9e14-0759754cce5e`. Restoring this version also removes the newly allowed origin.
+- **Frontend:** `js/app.js` allows the new exact origin; `index.html` mounts the existing authorized `PrivateMediaPanel` for the Videos tab. Unapproved hostnames continue to show the staging portal fallback.
+- **Automated verification:** Cloudflare Pages build `ac2d02daf6eb2261becfd63b2963046d3cc2f995` passed **98/98 focused tests plus 1/1 Vue 3 renderer smoke test**; the Cloudflare Pages deployment succeeded.
+- **Runtime verification:** A 390-pixel-width Cloudflare browser session from `https://sdl-ux-live.pages.dev/` sent a CORS-preflighted Worker request using a deliberately invalid synthetic bearer and received readable HTTP **401**. This verifies the origin is accepted without bypassing authentication.
+- **Not yet tested:** a real staging user's permitted player-video list and successful MP4 playback on iOS. No passwords, JWTs or private video URLs were acquired.
+
+**Important historical drift:** `backend/release/staging-worker-baseline.json` refers to older version `891b26a8-bd75-4f2c-b6af-b0244cc699f7`; it must be refreshed through the reviewed baseline protocol before the next Worker release. Do not assume that old baseline describes today's deployment. The deployed bundle's source map was carried forward as part of the one-origin patch; recompile from reconciled source on a subsequent controlled release.
+
+**Supersedes the earlier video-host CORS blocker in this document.** The existing staging portal remains a fallback, but is no longer required for users visiting the approved `sdl-ux-live.pages.dev` hostname.
+
 ## Deployed architecture
 
 - **Synthetic UX review:** https://sdl-ux-preview.pages.dev/ (no backend connection)
