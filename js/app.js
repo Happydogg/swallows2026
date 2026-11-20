@@ -25,6 +25,9 @@ import { useVideos } from '../composables/useVideos.js';
 import { useAnalytics } from '../composables/useAnalytics.js';
 import { useRosterCsv } from '../composables/useRosterCsv.js';
 import { LoginLanding } from '../components/LoginLanding.js';
+import { AppShell } from '../components/AppShell.js';
+import { CoachHome } from '../components/CoachHome.js';
+import { ParentHome } from '../components/ParentHome.js';
 import { AppHeader } from '../components/AppHeader.js';
 import { TeamOverview } from '../components/TeamOverview.js';
 import { CoachTeamRoster } from '../components/CoachTeamRoster.js';
@@ -38,7 +41,7 @@ const { createApp, ref, onMounted, onUnmounted, markRaw, computed } = Vue;
 
 createApp({
   components: {
-    PilotWorkspace, PerformanceInbox, LoginLanding, AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
+    PilotWorkspace, PerformanceInbox, LoginLanding, AppShell, CoachHome, ParentHome, AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
     SessionFormModal, UploadVideoModal, ArAnalyzerModal
   },
   setup() {
@@ -50,6 +53,8 @@ createApp({
     const isSaving = ref(false);
     const currentView = ref('overview');
     const overviewTab = ref('roster');
+    const activeTab = ref('home');
+    const requestedWorkspace = ref('auto');
     const searchQuery = ref('');
     const selectedPlayer = ref(null);
     const players = ref([]);
@@ -78,6 +83,28 @@ createApp({
         if(initialInvitation){pilotWorkspace.redemptionToken.value=initialInvitation;initialInvitation='';}
       }
     });
+    // Presentation-only selection. Every data request still uses verified server roles.
+    const workspaceMode = computed(() => {
+      if (requestedWorkspace.value === 'family' && auth.isVerifiedGuardian.value) return 'family';
+      if (requestedWorkspace.value === 'coach' && auth.isTeamCoach.value) return 'coach';
+      if (auth.isTeamCoach.value) return 'coach';
+      if (auth.isVerifiedGuardian.value) return 'family';
+      if (auth.isOrgAdmin.value) return 'admin';
+      return 'member';
+    });
+    const familyPlayers = computed(() => {
+      if (!auth.isVerifiedGuardian.value || auth.authError.value) return [];
+      const authorized = new Set(auth.guardianLinks.value.filter(link => link.status === 'verified').map(link => link.athlete_id));
+      return players.value.filter(player => authorized.has(player.athlete_id));
+    });
+    const changeWorkspace = requested => {
+      if (requested !== 'coach' && requested !== 'family') return;
+      if (requested === 'coach' && !auth.isTeamCoach.value) return;
+      if (requested === 'family' && !auth.isVerifiedGuardian.value) return;
+      requestedWorkspace.value = requested;
+      activeTab.value = 'home';
+      currentView.value = 'overview';
+    };
     const coach = useCoachMode(t);
     const analytics = useAnalytics({ players, sessions:analyticsSessions, selectedPlayer, currentView, searchQuery, t });
     const playerFeature = usePlayers({
@@ -194,6 +221,8 @@ createApp({
     };
     const triggerPrintReport = () => window.print();
     const clearSensitiveState = () => {
+      activeTab.value = 'home';
+      requestedWorkspace.value = 'auto';
       players.value = [];
       sessions.value = [];
       drillVideos.value = [];
@@ -228,13 +257,26 @@ createApp({
       videoFeature.newDrillVideo.value = { ...emptyVideoForm };
       for (const id of Object.keys(playerFeature.failedImgs)) delete playerFeature.failedImgs[id];
     };
+    const navigateTab = tab => {
+      if (!['home', 'team', 'stats', 'videos', 'me'].includes(tab)) return;
+      activeTab.value = tab;
+      currentView.value = 'overview';
+      if (tab === 'team' && workspaceMode.value === 'family') submissionWorkspace.changeTab('clubhouse');
+      if (tab === 'stats') {
+        submissionWorkspace.changeTab(workspaceMode.value === 'coach' ? 'review' : 'players');
+        overviewTab.value = 'leaderboard';
+      }
+      if (tab === 'videos') submissionWorkspace.changeTab('submissions');
+      if (tab === 'team' && workspaceMode.value === 'coach') overviewTab.value = 'roster';
+    };
+    Vue.watch(currentView, view => { if (view === 'player') activeTab.value = 'team'; });
     const signInAndLoad = () => auth.signIn();
     const signOutAndClear = () => {initialInvitation='';return auth.signOut();};
     onMounted(() => auth.initializeAuth());
     onUnmounted(() => { auth.disposeAuth(); submissionWorkspace.dispose(); enrollmentAdmin.dispose();pilotWorkspace.dispose(); });
 
     return {
-      currentLang, t, saveLanguage, loading, isSaving, currentView, overviewTab, searchQuery,
+      currentLang, t, saveLanguage, loading, isSaving, currentView, overviewTab, activeTab, workspaceMode, familyPlayers, navigateTab, changeWorkspace, searchQuery,
       selectedPlayer, players, sessions, drillVideos, coachRoster, coachRosterLoading, coachRosterError,
       formatImgUrl, triggerPrintReport,
       ...auth, signInAndLoad, signOutAndClear,
