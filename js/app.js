@@ -28,6 +28,7 @@ import { LoginLanding } from '../components/LoginLanding.js';
 import { AppShell } from '../components/AppShell.js';
 import { CoachHome } from '../components/CoachHome.js';
 import { ParentHome } from '../components/ParentHome.js';
+import { InviteOnboarding } from '../components/InviteOnboarding.js';
 import { AppHeader } from '../components/AppHeader.js';
 import { TeamOverview } from '../components/TeamOverview.js';
 import { CoachTeamRoster } from '../components/CoachTeamRoster.js';
@@ -41,7 +42,7 @@ const { createApp, ref, onMounted, onUnmounted, markRaw, computed } = Vue;
 
 createApp({
   components: {
-    PilotWorkspace, PerformanceInbox, LoginLanding, AppShell, CoachHome, ParentHome, AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
+    PilotWorkspace, PerformanceInbox, LoginLanding, AppShell, CoachHome, ParentHome, InviteOnboarding, AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
     SessionFormModal, UploadVideoModal, ArAnalyzerModal
   },
   setup() {
@@ -67,6 +68,7 @@ createApp({
     const coachRosterError = ref('');
 
     let initialInvitation='';
+    const pendingInvitation=ref(false);
     const auth = useAuthSession({
       onInvitation:token=>{initialInvitation=token;},
       onIdentityChange: previous => {if(previous?.userId)initialInvitation='';clearSensitiveState();},
@@ -80,7 +82,7 @@ createApp({
         await submissionWorkspace.load();
         await enrollmentAdmin.load();
         await pilotWorkspace.load();
-        if(initialInvitation){pilotWorkspace.redemptionToken.value=initialInvitation;initialInvitation='';}
+        if(initialInvitation){pilotWorkspace.redemptionToken.value=initialInvitation;pendingInvitation.value=true;initialInvitation='';}
       }
     });
     // Presentation-only selection. Every data request still uses verified server roles.
@@ -137,7 +139,7 @@ createApp({
       onPrivateVideos: playerId => { void privateMedia.selectMediaPlayer(playerId); }
     });
     const enrollmentAdmin = useEnrollmentAdmin({ auth });
-    const pilotWorkspace=usePilotWorkspace({auth,onLinked:async()=>{const identity=auth.captureIdentity();await auth.reloadMemberships();if(!auth.isCurrentIdentity(identity))return;await fetchAllData();if(auth.isCurrentIdentity(identity))await submissionWorkspace.load();},onUpdated:()=>{void submissionWorkspace.load();}});
+    const pilotWorkspace=usePilotWorkspace({auth,onLinked:async()=>{const identity=auth.captureIdentity();await auth.reloadMemberships();if(!auth.isCurrentIdentity(identity))return;await fetchAllData();if(auth.isCurrentIdentity(identity))await submissionWorkspace.load();if(auth.isCurrentIdentity(identity))pendingInvitation.value=false;},onUpdated:()=>{void submissionWorkspace.load();}});
     // Fragments are not sent in HTTP requests. Remove the invitation before any sharing/navigation.
     if(window.location?.hash?.startsWith('#guardian-invite=')){
       const token=window.location.hash.slice('#guardian-invite='.length);
@@ -221,6 +223,7 @@ createApp({
     };
     const triggerPrintReport = () => window.print();
     const clearSensitiveState = () => {
+      pendingInvitation.value = false;
       activeTab.value = 'home';
       requestedWorkspace.value = 'auto';
       players.value = [];
@@ -270,13 +273,14 @@ createApp({
       if (tab === 'team' && workspaceMode.value === 'coach') overviewTab.value = 'roster';
     };
     Vue.watch(currentView, view => { if (view === 'player') activeTab.value = 'team'; });
+    const dismissInvitePrompt = () => {pendingInvitation.value=false;};
     const signInAndLoad = () => auth.signIn();
     const signOutAndClear = () => {initialInvitation='';return auth.signOut();};
     onMounted(() => auth.initializeAuth());
     onUnmounted(() => { auth.disposeAuth(); submissionWorkspace.dispose(); enrollmentAdmin.dispose();pilotWorkspace.dispose(); });
 
     return {
-      currentLang, t, saveLanguage, loading, isSaving, currentView, overviewTab, activeTab, workspaceMode, familyPlayers, navigateTab, changeWorkspace, searchQuery,
+      currentLang, t, saveLanguage, loading, isSaving, currentView, overviewTab, activeTab, workspaceMode, familyPlayers, navigateTab, changeWorkspace, pendingInvitation, dismissInvitePrompt, searchQuery,
       selectedPlayer, players, sessions, drillVideos, coachRoster, coachRosterLoading, coachRosterError,
       formatImgUrl, triggerPrintReport,
       ...auth, signInAndLoad, signOutAndClear,
