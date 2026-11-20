@@ -236,3 +236,14 @@ test('compact mobile player editing is reached only from the dedicated Player Pr
   assert.ok(index.includes('@open-profile="openManagedPlayerProfile"'));
   assert.ok(index.includes(':show-list="activeTab === \'me\' && workspaceMode === \'admin\'"'));
 });
+
+test('private video room occupies the video section of authorized player profiles',()=>{
+  const profile=fs.readFileSync(new URL('../components/PlayerProfile.js',import.meta.url),'utf8');
+  const index=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
+  assert.ok(profile.includes('<slot name="private-media">'), 'legacy gallery retained only as fallback');
+  assert.ok(index.includes('<template #private-media>'));
+  assert.ok(index.includes("activeTab === 'team' && mediaOriginAllowed && visibleStagingPlayers.some"));
+  assert.ok(index.includes("activeTab === 'videos' && mediaOriginAllowed"));
+  assert.ok(index.includes(':controller="privateMediaController"'));
+  assert.ok(index.includes('verified family members'));
+});
