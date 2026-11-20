@@ -207,20 +207,16 @@ createApp({
           return;
         }
         if (auth.isTeamCoach.value) {
-          if(pilotWorkspace.enabled){
-            await fetchSafeCoachRoster(identity);
-            if(!auth.isCurrentIdentity(identity))return;
-            const linked=auth.isVerifiedGuardian.value?await fetchVerifiedGuardianPlayers(auth.guardianLinks.value):[];
-            if(!auth.isCurrentIdentity(identity))return;
-            players.value=[...new Map([...coachRoster.value,...linked].map(p=>[p.id,p])).values()].sort(compareJerseys);
-            sessions.value=[];drillVideos.value=[];return;
-          }
-          const data = await fetchAllCloudData();
-          if (!auth.isCurrentIdentity(identity)) return;
-          players.value = data.players.sort(compareJerseys);
-          sessions.value = data.sessions;
-          drillVideos.value = data.drillVideos;
+          // The scoped coach-roster RPC is the only authorized roster entry path.
+          // Legacy select('*') on public.sessions returns 403 under staging RLS.
+          // Never fall back to unscoped player/session reads when pilot flags are off.
           await fetchSafeCoachRoster(identity);
+          if(!auth.isCurrentIdentity(identity))return;
+          const linked=auth.isVerifiedGuardian.value
+            ? await fetchVerifiedGuardianPlayers(auth.guardianLinks.value) : [];
+          if(!auth.isCurrentIdentity(identity))return;
+          players.value=[...new Map([...coachRoster.value,...linked].map(p=>[p.id,p])).values()].sort(compareJerseys);
+          sessions.value=[];drillVideos.value=[];
           return;
         }
         if (auth.isVerifiedGuardian.value) {
