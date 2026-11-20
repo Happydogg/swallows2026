@@ -5,7 +5,8 @@
   "scripts": {
     "test": "node tests/run.mjs",
     "check:worker": "npm run build --prefix backend/worker && npm run check:package --prefix backend/worker",
-    "build:staging": "node backend/release/build-staging-frontend.mjs"
+    "build:staging": "node backend/release/build-staging-frontend.mjs",
+    "build:ux-preview": "node --test tests/uxPreview.test.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.16",
