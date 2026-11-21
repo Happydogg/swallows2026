@@ -4,6 +4,8 @@
 **Branch:** `feature/SDL-UX-002-login-redesign`, based on `sdl-staging`.
 **Owner approval:** phased frontend redesign; no deployment, RLS, API/Worker or authentication-policy expansion.
 
+Use the [approved SDL-UX-002 design archive](design/SDL-UX-002/README.md) for Coach Direction 3 and Parent/Player Direction 2. The Final UX Design blueprint is the primary specification.
+
 ## Current source changes (provisional, not staged/deployed)
 
 - `LoginLanding.js`: responsive invite-only sign-in; delegates to existing `useAuthSession`.

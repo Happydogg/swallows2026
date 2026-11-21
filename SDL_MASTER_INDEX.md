@@ -15,6 +15,8 @@
 | SDL-UX | Mobile role-adaptive experience, profiles, navigation, charts | `docs/SDL-UX-008-PLAYER-EDIT-AND-DRILL-ANALYSIS.md`, `docs/SDL-UX-007-PRODUCTION-PARITY-AVATARS.md` |
 | SDL-GOV | Releases, approvals, verification, rollback | `docs/SDL-004-FINAL-PILOT-CHECKPOINT.md`, `docs/SDL-004-BLOCKER-HANDOFF.md`, `SDL_DECISION_REGISTER.md` |
 
+The [SDL-UX-002 design archive](docs/design/SDL-UX-002/README.md) contains the governing approved blueprint and the four supporting, concept and bug references.
+
 ## Current environments
 
 - Original GitHub `main`: **production-source baseline; do not equate with currently deployed production without verification**.

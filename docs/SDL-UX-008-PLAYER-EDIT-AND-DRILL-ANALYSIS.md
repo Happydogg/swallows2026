@@ -3,6 +3,8 @@
 **Date:** 2026-11-20
 **Reviewed sources:** current UX feature branch, including `PlayerProfile.js`, `PlayerHeroCard.js`, `ParentHome.js`, `AvatarManager.js`, `js/app.js`, `arAnalyzer.js`, `pitchBiometrics.js`, `pitchAnchorDetector.js`, `pitchOverlayRenderer.js`, `ArAnalyzerModal.js`, and `usePrivateMedia.js`.
 
+The [SDL-UX-002 design archive](design/SDL-UX-002/README.md) governs the role-specific player presentation and records the mobile video issue separately.
+
 ## Owner acceptance evidence
 
 Owner reports that after leaving Chrome for 60 seconds and returning, the same player profile remained visible. Mark **user-verified for this 60-second test only**; this does not establish offline reliability or session persistence across arbitrary browser restarts.

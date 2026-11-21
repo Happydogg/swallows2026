@@ -7,6 +7,8 @@
 
 ## Design reference and non-goals
 
+The five originals and their approval status are recorded in the [SDL-UX-002 design archive](design/SDL-UX-002/README.md).
+
 Owner supplied five images: desktop/tablet coach and player dashboards, SDL-UX-002 approved mobile role-adaptive layout, invite-only login concept and the current mobile private-video cards. These are **visual references**, not evidence that the pictured statistics/videos are real or that the entire pictured workflow is implemented. Do not inject their invented numbers or use their child photographs as actual athlete profile data.
 
 **Scope:** Stage-only frontend/data changes, keep original Vue global/no-bundler runtime, existing exports and authorization. No production deployment, DNS, production database, production R2, domain or secret changes.
