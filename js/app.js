@@ -139,12 +139,24 @@ createApp({
       if (requested !== 'coach' && requested !== 'family') return;
       if (requested === 'coach' && !auth.isTeamCoach.value) return;
       if (requested === 'family' && !auth.isVerifiedGuardian.value) return;
+      clearProfileHistory();
       requestedWorkspace.value = requested;
       activeTab.value = 'home';
       currentView.value = 'overview';
     };
     const coach = useCoachMode(t);
     const analytics = useAnalytics({ players, sessions:analyticsSessions, selectedPlayer, currentView, searchQuery, t });
+    const clearProfileHistory = () => {
+      historyRevision++;
+      profileHistoryLoading.value = false;
+      profileHistoryError.value = '';
+      sessions.value = [];
+      guardianProfileId.value = '';
+      guardianProfileSessions.value = [];
+      clearPlayerChart();
+      analytics.hasChartData.value = false;
+      return historyRevision;
+    };
     const playerFeature = usePlayers({
       players, sessions, drillVideos, selectedPlayer, currentView,
       expandedSessionIds: analytics.expandedSessionIds,
@@ -169,7 +181,13 @@ createApp({
       players,
       coachRoster,
       sessions,
-      onProfile: (player,permitted=[])=>{guardianProfileId.value=player.id;guardianProfileSessions.value=permitted;playerFeature.selectPlayer({...player,photo_url:avatarForPlayer(player)});},
+      beginProfile: clearProfileHistory,
+      onProfile: (player, permitted, navigation) => {
+        if (navigation !== historyRevision) return;
+        guardianProfileId.value = player.id;
+        guardianProfileSessions.value = permitted;
+        playerFeature.selectPlayer({...player,photo_url:avatarForPlayer(player)});
+      },
       onFamilyStatistics: (id,rows,denied=false)=>{if(guardianProfileId.value===id){guardianProfileSessions.value=rows;if(denied){guardianProfileId.value='';selectedPlayer.value=null;currentView.value='overview';clearPlayerChart();analytics.hasChartData.value=false;}else analytics.renderPlayerChart();}},
       onBulkShare:(row,mode)=>pilotWorkspace.share(row,mode,{},false),
       onPrivateVideos: playerId => { void privateMedia.selectMediaPlayer(playerId); }
@@ -254,15 +272,20 @@ createApp({
     const loadAuthorizedHistory = async (id,role) => {
       const version=++historyRevision, identity=auth.captureIdentity();
       if(!auth.isCurrentIdentity(identity)||selectedPlayer.value?.id!==id)return;
-      profileHistoryError.value='';profileHistoryLoading.value=true;
-      sessions.value=[];guardianProfileId.value='';guardianProfileSessions.value=[];
+      const isCurrent = () => version === historyRevision && auth.isCurrentIdentity(identity)
+        && currentView.value === 'player' && selectedPlayer.value?.id === id
+        && (role === 'coach'
+          ? auth.isTeamCoach.value && coachRoster.value.some(player => player.id === id)
+          : familyPlayers.value.some(player => player.id === id));
+      profileHistoryLoading.value = true;
       try{
         const result=await fetchAuthorizedPlayerHistory(id,role);
-        if(version===historyRevision && auth.isCurrentIdentity(identity) && selectedPlayer.value?.id===id){
-          sessions.value=result;Vue.nextTick(()=>analytics.renderPlayerChart());
+        if(isCurrent()){
+          sessions.value=result;
+          Vue.nextTick(()=>{if(isCurrent())analytics.renderPlayerChart();});
         }
       }catch(error){
-        if(version===historyRevision && auth.isCurrentIdentity(identity) && selectedPlayer.value?.id===id){
+        if(isCurrent()){
           profileHistoryError.value=error.message||'Statistics unavailable.';
           sessions.value=[];
         }
@@ -287,12 +310,12 @@ createApp({
       // The authenticated service supplies private, short-lived signed photos.
       // The coach roster RPC remains narrowly scoped, with no raw profile read.
       const projected={...authorized,photo_url:avatarForPlayer(authorized)};
-      sessions.value=[]; drillVideos.value=[];
-      guardianProfileId.value=''; guardianProfileSessions.value=[];
+      clearProfileHistory();
+      drillVideos.value=[];
       playerFeature.selectPlayer(projected);
       activeTab.value='team';
       if (mediaOriginAllowed.value) void privateMedia.selectMediaPlayer(authorized.id);
-      void loadAuthorizedHistory(authorized.id,'coach');
+      return loadAuthorizedHistory(authorized.id,'coach');
     };
     // A parent's profile opens through the existing verified-guardian service,
     // not from a card's photo URL or a client-side permission toggle.
@@ -300,10 +323,11 @@ createApp({
       if (!auth.isVerifiedGuardian.value || workspaceMode.value !== 'family'
         || auth.authError.value || !familyPlayers.value.some(p => p.id === player?.id)) return;
       const selected=familyPlayers.value.find(p=>p.id===player.id);
+      clearProfileHistory();
       playerFeature.selectPlayer({...selected,photo_url:avatarForPlayer(selected)});
       activeTab.value='team';
       if(mediaOriginAllowed.value)void privateMedia.selectMediaPlayer(selected.id);
-      void loadAuthorizedHistory(selected.id,'guardian');
+      return loadAuthorizedHistory(selected.id,'guardian');
     };
     // Admin-only accounts can navigate from their server-filtered player
     // directory to the same profile, without reading sessions or private video.
@@ -311,15 +335,14 @@ createApp({
       if (workspaceMode.value !== 'admin' || !auth.isOrgAdmin.value || auth.authError.value) return;
       const managed=avatarManager.rows.value.find(p => p.id === player?.id);
       if (!managed || !avatarManager.canEdit(managed.id)) return;
-      sessions.value=[];drillVideos.value=[];
-      guardianProfileId.value='';guardianProfileSessions.value=[];
+      clearProfileHistory();
+      drillVideos.value=[];
       playerFeature.selectPlayer({...managed,photo_url:avatarForPlayer(managed)});
       activeTab.value='team';
     };
     const leavePlayerProfile = () => {
       currentView.value='overview';
-      historyRevision++;profileHistoryLoading.value=false;profileHistoryError.value='';
-      sessions.value=[];
+      clearProfileHistory();
       privateMedia.resetMedia();
       if (workspaceMode.value === 'admin') activeTab.value='me';
     };
@@ -337,9 +360,8 @@ createApp({
       drillVideos.value = [];
       coachRoster.value = [];
       coachRosterError.value = '';
-      guardianProfileId.value='';guardianProfileSessions.value=[];
       selectedPlayer.value = null;
-      historyRevision++;profileHistoryLoading.value=false;profileHistoryError.value='';
+      clearProfileHistory();
       currentView.value = 'overview';
       loading.value = false;
       coachRosterLoading.value = false;
@@ -351,9 +373,7 @@ createApp({
       submissionWorkspace.reset();
       enrollmentAdmin.reset();
       pilotWorkspace.reset();
-      clearPlayerChart();
       analytics.expandedSessionIds.clear();
-      analytics.hasChartData.value = false;
       playerFeature.showAddPlayerModal.value = false;
       playerFeature.showEditPlayerModal.value = false;
       playerFeature.editingPlayer.value = null;
@@ -371,6 +391,7 @@ createApp({
     };
     const navigateTab = tab => {
       if (!['home', 'team', 'stats', 'videos', 'me'].includes(tab)) return;
+      clearProfileHistory();
       activeTab.value = tab;
       currentView.value = 'overview';
       if (tab === 'team' && workspaceMode.value === 'family') submissionWorkspace.changeTab('players');
@@ -401,13 +422,10 @@ createApp({
       ...auth, signInAndLoad, signOutAndClear,
       ...coach, ...analytics, ...playerFeature, ...sessionFeature, ...videoFeature, ...csvFeature,
       ...arAnalyzer,
-      selectPlayer: player=>{
-        guardianProfileId.value='';guardianProfileSessions.value=[];
-        playerFeature.selectPlayer(player);
-        const allowedCoach=auth.isTeamCoach.value && coachRoster.value.some(p=>p.id===player?.id);
-        const allowedGuardian=auth.isVerifiedGuardian.value && familyPlayers.value.some(p=>p.id===player?.id);
-        if(allowedCoach)void loadAuthorizedHistory(player.id,'coach');
-        else if(allowedGuardian)void loadAuthorizedHistory(player.id,'guardian');
+      selectPlayer: player => {
+        if (workspaceMode.value === 'coach') return selectCoachRosterPlayer(player);
+        if (workspaceMode.value === 'family') return openFamilyPlayerProfile(player);
+        if (workspaceMode.value === 'admin') return openManagedPlayerProfile(player);
       },
       // Passing the original refs (not Vue-unwrapped copies) maintains DOM/video ownership.
       loginController: markRaw(auth),

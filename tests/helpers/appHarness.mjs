@@ -61,7 +61,11 @@ export async function harness(t, initialUser = null, options = {}) {
       };
       return q;
     },
-    rpc(name) { h.calls.push({ rpc: name }); return Promise.resolve(result('roster', ok(h.rows.roster ?? []))); }
+    rpc(name, args) {
+      h.calls.push({ rpc: name, args, userId: h.user?.id });
+      const key = name === 'sdl_004_coach_roster' ? 'roster' : name;
+      return Promise.resolve(result(key, ok(h.rows[key] ?? [])));
+    }
   };
   h.emit = (event, identity) => {
     h.user = identity;

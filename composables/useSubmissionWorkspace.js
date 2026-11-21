@@ -2,7 +2,7 @@ import { createSubmissionService,CLUB_CONSENT_POLICY_VERSION,STATISTICS_CONSENT_
 import { validateMediaFile } from '../js/privateMediaService.js';
 import { groupMyPlayers,coachTeams,projectClubhouseRoster,projectClubhouseLeaderboard } from '../utils/dashboardUtils.js';
 const {ref,computed}=Vue;
-export function useSubmissionWorkspace({auth,players,coachRoster,sessions=ref([]),onBulkShare=async()=>null,onProfile=()=>{},onPrivateVideos=()=>{},onFamilyStatistics=()=>{},service=createSubmissionService({auth}),
+export function useSubmissionWorkspace({auth,players,coachRoster,sessions=ref([]),onBulkShare=async()=>null,onProfile=()=>{},beginProfile=()=>{},onPrivateVideos=()=>{},onFamilyStatistics=()=>{},service=createSubmissionService({auth}),
   urls=URL,newKey=()=>crypto.randomUUID(),pollMs=5000,timeoutMs=65000}) {
   const tab=ref('players'),clubhouseSection=ref('roster'),workspace=ref([]),playerId=ref(''),teamId=ref('');
   const clubEnrollments=ref([]),consentAccepted=ref({}),subjectConfirmed=ref({});
@@ -271,11 +271,11 @@ export function useSubmissionWorkspace({auth,players,coachRoster,sessions=ref([]
   function playbackError(){clearPlayback();error.value='Video playback failed. Refresh and try again.';}
   async function showProfile(id){
     const find=()=>players.value.find(p=>p.id===id&&auth.guardianLinks.value.some(g=>g.athlete_id===p.athlete_id&&g.status==='verified'));
-    if(!find())return;const version=epoch,identity=auth.captureIdentity();
+    if(!find())return;const version=epoch,identity=auth.captureIdentity(),navigation=beginProfile();
     if(service.hasParentStatistics?.())await refreshFamilyStatistics(id);
     const p=find();if(!p||version!==epoch||!auth.isCurrentIdentity(identity))return;
     const safe={id:p.id,athlete_id:p.athlete_id,preferred_name:p.preferred_name,jersey:p.jersey,position:p.position,throws:p.throws,bats:p.bats};
-    onProfile(safe,familyStatisticsReady.value[id]?familyStatistics.value[id]:[]);
+    onProfile(safe,familyStatisticsReady.value[id]?familyStatistics.value[id]:[],navigation);
   }
   function openPrivateVideos(id){const p=players.value.find(p=>p.id===id&&auth.guardianLinks.value.some(g=>g.athlete_id===p.athlete_id&&g.status==='verified'));if(p)onPrivateVideos(p.id);}
   function changeTab(value){invalidate();clearClubhouseData();error.value='';notice.value='';notes.value={};consentAccepted.value={};subjectConfirmed.value={};tab.value=value;clubEnrollments.value=[];statisticsEnrollments.value=[];statisticsChoices.value={};items.value=[];queue.value=[];shared.value=[];playerId.value='';teamId.value='';clearFile();}
