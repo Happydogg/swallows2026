@@ -17,6 +17,8 @@
 
 The [SDL-UX-002 design archive](docs/design/SDL-UX-002/README.md) contains the governing approved blueprint and the four supporting, concept and bug references.
 
+The [overnight release record](docs/SDL-000-CODEX-OVERNIGHT-RESULT-20261121.md) identifies the deployed application, Pages rollback IDs and remaining signed-in acceptance work.
+
 ## Current environments
 
 - Original GitHub `main`: **production-source baseline; do not equate with currently deployed production without verification**.
