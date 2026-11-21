@@ -6,7 +6,7 @@
 
 | Milestone | Scope | Current primary records |
 |---|---|---|
-| SDL-000 | Coordination, inventory, status, decisions | `SDL_ROADMAP_STATUS.md`, `SDL_DECISION_REGISTER.md`, `docs/SDL-000-20261121-STAGING-COMPLETION-SPRINT.md` |
+| SDL-000 | Coordination, inventory, status, decisions | `SDL_ROADMAP_STATUS.md`, `SDL_DECISION_REGISTER.md`, `docs/SDL-000-20261121-STAGING-COMPLETION-SPRINT.md`, `docs/SDL-000-CODEX-OVERNIGHT-RESULT-20261121.md` |
 | SDL-001/002 | Original team, player, stats workflows | `docs/SDL-001-CHANGE-RECORD.md`, `docs/SDL-002-CHANGE-RECORD.md` |
 | SDL-003 | Frontend modular architecture and build reliability | `SDL-003-README.md`, `docs/SDL-003-CHANGE-RECORD.md` |
 | SDL-004 | Auth, memberships, private media, submissions, family, Clubhouse and pilot gates | `docs/SDL-004-FINAL-PILOT.md`, `docs/SDL-004-STAGING-RELEASE.md`, `docs/SDL-004-SESSION-UX-001-CONSOLE-AUDIT.md` |

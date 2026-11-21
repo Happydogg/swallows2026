@@ -17,6 +17,8 @@
 
 ## Recent source and deployment evidence
 
+- SDL-004 dual-role history regression repaired in source commit `6f1ebe66a99ca5ec0895e21a2851482c668160ba`. Full local suite passed 405/405. Both Pages review URLs still serve `0a3ec0881eb2be93967fdef271d4d6d3a18a8336`. See `docs/SDL-000-CODEX-OVERNIGHT-RESULT-20261121.md` for browser evidence and signed-in acceptance blockers.
+
 - `docs/SDL-000-20261121-STAGING-COMPLETION-SPRINT.md`: detailed mutation, tests and rollback.
 - GitHub code checkpoint `05fc32a67079973b435591a994396e68e5ec408a`.
 - `sdl-ux-live`: 129/129 focused tests and 1/1 Vue renderer test; Cloudflare deploy succeeded.
