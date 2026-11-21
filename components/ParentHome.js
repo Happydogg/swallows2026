@@ -1,5 +1,5 @@
 // SDL-UX-002: Personal-first family home. Scoped guardian players only.
-// Deliberately excludes private identity, contact, photo and unverified metrics.
+// Player cards use the authorized projection. No estimated values are shown.
 import { PlayerHeroCard } from './PlayerHeroCard.js';
 
 export const ParentHome = {
@@ -13,55 +13,34 @@ export const ParentHome = {
   emits: ['navigate', 'edit-photo', 'open-video', 'open-profile'],
   template: `
   <section class="space-y-5" aria-label="Parent home">
-    <div class="relative overflow-hidden rounded-3xl border border-blue-400/25 bg-gradient-to-br from-blue-900 via-slate-900 to-slate-950 p-5 sm:p-7">
-      <div class="pointer-events-none absolute -right-8 -top-14 h-52 w-52 rounded-full bg-sky-400/20 blur-3xl" aria-hidden="true"></div>
-      <div class="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p class="text-xs font-bold uppercase tracking-widest text-cyan-300">My Baseball Family</p>
-          <h1 class="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Their story starts here.</h1>
-          <p class="mt-3 max-w-lg text-sm leading-relaxed text-slate-300">A home for every practice, milestone and memory. Only the players linked to your verified family account appear here.</p>
-        </div>
-        <button type="button" @click="$emit('navigate','team')" class="self-start rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold hover:bg-blue-500">My players</button>
-      </div>
-    </div>
-    <div class="flex items-center justify-between gap-3">
-      <div><h2 class="text-lg font-bold">My players</h2><p class="text-xs text-slate-400">Your linked athletes</p></div>
-      <span class="rounded-full border border-emerald-400/30 bg-emerald-950/40 px-3 py-1 text-xs font-semibold text-emerald-300">Verified family access</span>
-    </div>
+    <header class="flex flex-wrap items-center justify-between gap-3">
+      <h1 class="text-2xl font-black tracking-tight text-white sm:text-3xl">My players</h1>
+      <button v-if="players.length" type="button" @click="$emit('navigate','team')" class="rounded-xl border border-sky-500/40 bg-blue-950 px-4 py-2.5 text-sm font-semibold text-sky-100 hover:bg-blue-900">Family team</button>
+    </header>
     <p v-if="loading" class="rounded-2xl border border-slate-700 bg-slate-800 p-5 text-sm text-slate-400" role="status">Loading authorized family profiles…</p>
     <div v-else-if="!players.length" class="rounded-2xl border border-dashed border-slate-600 bg-slate-900 p-7">
       <h3 class="text-lg font-bold">Your player will appear here</h3>
       <p class="mt-2 max-w-lg text-sm text-slate-400">Your club must verify the guardian link before any player details can be displayed. Ask your coach or club administrator about your invitation.</p>
       <button type="button" @click="$emit('navigate','me')" class="mt-4 rounded-xl bg-blue-700 px-4 py-3 text-sm font-semibold">Family and account details</button>
     </div>
-    <div v-else class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <div v-else class="grid grid-cols-1 gap-4 xl:grid-cols-2">
       <article v-for="player in players" :key="player.id" class="overflow-hidden rounded-2xl border border-blue-400/25 bg-slate-900 shadow-xl">
         <player-hero-card :player="player" variant="compact"></player-hero-card>
-        <div class="p-5">
-          <p class="text-sm font-semibold">Growth and development</p>
-          <p class="mt-1 text-xs leading-relaxed text-slate-400">Verified measurements and progress will appear in the family workspace when available. No estimated values are shown.</p>
-          <div class="mt-4 flex flex-col gap-2">
+        <div class="p-4">
+          <div class="grid gap-2 sm:grid-cols-2">
             <button type="button" @click="$emit('open-profile',player)"
               :aria-label="'Open '+(player.preferred_name || 'player')+' profile'"
-              class="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white hover:bg-blue-500">View player profile</button>
+              class="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white hover:bg-blue-500">Profile and growth</button>
             <button type="button" @click="$emit('open-video',player)"
               :aria-label="'Open private videos for '+(player.preferred_name || 'this player')"
-              class="w-full rounded-xl border border-sky-500/40 bg-blue-950 px-4 py-3 font-bold text-sky-200 hover:bg-blue-900">▶ Watch player videos</button>
+              class="w-full rounded-xl border border-sky-500/40 bg-blue-950 px-4 py-3 font-bold text-sky-200 hover:bg-blue-900">Player videos</button>
           </div>
         </div>
       </article>
     </div>
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <button type="button" @click="$emit('navigate','stats')" class="rounded-2xl border border-slate-700 bg-slate-800/70 p-5 text-left hover:border-blue-400/50">
-        <span class="text-xl" aria-hidden="true">📈</span><h3 class="mt-3 text-base font-bold">Progress and stats</h3>
-        <p class="mt-2 text-sm text-slate-400">View available, family-authorized performance and historical records.</p>
-        <span class="mt-3 inline-block text-sm font-semibold text-cyan-300">Explore progress ›</span>
-      </button>
-      <button type="button" @click="$emit('navigate','videos')" class="rounded-2xl border border-slate-700 bg-slate-800/70 p-5 text-left hover:border-blue-400/50">
-        <span class="text-xl" aria-hidden="true">▶</span><h3 class="mt-3 text-base font-bold">Practice videos</h3>
-        <p class="mt-2 text-sm text-slate-400">Revisit clips you have permission to view and upload private practice video.</p>
-        <span class="mt-3 inline-block text-sm font-semibold text-cyan-300">Open videos ›</span>
-      </button>
+    <div v-if="players.length" class="grid grid-cols-2 gap-3">
+      <button type="button" @click="$emit('navigate','stats')" class="rounded-2xl border border-slate-700 bg-slate-800/70 p-4 text-left text-sm font-semibold hover:border-blue-400/50">Growth and stats</button>
+      <button type="button" @click="$emit('navigate','videos')" class="rounded-2xl border border-slate-700 bg-slate-800/70 p-4 text-left text-sm font-semibold hover:border-blue-400/50">Practice videos</button>
     </div>
   </section>
   `

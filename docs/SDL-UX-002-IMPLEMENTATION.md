@@ -50,3 +50,9 @@ Use the [approved SDL-UX-002 design archive](design/SDL-UX-002/README.md) for Co
 Review browser behavior and fix runtime defects. Then develop the approved player Hero Card/profile presentation and consolidated video/stat navigation. Maintain backward-compatible exports and access rules.
 
 **Rollback:** revert this development branch or its component commits. Neither `sdl-staging` nor `main` has been changed.
+
+## Approved direction follow-up
+
+Coach Direction 3 now starts with a compact dashboard title, verified roster counts and direct access to the full roster, stats and private video. Parent/Player Direction 2 starts with linked athlete cards and direct access to each athlete’s profile, growth and videos. The homes remain wired to the existing authorized profile and media handlers.
+
+Local Chromium checks rendered both homes at 360, 390, 768 and 1280 CSS pixels using synthetic profiles. They checked profile and video actions and horizontal overflow. The family empty state was checked separately. Signed-in staging acceptance remains pending.

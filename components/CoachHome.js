@@ -1,5 +1,5 @@
 // SDL-UX-002: Coach-first, read-only summary of a server-scoped roster.
-// No historical statistics are inferred from roster rows.
+// This dashboard does not invent team averages from roster rows.
 export const CoachHome = {
   name: 'CoachHome',
   props: {
@@ -22,19 +22,12 @@ export const CoachHome = {
   },
   template: `
   <section class="space-y-5" aria-label="Coach home">
-    <div class="relative overflow-hidden rounded-3xl border border-blue-400/25 bg-gradient-to-br from-blue-950 via-slate-900 to-slate-950 p-5 sm:p-7">
-      <div class="pointer-events-none absolute -right-12 -top-16 h-52 w-52 rounded-full bg-blue-500/20 blur-3xl" aria-hidden="true"></div>
-      <div class="relative flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <p class="text-xs font-bold uppercase tracking-widest text-cyan-300">Coach Command Center</p>
-          <h1 class="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Build the next play.</h1>
-          <p class="mt-2 max-w-xl text-sm text-slate-300">Your verified team roster and coaching workflows, together in one place.</p>
-        </div>
-        <button type="button" @click="$emit('navigate','team')" class="self-start rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-500">Open team roster</button>
-      </div>
-    </div>
+    <header class="flex flex-wrap items-center justify-between gap-3">
+      <h1 class="text-2xl font-black tracking-tight text-white sm:text-3xl">Coach Dashboard</h1>
+      <button type="button" @click="$emit('navigate','team')" class="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-500">Open team roster</button>
+    </header>
     <p v-if="error" class="rounded-xl border border-rose-700/60 bg-rose-950/30 p-3 text-sm text-rose-200" role="alert">{{ error }}</p>
-    <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div class="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
       <div class="rounded-2xl border border-slate-700 bg-slate-800/70 p-4">
         <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Authorized teams</p>
         <p class="mt-2 text-3xl font-black text-white">{{ loading ? '…' : teamCount }}</p>
@@ -44,8 +37,8 @@ export const CoachHome = {
         <p class="mt-2 text-3xl font-black text-cyan-300">{{ loading ? '…' : roster.length }}</p>
       </div>
       <div class="rounded-2xl border border-slate-700 bg-slate-800/70 p-4">
-        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Performance reviews</p>
-        <button type="button" @click="$emit('navigate','stats')" class="mt-2 text-left text-sm font-bold text-cyan-300 underline underline-offset-4">Open reviews</button>
+        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Player performance</p>
+        <button type="button" @click="$emit('navigate','stats')" class="mt-2 text-left text-sm font-bold text-cyan-300 underline underline-offset-4">Open stats</button>
       </div>
       <div class="rounded-2xl border border-slate-700 bg-slate-800/70 p-4">
         <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Private media</p>
@@ -80,20 +73,18 @@ export const CoachHome = {
             </div>
           </li>
         </ul>
-        <p class="mt-4 text-xs text-slate-500">Only fields returned by the authorized coach-roster service are shown.</p>
       </div>
       <div class="space-y-3 rounded-2xl border border-slate-700 bg-slate-900/90 p-5 lg:col-span-2">
         <h2 class="text-lg font-bold">Quick access</h2>
         <button type="button" @click="$emit('navigate','team')" class="flex w-full items-center justify-between rounded-xl bg-blue-700/25 p-4 text-left text-sm font-semibold hover:bg-blue-700/40">
-          <span>⚾ Team and roster</span><span aria-hidden="true">›</span>
+          <span>Team and roster</span><span aria-hidden="true">›</span>
         </button>
         <button type="button" @click="$emit('navigate','stats')" class="flex w-full items-center justify-between rounded-xl bg-slate-800 p-4 text-left text-sm font-semibold hover:bg-slate-700">
-          <span>📊 Performance and approvals</span><span aria-hidden="true">›</span>
+          <span>Performance and approvals</span><span aria-hidden="true">›</span>
         </button>
         <button type="button" @click="$emit('navigate','videos')" class="flex w-full items-center justify-between rounded-xl bg-slate-800 p-4 text-left text-sm font-semibold hover:bg-slate-700">
-          <span>▶ Private video library</span><span aria-hidden="true">›</span>
+          <span>Private video library</span><span aria-hidden="true">›</span>
         </button>
-        <p class="text-xs leading-relaxed text-slate-400">Practice and official statistics remain in their existing authorized workflows. This dashboard does not invent team averages.</p>
       </div>
     </div>
   </section>
