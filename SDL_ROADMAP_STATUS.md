@@ -15,7 +15,11 @@
 | SDL-006 | Independent science QA and evidence-gated AI Coach | Research/integration requirements organized | Claim-level independent QA and validated coaching requirements |
 | SDL-GOV | Documentation, rollback, release gating, feature parity | New staging sprint record and decision mirror established | Verify backup restore, master directory reconciliation and production release approval |
 
-## Recent source and deployment evidence
+## Current staging release
+
+Both review sites deployed `950e393` from PR #5. The 406-test suite and public browser journeys passed. Signed-in coach, family, admin and R2 acceptance and isolated backup recovery remain pending. [Release results](docs/SDL-000-CODEX-OVERNIGHT-RESULT-20261121.md)
+
+## Earlier source and deployment evidence
 
 - SDL-004 dual-role history regression repaired in source commit `6f1ebe66a99ca5ec0895e21a2851482c668160ba`. Full local suite passed 405/405. Both Pages review URLs still serve `0a3ec0881eb2be93967fdef271d4d6d3a18a8336`. See `docs/SDL-000-CODEX-OVERNIGHT-RESULT-20261121.md` for browser evidence and signed-in acceptance blockers.
 

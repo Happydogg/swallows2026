@@ -14,5 +14,6 @@
 | SDL-D-20261121-08 | Keep scientific QA independent: no unsupported injury predictions, simulated velocities, or fixed thresholds promoted into AI Coach. | Approved architecture requirement, not implementation | SDL-006 research/integration workstreams |
 | SDL-D-20261121-09 | Present the **same private, permission-enforced video room inside Player Profile** and retain Videos tab; never present the disabled legacy empty gallery in place of actual R2 clips. | Implemented, automated-tested, deployed to UX Live | `PlayerProfile.js` named slot and `index.html`; real coach/parent UAT pending |
 | SDL-D-20261121-10 | Select player history through the active role’s approved scope and invalidate pending profile results on navigation or identity changes. | Implemented and locally tested | Full suite 405/405. Signed-in staging acceptance pending. |
+| SDL-D-20261121-11 | Release the tested frontend through the staging feature branch. Keep both pilot gates off pending verified recovery and role acceptance. | Staging frontend deployed | PR #5, commit `950e393`, 406 local tests passed. |
 
 **Non-decisions:** No permission to merge `main`, deploy production, auto-delete seeded enrollments, weaken player RLS or publish private media. A successful unit test is not a final owner acceptance test.
