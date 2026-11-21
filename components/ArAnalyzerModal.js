@@ -53,22 +53,22 @@ export const ArAnalyzerModal = {
              class="bg-slate-950/85 hover:bg-slate-900/90 active:scale-95 backdrop-blur-md border border-white/20 hover:border-amber-400/60 shadow-xl rounded-full px-3 py-1.5 flex items-center gap-2.5 cursor-pointer transition-all touch-manipulation">
           <!-- Velocity -->
           <div class="flex items-center gap-1 font-mono">
-            <span class="text-xs text-amber-400">⚡</span>
-            <span class="text-xs sm:text-sm font-black text-white">{{ currentCalculatedSpeed }}</span>
+            <span class="text-xs text-amber-400">Wrist estimate</span>
+            <span class="text-xs sm:text-sm font-black text-white">{{ currentCalculatedSpeed ?? '—' }}</span>
             <span class="text-[9px] sm:text-[10px] text-slate-400">km/h</span>
           </div>
           <span class="text-slate-600 text-xs">|</span>
           <!-- Arm Slot / Attack Angle -->
           <div class="flex items-center gap-1 font-mono">
             <span class="text-xs text-cyan-400">🎯</span>
-            <span class="text-xs sm:text-sm font-bold text-cyan-300">{{ currentTrajectoryAngle }}°</span>
+            <span class="text-xs sm:text-sm font-bold text-cyan-300">{{ currentTrajectoryAngle == null ? '—' : currentTrajectoryAngle+'°' }}</span>
           </div>
           <span class="text-slate-600 text-xs">|</span>
           <!-- Knee Block -->
           <div class="flex items-center gap-1 font-mono">
             <span class="text-xs">🦵</span>
             <span class="text-xs sm:text-sm font-bold" :class="leadKneeAngle >= 140 ? 'text-emerald-400' : 'text-amber-400'">
-              {{ leadKneeAngle }}°
+              {{ leadKneeAngle == null ? '—' : leadKneeAngle+'°' }}
             </span>
           </div>
           <span class="text-[10px] text-slate-400 pl-0.5">
@@ -80,7 +80,7 @@ export const ArAnalyzerModal = {
         <div v-if="isHudExpanded" 
              class="bg-slate-950/95 backdrop-blur-xl border border-white/20 rounded-2xl p-3 shadow-2xl w-60 sm:w-64 text-xs font-mono space-y-2 animate-in fade-in zoom-in-95 duration-150">
           <div class="flex items-center justify-between pb-1.5 border-b border-slate-800 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-            <span>Diagnostics</span>
+            <span>Experimental 2D pose estimates</span>
             <span class="text-amber-400">Frame {{ currentFrameIndex }}</span>
           </div>
 

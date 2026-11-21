@@ -2,6 +2,7 @@
 // No invented norms, threshold assessments, or direct Supabase calls.
 export const AuthorizedStatsBoard = {
   name:'AuthorizedStatsBoard',
+  emits:['open-profile'],
   props:{controller:{type:Object,required:true}},
   setup(props){
     const metrics=Object.freeze([
@@ -32,7 +33,8 @@ export const AuthorizedStatsBoard = {
         (65-((Number(r[m.key])-lo)/range)*53).toFixed(1)
       ].join(',')).join(' ');
     };
-    return {...props.controller,metrics,first,last,value,delta,points};
+    const recordedMetrics = Vue.computed(() => metrics.filter(metric => last(props.controller.sessions.value, metric)));
+    return {...props.controller,recordedMetrics,first,last,value,delta,points};
   },
   template:`
     <section class="space-y-4 rounded-3xl border border-cyan-400/20 bg-slate-900/90 p-4 sm:p-6"
@@ -63,6 +65,7 @@ export const AuthorizedStatsBoard = {
           <p class="font-bold text-white">{{ selected.preferred_name }}</p>
           <p class="text-xs text-slate-400">#{{ selected.jersey || '–' }} · {{ sessions.length }} recorded session{{ sessions.length===1?'':'s' }}</p>
         </div>
+        <button type="button" @click="$emit('open-profile',selected)" class="ml-auto rounded-lg bg-blue-700 px-3 py-2 text-sm text-white">View profile</button>
       </div>
       <p v-if="busy" class="rounded-xl bg-slate-950 p-4 text-sm text-slate-300" role="status">
         Checking access and loading permitted measurements…
@@ -73,7 +76,7 @@ export const AuthorizedStatsBoard = {
       </p>
       <template v-if="!busy && !error && sessions.length">
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <article v-for="m in metrics" :key="m.key" class="rounded-2xl border border-slate-700 bg-slate-950/85 p-4">
+          <article v-for="m in recordedMetrics" :key="m.key" class="rounded-2xl border border-slate-700 bg-slate-950/85 p-4">
             <p class="text-xs font-bold uppercase tracking-wide text-slate-300">{{ m.name }}</p>
             <p class="mt-2 text-xl font-black text-white">{{ value(last(sessions,m),m) }}</p>
             <div v-if="last(sessions,m)" class="mt-1 flex justify-between gap-2 text-xs text-slate-400">
@@ -92,13 +95,10 @@ export const AuthorizedStatsBoard = {
           <div class="mt-3 overflow-x-auto">
             <table class="w-full min-w-[610px] text-left text-xs">
               <thead><tr class="border-b border-slate-600 text-slate-400">
-                <th scope="col" class="p-2">Date</th><th scope="col" class="p-2">Height</th><th scope="col" class="p-2">Weight</th>
-                <th scope="col" class="p-2">Throw km/h</th><th scope="col" class="p-2">Exit km/h</th><th scope="col" class="p-2">Sprint s</th>
+                <th scope="col" class="p-2">Date</th><th v-for="m in recordedMetrics" :key="m.key" scope="col" class="p-2">{{ m.name }} ({{ m.unit }})</th>
               </tr></thead>
               <tbody><tr v-for="row in sessions" :key="row.id" class="border-b border-slate-800 text-slate-200">
-                <td class="p-2">{{ row.session_date }}</td><td class="p-2">{{ row.height_cm ?? '–' }}</td>
-                <td class="p-2">{{ row.weight_kg ?? '–' }}</td><td class="p-2">{{ row.throwing_velo ?? '–' }}</td>
-                <td class="p-2">{{ row.exit_velo ?? '–' }}</td><td class="p-2">{{ row.sprint_time ?? '–' }}</td>
+                <td class="p-2">{{ row.session_date }}</td><td v-for="m in recordedMetrics" :key="m.key" class="p-2">{{ row[m.key] ?? '–' }}</td>
               </tr></tbody>
             </table>
           </div>

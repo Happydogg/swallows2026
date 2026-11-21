@@ -173,7 +173,10 @@ test('an older identity request failure cannot replace current errors', async t 
 test('logout releases video/blob/canvas/tracker and resets analyzer and form state', async t => {
   const h = await harness(t, user('parent')); const a = h.app;
   let paused = 0, detached = 0, loaded = 0, erased = 0;
-  a.openLocalAnalyzer({ type: 'video/mp4', name: 'synthetic.mp4' });
+  const clip = { type: 'video/mp4', name: 'synthetic.mp4' };
+  assert.throws(() => a.openLocalAnalyzer(clip), /movement.*FPS/);
+  a.openLocalAnalyzer(clip, {category:'pitching', playbackFps:120});
+  assert.equal(a.currentCalculatedSpeed.value, null);
   a.analyzerVideoRef.value = { pause() { paused++; }, removeAttribute(name) { assert.equal(name, 'src'); detached++; }, load() { loaded++; } };
   a.analyzerCanvasRef.value = { width: 100, height: 100, getContext: () => ({ clearRect() { erased++; } }) };
   a.currentCalculatedSpeed.value = 88; a.isTrackerLocked.value = true; a.videoDuration.value = 5;
@@ -186,7 +189,7 @@ test('logout releases video/blob/canvas/tracker and resets analyzer and form sta
   assert.equal(paused, 1); assert.equal(detached, 1); assert.equal(loaded, 1); assert.equal(erased, 1);
   assert.equal(h.closedTrackers, 1);
   assert.equal(a.analyzerVideoRef.value, null); assert.equal(a.analyzerCanvasRef.value, null);
-  assert.equal(a.currentCalculatedSpeed.value, 19.9); assert.equal(a.videoDuration.value, 0);
+  assert.equal(a.currentCalculatedSpeed.value, null); assert.equal(a.videoDuration.value, 0);
   assert.equal(a.bauerPhases.value.length, 0); assert.equal(a.isTrackerLocked.value, false);
   assert.equal(a.editingPlayer.value, null); assert.equal(a.editingSession.value, null);
   assert.equal(a.newPlayer.value.parent_phone, ''); assert.equal(a.newDrillVideo.value.coach_feedback, '');

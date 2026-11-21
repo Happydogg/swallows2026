@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { harness, deferred, user } from './helpers/appHarness.mjs';
+import { harness, deferred, until, user } from './helpers/appHarness.mjs';
 const PLAYER = '11111111-1111-4111-8111-111111111111';
 const OTHER = '22222222-2222-4222-8222-222222222222';
 const VIDEO = '33333333-3333-4333-8333-333333333333';
@@ -337,4 +337,25 @@ test('private analysis screen asks for recording metadata, never labels every cl
  assert.ok(panel.includes('v-model="analysisFps"'));
  assert.ok(panel.includes('automatic motion checkpoints remain experimental'));
  assert.ok(!panel.includes('default batting / 60 FPS'));
+});
+
+test('all visible authorized clips get a turn and a failed preview can be retried', async t => {
+  const items = Array.from({length: 9}, (_, index) => ({...row, id: String(index)}));
+  let fail = true;
+  const {c} = await controllerHarness(t, {list: async () => items}, {
+    thumbnailExtractor: async () => {
+      if (fail) {
+        fail = false;
+        throw Error('temporary decode failure');
+      }
+      return 'data:image/jpeg;base64,QQ==';
+    }
+  });
+  await c.selectMediaPlayer(PLAYER);
+  items.forEach(c.ensureMediaThumbnail);
+  await until(() => c.mediaThumbnails.value['8']);
+  assert.equal(c.mediaThumbnailFailed.value['0'], true);
+  c.retryMediaThumbnail(items[0]);
+  await until(() => c.mediaThumbnails.value['0']);
+  assert.equal(Object.keys(c.mediaThumbnails.value).length, items.length);
 });

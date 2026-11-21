@@ -126,8 +126,8 @@
     <app-shell v-else :active-tab="activeTab" :mode="role" :can-coach="true" :can-family="true"
       account-email="demo@example.invalid" @navigate="activeTab=$event" @mode-change="role=$event;activeTab='home'"
       @sign-out="screen='login'">
-      <coach-home v-if="activeTab==='home' && role==='coach'" :roster="demoRoster" :loading="false" error="" @navigate="activeTab=$event" @open-profile="openPreviewProfile"></coach-home>
-      <parent-home v-else-if="activeTab==='home'" :players="demoPlayers" :loading="false" @navigate="activeTab=$event" @open-profile="openPreviewProfile"></parent-home>
+      <coach-home v-if="activeTab==='home' && role==='coach'" :roster="demoRoster" :loading="false" error="" @navigate="activeTab=$event" @open-profile="openPreviewProfile" @open-video="openPreviewVideos"></coach-home>
+      <parent-home v-else-if="activeTab==='home'" :players="demoPlayers" :loading="false" @navigate="activeTab=$event" @open-profile="openPreviewProfile" @open-video="openPreviewVideos"></parent-home>
       <coach-team-roster v-else-if="activeTab==='team' && role==='coach'"
         :roster="demoRoster" :loading="false" error=""
         @open-profile="openPreviewProfile" @open-review="activeTab='stats'"></coach-team-roster>

@@ -71,6 +71,9 @@ function previewMediaController() {
     mediaPlayers, mediaPlayerId, mediaItems, mediaReadAllowed, mediaUploadAllowed, mediaLoading,
     mediaUploading, mediaPlaybackLoading, mediaProgress, mediaError, mediaNotice,
     mediaFile, mediaPlaybackUrl, mediaPlaybackId,
+    mediaThumbnails: ref({}), mediaThumbnailBusy: ref({}),
+    mediaThumbnailFailed: ref(Object.fromEntries(mediaItems.value.map(item => [item.id, true]))),
+    retryMediaThumbnail: unavailable,
     selectMediaPlayer(id) { if (mediaPlayers.value.some(p=>p.id===id)) {mediaPlayerId.value=id;unavailable();} },
     refreshMedia:unavailable, selectMediaFile:unavailable, uploadPrivateMedia:unavailable,
     playPrivateMedia:unavailable, analyzePrivateMedia:unavailable, reportPlaybackError:unavailable
@@ -104,6 +107,10 @@ createApp({
       previewSelectedPlayer.value=allowed;
       previewMediaControllerState.selectMediaPlayer(allowed.id);
       screen.value='profile';
+    };
+    const openPreviewVideos = player => {
+      previewMediaControllerState.selectMediaPlayer(player.id);
+      activeTab.value = 'videos';
     };
     // Fictional numbers on the explicitly labeled synthetic site.
     const previewFamilyStats = Object.freeze([
@@ -159,7 +166,7 @@ createApp({
     }
     return {
       previewViews, screen, role, activeTab, tabTitle, version, branch,
-      demoPlayers, demoRoster, previewSelectedPlayer, previewEditOpen, openPreviewProfile, loginController, invitationController,
+      demoPlayers, demoRoster, previewSelectedPlayer, previewEditOpen, openPreviewProfile, openPreviewVideos, loginController, invitationController,
       previewMediaControllerState, previewFamilyStats, previewTranslate, demoMeasurements,
       reportOpen, issue, reportText, copyReport, copyNotice, manualReport
     };

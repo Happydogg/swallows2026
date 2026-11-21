@@ -56,3 +56,7 @@ Review browser behavior and fix runtime defects. Then develop the approved playe
 Coach Direction 3 now starts with a compact dashboard title, verified roster counts and direct access to the full roster, stats and private video. Parent/Player Direction 2 starts with linked athlete cards and direct access to each athlete’s profile, growth and videos. The homes remain wired to the existing authorized profile and media handlers.
 
 Local Chromium checks rendered both homes at 360, 390, 768 and 1280 CSS pixels using synthetic profiles. They checked profile and video actions and horizontal overflow. The family empty state was checked separately. Signed-in staging acceptance remains pending.
+
+### Connected staging integration
+
+The team roster supports name and jersey search within its team filter. Stats links the selected athlete back to their scoped profile. The dated history table includes each recorded metric and its unit. Profile video controls stay on the displayed athlete, while the Videos tab retains its player picker. Visible clips queue sequentially and failed previews can be retried individually.

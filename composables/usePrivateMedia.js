@@ -43,10 +43,17 @@ export function usePrivateMedia({ auth, players, coachRoster, analyzer, service 
     if(!mediaReadAllowed.value || !mediaPlayerId.value || !item
       || !mediaItems.value.some(x=>x.id===item.id)
       || mediaThumbnails.value[item.id] || mediaThumbnailFailed.value[item.id]
-      || thumbnailQueued.has(item.id) || thumbnailQueue.length>=6)return;
+      || thumbnailQueued.has(item.id))return;
     thumbnailQueued.add(item.id);
     thumbnailQueue.push({id:item.id,epoch:thumbnailEpoch});
     void runThumbnailQueue();
+  }
+  function retryMediaThumbnail(item) {
+    if (!mediaThumbnailFailed.value[item.id]) return;
+    const remaining = {...mediaThumbnailFailed.value};
+    delete remaining[item.id];
+    mediaThumbnailFailed.value = remaining;
+    ensureMediaThumbnail(item);
   }
   async function runThumbnailQueue(){
     if(thumbnailWorkerRunning)return;
@@ -68,10 +75,10 @@ export function usePrivateMedia({ auth, players, coachRoster, analyzer, service 
         }catch(error){
           if(op.ownsState() && epoch===thumbnailEpoch){
             if(error.status===401||error.status===403)op.failed(error);
-            else if(error.name!=='AbortError')mediaThumbnailFailed.value={...mediaThumbnailFailed.value,[id]:true};
+            else mediaThumbnailFailed.value={...mediaThumbnailFailed.value,[id]:true};
           }
         }finally{
-          thumbnailQueued.delete(id);
+          if (epoch === thumbnailEpoch) thumbnailQueued.delete(id);
           if(op.ownsState()&&epoch===thumbnailEpoch){
             const pending={...mediaThumbnailBusy.value};delete pending[id];mediaThumbnailBusy.value=pending;
           }
@@ -241,7 +248,7 @@ export function usePrivateMedia({ auth, players, coachRoster, analyzer, service 
   return { mediaPlayers, mediaPlayerId, mediaItems, mediaReadAllowed, mediaUploadAllowed, mediaLoading,
     mediaUploading, mediaProgress, mediaError, mediaNotice, mediaFile, mediaPlaybackUrl, mediaPlaybackId,
     mediaPlaybackLoading, analysisCategory, analysisFps, mediaThumbnails, mediaThumbnailBusy, mediaThumbnailFailed,
-    submissionsEnabled, ensureMediaThumbnail,
+    submissionsEnabled, ensureMediaThumbnail, retryMediaThumbnail,
     selectMediaPlayer, refreshMedia, selectMediaFile, uploadPrivateMedia, playPrivateMedia,
     analyzePrivateMedia, reportPlaybackError, resetMedia };
 }

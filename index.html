@@ -117,7 +117,7 @@
         :loading="loading" :enabled="submissionController.enabled" :show-synthetic="false"
         @navigate="navigateTab" @open-player="submissionController.showProfile($event)"></stats-hub>
       <authorized-stats-board v-if="activeTab === 'stats' && currentView === 'overview' && (workspaceMode === 'coach' || workspaceMode === 'family')"
-        :controller="statsBoardController"></authorized-stats-board>
+        :controller="statsBoardController" @open-profile="selectPlayer"></authorized-stats-board>
 
       <staging-data-browser v-if="activeTab === 'team' && currentView === 'overview' && workspaceMode === 'family'"
         :players="visibleStagingPlayers" :mode="workspaceMode" :loading="loading || (workspaceMode === 'coach' && coachRosterLoading)"
@@ -214,7 +214,7 @@
       @open-submissions="submissionController.changeTab('submissions'); submissionController.selectPlayer($event)" @back="leavePlayerProfile">
       <template #private-media>
         <private-media-panel v-if="activeTab === 'team' && mediaOriginAllowed && visibleStagingPlayers.some(row => row.id === selectedPlayer.id)"
-          :controller="privateMediaController"></private-media-panel>
+          :controller="privateMediaController" :profile-player-id="selectedPlayer.id"></private-media-panel>
         <p v-else class="rounded-xl border border-slate-700 bg-slate-900 p-4 text-sm text-slate-300">
           Private videos are available only to permitted team coaches or verified family members on the authorized staging site.
         </p>

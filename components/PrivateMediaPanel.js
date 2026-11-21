@@ -2,7 +2,7 @@
 // keeps sole ownership of authorization, playback blobs, uploads and cleanup.
 export const PrivateMediaPanel = {
   name: 'PrivateMediaPanel',
-  props: { controller: { type: Object, required: true } },
+  props: { controller: { type: Object, required: true }, profilePlayerId: { type: String, default: '' } },
   directives: {
     // Demand-driven previews: only visible cards fetch their authorized MP4.
     'media-visible': {
@@ -35,7 +35,7 @@ export const PrivateMediaPanel = {
     </div>
   </div>
 
-  <div class="rounded-2xl border border-slate-700 bg-slate-900/90 p-4 sm:p-5">
+  <div v-if="!profilePlayerId" class="rounded-2xl border border-slate-700 bg-slate-900/90 p-4 sm:p-5">
     <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
       <div>
         <h3 class="text-lg font-bold text-white">Choose a player</h3>
@@ -69,7 +69,7 @@ export const PrivateMediaPanel = {
     Checking access and loading videos…
   </div>
 
-  <template v-if="mediaPlayerId && !mediaLoading">
+  <template v-if="mediaPlayerId && !mediaLoading && (!profilePlayerId || profilePlayerId === mediaPlayerId)">
     <div v-if="mediaReadAllowed" class="space-y-4 rounded-2xl border border-slate-700 bg-slate-900/90 p-4 sm:p-5">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -110,6 +110,7 @@ export const PrivateMediaPanel = {
                 · {{ (item.byte_size / 1048576).toFixed(1) }} MiB
               </p>
             </div>
+            <button v-if="mediaThumbnailFailed[item.id]" type="button" @click="retryMediaThumbnail(item)" class="rounded-lg border border-slate-600 px-3 py-2 text-sm text-white">Retry preview</button>
             <button type="button" @click="playPrivateMedia(item)" :disabled="mediaPlaybackLoading"
               class="min-h-10 w-full rounded-xl bg-blue-600 px-3 py-2 text-sm font-bold text-white hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:opacity-50">
               ▶ Play privately

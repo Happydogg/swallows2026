@@ -67,3 +67,7 @@ SDL-004: future nonblocking, rate-limited auth/role freshness strategy, includin
 - Cloudflare `sdl-ux-live` deployed this source successfully: **119/119 tests**, plus **1/1 Vue renderer test**.
 - Cloudflare `sdl-ux-preview` deployed this source successfully.
 - Actual browser tab background/foreground, Chrome extension isolation and real poor-reception UAT remain outstanding; source and synthetic unit tests alone do not establish field acceptance.
+
+### Overnight integration follow-up
+
+Changing between coach and family workspaces resets private playback and limits the media picker to the current role. Local analysis requires a movement and recording FPS. The analyzer displays an experimental wrist-speed estimate only after pose processing produces one. The private media regression exercises nine visible clips, a decode failure and a successful retry.

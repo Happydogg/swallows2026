@@ -140,6 +140,7 @@ createApp({
       if (requested === 'coach' && !auth.isTeamCoach.value) return;
       if (requested === 'family' && !auth.isVerifiedGuardian.value) return;
       clearProfileHistory();
+      if (requested !== workspaceMode.value) privateMedia.resetMedia();
       requestedWorkspace.value = requested;
       activeTab.value = 'home';
       currentView.value = 'overview';
@@ -175,7 +176,11 @@ createApp({
       getPlayerDisplayName: playerFeature.getPlayerDisplayName
     });
     const arAnalyzer = createArAnalyzerController({ selectedPlayer });
-    const privateMedia = usePrivateMedia({ auth, players, coachRoster, analyzer: arAnalyzer });
+    const privateMedia = usePrivateMedia({
+      auth, analyzer: arAnalyzer,
+      players: computed(() => workspaceMode.value === 'family' ? familyPlayers.value : []),
+      coachRoster: computed(() => workspaceMode.value === 'coach' ? coachRoster.value : [])
+    });
     const submissionWorkspace = useSubmissionWorkspace({
       auth,
       players,
@@ -187,6 +192,7 @@ createApp({
         guardianProfileId.value = player.id;
         guardianProfileSessions.value = permitted;
         playerFeature.selectPlayer({...player,photo_url:avatarForPlayer(player)});
+        if (mediaOriginAllowed.value) void privateMedia.selectMediaPlayer(player.id);
       },
       onFamilyStatistics: (id,rows,denied=false)=>{if(guardianProfileId.value===id){guardianProfileSessions.value=rows;if(denied){guardianProfileId.value='';selectedPlayer.value=null;currentView.value='overview';clearPlayerChart();analytics.hasChartData.value=false;}else analytics.renderPlayerChart();}},
       onBulkShare:(row,mode)=>pilotWorkspace.share(row,mode,{},false),
