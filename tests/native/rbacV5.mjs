@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
-import {mkdtempSync,rmSync} from 'node:fs';
+import {mkdtempSync,readFileSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
@@ -43,6 +43,7 @@ async function competingWrites(){
  const {db,as}=await rbacV5({after(fn){cleanup=fn;}});
  const clients=[];
  try {
+   await db.exec(readFileSync(new URL('../../backend/proposals/sdl004-rbac-v5/postflight.sql',import.meta.url),'utf8'));
    for(const uid of [coach,coach,adminUser,adminUser]){
      const client=new pg.Client({...options(),database:db.name});
      await client.connect();clients.push(client);

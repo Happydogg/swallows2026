@@ -13,6 +13,10 @@ export async function checkRest(db){
  await db.exec(`RESET ROLE;
  CREATE ROLE sdl_fixture_api LOGIN NOINHERIT;
  GRANT authenticated,anon TO sdl_fixture_api;
+ ALTER TABLE public.players ENABLE ROW LEVEL SECURITY;
+ CREATE POLICY fixture_roster ON public.players FOR SELECT TO authenticated USING (true);
+ GRANT SELECT ON public.players TO authenticated;
+ SELECT sdl_rbac_v5.set_platform_grant('${outsider}',true,'synthetic HTTP assurance fixture');
  CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS
  $$ SELECT (nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'sub')::uuid $$;
  CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS
@@ -27,9 +31,9 @@ export async function checkRest(db){
  }});
  const exit=once(api,'exit');
  const base='http://127.0.0.1:'+port;
- function token(user){
+ function token(user,aal){
    const encode=value=>Buffer.from(JSON.stringify(value)).toString('base64url');
-   const claims=encode({alg:'HS256',typ:'JWT'})+'.'+encode({role:'authenticated',sub:user,session_id:user,aal:'aal1',exp:Math.floor(Date.now()/1000)+60});
+   const claims=encode({alg:'HS256',typ:'JWT'})+'.'+encode({role:'authenticated',sub:user,session_id:user,aal,exp:Math.floor(Date.now()/1000)+60});
    return claims+'.'+createHmac('sha256',secret).update(claims).digest('base64url');
  }
  try {
@@ -40,16 +44,25 @@ export async function checkRest(db){
      await delay(50);
    }
    assert.ok(ready,'local PostgREST startup');
-   const read=(path,user)=>fetch(base+path,{headers:{Authorization:'Bearer '+token(user)}});
-   const rpc=user=>fetch(base+'/rpc/sdl_v5_private_statistics',{method:'POST',
-     headers:{Authorization:'Bearer '+token(user),'Content-Type':'application/json'},body:JSON.stringify({p_player:player})});
+   const read=(path,user)=>fetch(base+path,{headers:{Authorization:'Bearer '+token(user,'aal1')}});
+   const rpc=(user,name='private_statistics',aal='aal1',accept='application/json')=>fetch(base+'/rpc/sdl_v5_'+name,{method:'POST',
+     headers:{Authorization:'Bearer '+token(user,aal),'Content-Type':'application/json',Accept:accept},body:JSON.stringify({p_player:player})});
    assert.equal((await rpc(parent)).status,200);
+   assert.equal((await rpc(outsider)).status,200);
+   assert.equal((await rpc(outsider,'private_statistics','aal1','text/csv')).status,403);
+   assert.equal((await rpc(outsider,'export_private_history')).status,403);
+   assert.equal((await rpc(outsider,'export_private_history','aal2','text/csv')).status,200);
+   assert.equal((await read('/players?select=id',parent)).status,200);
+   await db.query("UPDATE public.profiles SET status='suspended' WHERE id=$1",[outsider]);
    assert.equal((await rpc(outsider)).status,403);
    const raw=await read('/sessions?select=id',parent);
    assert.ok([403,404].includes(raw.status),'direct session rows denied');
    assert.ok([403,404].includes((await read('/platform_admin_grants?select=user_id',parent)).status));
    await db.query('UPDATE auth.sessions SET not_after=now() WHERE user_id=$1',[parent]);
    assert.equal((await rpc(parent)).status,403);
+   const roster=await read('/players?select=id',parent);
+   assert.equal(roster.status,200);
+   assert.deepEqual(await roster.json(),[]);
    console.log('PostgREST direct table, RPC scope and session revocation checks passed.');
  }finally{
    if(api.exitCode===null && api.signalCode===null)api.kill();

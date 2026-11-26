@@ -93,7 +93,7 @@ test('download authorization checks subject, recording, retention and current ro
  assert.equal((await owner("SELECT count(*)::int AS n FROM sdl_rbac_v5.events WHERE action='download_authorized'"))[0].n,3);
 });
 
-test('session projections require a fresh standing receipt and respect a second guardian’s objection',async t=>{
+test('session projections require reviewed scope and verified resolution of a guardian objection',async t=>{
  const {as,owner,generation}=await rbacV5(t);
  const enrollment=uuid(51);
  const gen=await generation();
@@ -103,6 +103,10 @@ test('session projections require a fresh standing receipt and respect a second 
  const sessions=`SELECT * FROM public.sdl_v5_clubhouse_sessions('${team}',null,10)`;
  await as(parent,consent('sdl004-baseball-statistics-v1'));
  assert.deepEqual(await as(adminUser,sessions),[]);
+ const [legacy]=await owner("SELECT id FROM public.sdl_statistic_consents WHERE policy_version='sdl004-baseball-statistics-v1'");
+ await owner(`INSERT INTO sdl_rbac_v5.reviewed_consent_expansions(category,receipt_id,enrollment_generation,approved_metrics,review_ref)
+ VALUES('statistics','${legacy.id}','${gen}',ARRAY['exit_velo'],'synthetic reviewed scope')`);
+ assert.equal((await as(adminUser,sessions)).length,1);
  await as(parent,consent('baseball-sessions-v5'));
  const rows=await as(adminUser,sessions);
  assert.equal(rows.length,1);
@@ -113,6 +117,11 @@ test('session projections require a fresh standing receipt and respect a second 
  assert.deepEqual(await as(coach,sessions),[]);
  await assert.rejects(as(coach,sessions.replace(team,otherTeam)),{code:'42501'});
  await as(outsider,consent('baseball-sessions-v5'));
+ assert.deepEqual(await as(coach,sessions),[]);
+ const [objection]=await owner('SELECT id FROM sdl_rbac_v5.guardian_objections');
+ const resolve=`SELECT sdl_rbac_v5.resolve_objection('${objection.id}','independently verified fixture')`;
+ await assert.rejects(as(adminUser,resolve),{code:'42501'});
+ await owner(resolve);
  assert.equal((await as(coach,sessions)).length,1);
 });
 
@@ -132,7 +141,7 @@ test('exports and audit views enforce explicit scope and current enrollment',asy
  await assert.rejects(as(parent,history('club',org)),{code:'42501'});
  await assert.rejects(as(parent,'SELECT * FROM sdl_rbac_v5.events'),{code:'42501'});
  await owner(`UPDATE public.sdl_club_enrollments SET status='ended',ended_at=now() WHERE organization_id='${org}'`);
- assert.deepEqual(await as(adminUser,report('club',org)),[]);
+ assert.equal((await as(adminUser,report('club',org))).length,1);
  assert.equal((await as(parent,report('player',player))).length,1);
 });
 
@@ -227,4 +236,82 @@ test('official corrections keep a distinct reason and private exports retain gro
  assert.equal(rows.filter(row=>row.exit_velo!==null).length,1);
  await assert.rejects(as(outsider,query),{code:'42501'});
  assert.equal((await owner("SELECT count(*)::int AS n FROM sdl_rbac_v5.events WHERE action='official_correction'"))[0].n,1);
+});
+
+test('Platform Admin view, playback, export and sensitive write use separate assurance gates',async t=>{
+ const {as,owner,upload}=await rbacV5(t);
+ await owner(`SELECT sdl_rbac_v5.set_platform_grant('${outsider}',true,'synthetic platform grant')`);
+ await owner(`UPDATE public.sdl_club_enrollments SET recording_storage_authorized=true,recording_permission_ref='fixture' WHERE organization_id='${org}'`);
+ const id=await upload();
+ await as(coach,`SELECT public.sdl_v5_confirm_subject('${id}','${uuid(41)}','verified fixture')`);
+ const view=`SELECT * FROM public.sdl_v5_private_statistics('${player}')`;
+ const exportHistory=view.replace('private_statistics','export_private_history');
+ const exportPlayer=`SELECT * FROM public.sdl_v5_export_statistics('player','${player}')`;
+ const exportPlatform="SELECT * FROM public.sdl_v5_export_statistics('platform',NULL)";
+ const playback=`SELECT public.sdl_v5_authorize_playback('${id}') AS allowed`;
+ const download=playback.replace('playback','download');
+ const write=`SELECT public.sdl_v5_set_staff('${org}','${parent}','club_admin',true,'fixture')`;
+ await owner("SELECT set_config('test.aal','aal1',false)");
+ await as(coach,`SELECT public.sdl_004_pilot_submit_performance('${player}','exit-radar-v1',77,CURRENT_DATE,'fixture','${uuid(894)}',true)`);
+ assert.equal(Number((await as(outsider,view))[0].exit_velo),77);
+ assert.equal((await as(outsider,playback))[0].allowed,true);
+ assert.equal((await as(outsider,download))[0].allowed,false);
+ for(const query of [exportHistory,exportPlayer,exportPlatform,write])await assert.rejects(as(outsider,query),{code:'42501'});
+ await owner(`SELECT set_config('request.headers','{"accept":"text/csv"}',false)`);
+ await assert.rejects(as(outsider,view),{code:'42501'});
+ await owner("SELECT set_config('request.headers','{}',false)");
+ await owner("SELECT set_config('test.aal','aal2',false)");
+ assert.equal((await as(outsider,download))[0].allowed,true);
+ await as(outsider,exportHistory);
+ await owner("SELECT set_config('test.aal','aal1',false)");
+ // The same AAL1 account may still use a verified ordinary role in its own scope.
+ await owner(`INSERT INTO public.athlete_guardians(athlete_id,user_id,status) VALUES('${uuid(41)}','${outsider}','verified')`);
+ await as(outsider,exportPlayer);
+ assert.equal((await as(outsider,download))[0].allowed,true);
+ await assert.rejects(as(outsider,exportPlatform),{code:'42501'});
+ await owner("SELECT set_config('test.aal','aal2',false)");
+ await as(outsider,exportPlatform);
+ await as(outsider,write);
+ await owner(`UPDATE public.profiles SET status='suspended' WHERE id='${outsider}'`);
+ assert.equal((await as(outsider,playback))[0].allowed,false);
+ await assert.rejects(as(outsider,exportPlatform),{code:'42501'});
+ await owner(`UPDATE public.profiles SET status='active' WHERE id='${outsider}'`);
+ await owner(`UPDATE auth.sessions SET not_after=now() WHERE user_id='${outsider}'`);
+ await assert.rejects(as(outsider,view),{code:'42501'});
+ assert.equal((await as(outsider,download))[0].allowed,false);
+ const audit=await owner(`SELECT DISTINCT action FROM sdl_rbac_v5.events WHERE actor='${outsider}'`);
+ for(const action of ['private_history_read','platform_playback_authorized','download_authorized','export_authorized'])
+   assert.ok(audit.some(row=>row.action===action),action);
+});
+
+test('historical staff evidence grants individual reads without restoring writes, exports or downloads',async t=>{
+ const {as,owner,upload,generation}=await rbacV5(t);
+ const session=uuid(881), unmatched=uuid(882);
+ const gen=await generation();
+ await owner(`INSERT INTO public.sessions(id,player_id,session_date,exit_velo) VALUES
+ ('${session}','${player}',CURRENT_DATE,77),('${unmatched}','${player}',CURRENT_DATE,88)`);
+ await owner(`UPDATE public.sdl_club_enrollments SET recording_storage_authorized=true,recording_permission_ref='fixture' WHERE id='${uuid(51)}'`);
+ const id=await upload();
+ await as(coach,`SELECT public.sdl_v5_confirm_subject('${id}','${uuid(41)}','fixture')`);
+ await owner(`UPDATE public.sdl_club_enrollments SET status='ended',ended_at=now() WHERE id='${uuid(51)}'`);
+ const history=`SELECT id FROM public.sdl_v5_private_statistics('${player}')`;
+ await assert.rejects(as(coach,history),{code:'42501'});
+ await owner(`INSERT INTO sdl_rbac_v5.historical_assignment_evidence
+ (player_id,organization_id,team_id,staff_id,staff_role,record_kind,record_id,created_at,assigned_from,assigned_until,verification_ref)
+ VALUES ('${player}','${org}','${team}','${coach}','coach','session','${session}',now()-interval '2 days',now()-interval '3 days',now()-interval '1 day','fixture'),
+ ('${player}','${org}','${team}','${coach}','coach','video','${id}',now()-interval '2 days',now()-interval '3 days',now()-interval '1 day','fixture')`);
+ const play=`SELECT public.sdl_v5_authorize_playback('${id}') AS allowed`;
+ const download=play.replace('playback','download');
+ assert.deepEqual(await as(coach,history),[{id:session}]);
+ assert.equal((await as(adminUser,history)).length,2);
+ assert.equal((await as(parent,play))[0].allowed,false);
+ await owner(`INSERT INTO sdl_rbac_v5.retained_media_rights VALUES ('${id}','${gen}',true,true,now()+interval '1 day',null,'fixture')`);
+ assert.equal((await as(coach,play))[0].allowed,true);
+ assert.equal((await as(coach,download))[0].allowed,false);
+ assert.equal((await as(parent,download))[0].allowed,true);
+ await assert.rejects(as(coach,history.replace('private_statistics','export_private_history')),{code:'42501'});
+ await assert.rejects(as(coach,`SELECT public.sdl_004_pilot_save_growth('${player}',CURRENT_DATE,150,50)`),{code:'42501'});
+ await owner(`UPDATE public.team_memberships SET status='revoked' WHERE user_id='${coach}'`);
+ await assert.rejects(as(coach,history),{code:'42501'});
+ assert.equal((await as(coach,play))[0].allowed,false);
 });

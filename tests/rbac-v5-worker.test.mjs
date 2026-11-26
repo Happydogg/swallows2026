@@ -42,3 +42,30 @@ test('legacy playback requires v5 object authorization after the player-only RPC
  permit=false;
  assert.equal((await play()).status,403);
 });
+
+test('legacy and range requests check the current session and keep playback separate from attachments',async()=>{
+ const h=await workerHarness();h.seed();h.env.SUBMISSIONS_ENABLED='true';
+ let active=true;
+ const actions=[];
+ h.rpcOverride=(name)=>{
+   if(name==='sdl_004_session_active')return Response.json(active);
+   if(name==='sdl_004_submission_contract')return Response.json({revision:'sdl004-club-enrollment-v2',rbacVersion:5});
+   if(name==='sdl_004_media_can_access')return Response.json(false);
+   actions.push(name);
+   return Response.json(name==='sdl_v5_authorize_playback');
+ };
+ const range=path=>{
+   const request=h.request(path);
+   request.headers.set('Range','bytes=0-7');
+   return h.packaged.fetch(request,h.env);
+ };
+ const playback='/v2/submissions/'+VIDEO+'/playback';
+ const legacy='/v1/media/'+VIDEO;
+ assert.equal((await range(playback)).status,200);
+ assert.equal((await range(legacy)).headers.has('Content-Disposition'),false);
+ assert.equal((await range(playback.replace('playback','download'))).status,403);
+ active=false;
+ assert.equal((await range(legacy)).status,401);
+ assert.equal((await range(playback)).status,401);
+ assert.deepEqual(actions,['sdl_v5_authorize_playback','sdl_v5_authorize_playback','sdl_v5_authorize_download']);
+});

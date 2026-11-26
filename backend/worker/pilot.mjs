@@ -37,16 +37,19 @@ async function verifyIdentity(request, env) {
   if (!validId(user?.id)) return {error:'Invalid identity response',status:401};
   return { bearer, userId: user.id };
 }
-async function canAccess(env, bearer, playerId, action) {
+async function authorizationDecision(env, bearer, rpc, args) {
   try {
-    const res = await fetch(`${STAGING_URL}/rest/v1/rpc/sdl_004_media_can_access`, {
+    const res = await fetch(`${STAGING_URL}/rest/v1/rpc/${rpc}`, {
       method:'POST',redirect:'manual',
       headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY, Authorization:bearer,'Content-Type':'application/json'},
-      body:JSON.stringify({p_player_id:playerId,p_action:action})
+      body:JSON.stringify(args)
     });
     if (!res.ok) return null;
     return (await res.json()) === true;
   } catch { return null; }
+}
+function canAccess(env, bearer, playerId, action) {
+  return authorizationDecision(env,bearer,'sdl_004_media_can_access',{p_player_id:playerId,p_action:action});
 }
 async function adminQuery(env, path, options={}) {
   // No browser token is forwarded. Secret key stays only in Cloudflare.
@@ -102,6 +105,9 @@ export default {
     if (!validRoute) return json({error:'Not found'},404,origin);
     const identity=await verifyIdentity(request,env);
     if(identity.error) return json({error:identity.error},identity.status,origin);
+    const active=await authorizationDecision(env,identity.bearer,'sdl_004_session_active',{});
+    if(active===null)return json({error:'Session verification unavailable'},503,origin);
+    if(!active)return json({error:'Session expired or revoked'},401,origin);
     const playerId=url.searchParams.get('player_id');
     if (path==='/v1/authorize' && request.method==='POST') {
       let p;try{ p=await request.json();}catch{return json({error:'Invalid JSON'},400,origin);}

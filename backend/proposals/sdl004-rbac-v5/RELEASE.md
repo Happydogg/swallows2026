@@ -4,7 +4,7 @@ The candidate is ready for independent source review. Hosted installation is blo
 
 ## Migration ledger
 
-Apply the eleven CLI-generated files in filename order as a unit on an isolated clone first. Each file is transactional. Each row depends on its predecessors and the historical pilot contracts. The migration names below are suffixes of the versioned files in [the migrations directory](../../../supabase/migrations/).
+Apply the fourteen CLI-generated files in filename order as a unit on an isolated clone first. Each file is transactional. Each row depends on its predecessors and the historical pilot contracts. The migration names below are suffixes of the versioned files in [the migrations directory](../../../supabase/migrations/).
 
 | Migration | Schema, permission and compatibility impact | Verification and containment |
 |---|---|---|
@@ -19,6 +19,12 @@ Apply the eleven CLI-generated files in filename order as a unit on an isolated 
 | guardian_lifecycle | Add local restrictions and one-use verified cases. Restriction changes participation. Global unlink changes verified status and invokes existing consent invalidation. | Check independent roles and historic own-child access. Retain restrictions, objections, used cases and audit on rollback. |
 | profiles | Add private baseball revisions and guardian-owned phone entries. Provide scoped family/registration reads, support-case corrections and team setting changes. | Verify stale-edit conflicts, revoked profile approval and field-level access. Preserve private revisions and existing contact values. |
 | completion | Advertise v5 in the existing contract. Bind media lists, review queues, private history and exports to current scope. Capture future team audit scope and forward minimal pilot activity. Add independent subject confirmation and explicit correction reasons. | Check the complete native and Worker suites. A previous Worker version can require a scoped compatibility plan before resuming service. |
+
+| p1_authentication | Adds action-specific assurance, active-account checks on existing session paths and restrictive core RLS. | Review AAL1 view and playback, AAL2 exports and attachments, ordinary roles and first-profile redemption. |
+| p1_history | Adds private per-record evidence and retained media rights. Installs no historical evidence. | Verify provenance, continuing original authority, rights, retention and historical-only read limits. |
+| p1_consent | Adds immutable objection and resolution records, reviewed expansion evidence and a private dry-run inventory. | Reconcile original receipts and objections. Confirm blank evidence keeps expansions closed. |
+
+See the [P1 caller inventory](P1.md) for action policy, recovery and residual copying risk.
 
 ## Reproduction
 
@@ -36,7 +42,7 @@ node tests/native/rbacV5.mjs
 
 1. Obtain authoritative core DDL, schema exposure settings, current migration ledger, function and table ownership, policy inventory, Worker bundle and binding contract. Reconcile differences privately with the release owner. Confirm the exact approved source revision.
 2. Test a backup restore and apply the baseline to a disposable clone. Run [the read-only preflight](preflight.sql) before any v5 migration. It checks known function bodies, core RLS and direct write grants. Independently inspect all direct reads, views, storage policies, service credentials and exposed schemas. Any unresolved mismatch blocks release.
-3. Apply the eleven migrations only to the approved disposable database. Run [the read-only postflight](postflight.sql) immediately after installation, before synthetic platform provisioning. Confirm private ACLs, empty platform grants, definer search paths and immutable audit. Repeat local abuse-resistant role and scope scenarios using synthetic records in that clone.
+3. Apply the fourteen migrations only to the approved disposable database. Run [the read-only postflight](postflight.sql) immediately after installation, before synthetic platform provisioning. Confirm private ACLs, empty platform grants, definer search paths and immutable audit. Repeat local abuse-resistant role and scope scenarios using synthetic records in that clone.
 4. Obtain privacy and operational sign-off on the standing notice, legacy consent and objections, guardian disputes, global recovery, media subject evidence, retention deadlines, download obligations and external rights. Verify legacy-only assets and enrollment changes individually. Keep ambiguous assets and preferences private. Review private avatar storage separately. Permanent deletion needs its own verified process.
 5. The release owner approves the staging migration and compatibility window separately from a Worker deployment or gate activation. Capture restore evidence, release version and acceptance owner. Verify role transitions using the staging auth provider, MFA, PostgREST, private storage, byte-range playback and download history before calling the candidate Staging Verified.
 6. Production requires a separate decision, deployment record and verification. This candidate authorizes no provisioning, public distribution or deletion.

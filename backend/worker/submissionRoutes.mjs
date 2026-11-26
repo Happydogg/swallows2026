@@ -25,6 +25,11 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
       const call = (name, body) => rpc(env, identity.bearer, name, body);
       const active = await call('sdl_004_session_active', {});
       if (active.error) return json({error:'Session verification unavailable'},503,origin);
+      if (active.value !== true && path==='/v2/onboarding/invitations/redeem' && request.method==='POST') {
+        // The redemption RPC validates the session, verified email and invite,
+        // and can create the first profile. All other operations require one.
+        return pilotWorkflowRoute({request,url,path,contract:{pilotWorkflow:'sdl004-final-pilot-v1'},call,validId,json,origin});
+      }
       if (active.value !== true) return json({error:'Session expired or revoked'},401,origin);
       const contract = await call('sdl_004_submission_contract', {});
       if (contract.error || contract.value?.revision !== 'sdl004-club-enrollment-v2') return json({error:'Backend contract unavailable'},503,origin);
