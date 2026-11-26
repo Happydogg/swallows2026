@@ -65,3 +65,7 @@ The authenticated delegation and registration test applies both historical migra
 ## Guardian invitations and contacts
 
 The family migration binds new manager invitations to an issuing team and rechecks the issuer, recipient, current assignment and enrollment at redemption. Existing unredeemed invitations require reissue. Revoked relationships cannot be reactivated by redemption. Contact and registration reads use distinct field projections. Q10–Q13 and F04 still need lifecycle and editing coverage. Both authenticated integration scenarios passed locally.
+
+## Official performance and growth
+
+Q14–Q16, F07 and F08 now use distinct named operations. Synthetic RPC tests cover club-admin direct entry, correction, duplicate retry, invalidation, denial of pending review and independent coach approval. Growth role attribution and manager permissions still need expanded tests. Correction evidence must document the reason for the replacement. Historical submissions and official revisions remain in place.

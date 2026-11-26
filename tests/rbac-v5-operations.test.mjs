@@ -47,3 +47,22 @@ test('manager invitations recheck issuing scope and verified identity at redempt
  await as(outsider,redeem.replace(hash,'c'.repeat(64)));
  await assert.rejects(as(outsider,redeem.replace(hash,'c'.repeat(64))),{code:'PT409'});
 });
+
+test('official entry, correction and independent parent review have separate scopes',async t=>{
+ const {as,owner}=await rbacV5(t);
+ const submit=(key,official,prior=null)=>`SELECT public.sdl_004_pilot_submit_performance('${player}','exit-radar-v1',77,CURRENT_DATE,'synthetic radar evidence','${uuid(key)}',${official},null,${prior?"'"+prior+"'":"null"}) AS receipt`;
+ const [pending]=await as(parent,submit(700,false));
+ const review=`SELECT public.sdl_004_pilot_review_performance('${pending.receipt.id}','approved','checked',1)`;
+ await assert.rejects(as(adminUser,review),{code:'42501'});
+ await assert.rejects(as(adminUser,submit(701,true,pending.receipt.id)),{code:'22023'});
+ await assert.rejects(as(outsider,submit(701,true)),{code:'42501'});
+ await as(coach,review);
+ const [official]=await as(adminUser,submit(701,true,pending.receipt.id));
+ assert.equal(official.receipt.status,'approved');
+ assert.deepEqual(await as(adminUser,submit(701,true,pending.receipt.id)),[official]);
+ const [result]=await owner(`SELECT s.source_kind,old.superseded_by=s.id AS corrected,a.invalidated_at IS NOT NULL AS invalidated
+ FROM public.sdl_performance_submissions s JOIN public.sdl_performance_submissions old ON old.id=s.supersedes
+ JOIN public.sdl_official_statistics a ON a.session_id=old.session_id WHERE s.id='${official.receipt.id}'`);
+ assert.deepEqual(result,{source_kind:'club_admin',corrected:true,invalidated:true});
+ await assert.rejects(as(parent,submit(702,true)),{code:'42501'});
+});
