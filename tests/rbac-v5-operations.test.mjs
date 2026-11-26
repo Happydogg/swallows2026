@@ -171,3 +171,19 @@ test('local restrictions preserve own-child history and global unlink requires a
  await assert.rejects(as(parent,history),{code:'42501'});
  await assert.rejects(as(outsider,unlink),{code:'42501'});
 });
+
+test('baseball edits invalidate sharing approval and family identities require separate permissions',async t=>{
+ const {as,owner}=await rbacV5(t);
+ const edit=`SELECT public.sdl_v5_edit_profile('${player}','{"preferred_name":"Sample"}','{"preferred_name":"Player"}','fixture correction')`;
+ await as(parent,edit);
+ await assert.rejects(as(parent,edit),{code:'PT409'});
+ assert.equal((await owner(`SELECT public.sdl_004_pilot_profile_approved('${player}') AS ok`))[0].ok,false);
+ const legal=edit.replace('{"preferred_name":"Sample"}','{"last_name":"Synthetic"}').replace('{"preferred_name":"Player"}','{"last_name":null}');
+ await assert.rejects(as(coach,legal),{code:'42501'});
+ await as(adminUser,legal);
+ const contacts=`SELECT public.sdl_v5_family_contacts('${player}','family_contacts') AS data`;
+ await assert.rejects(as(coach,contacts),{code:'42501'});
+ await as(parent,`SELECT public.sdl_v5_set_own_contact('${player}','555-0100')`);
+ assert.deepEqual((await as(parent,contacts))[0].data.contacts,['555-0100']);
+ assert.equal((await as(adminUser,contacts.replace('family_contacts\')','registration_contacts\')')))[0].data.last_name,'Synthetic');
+});
