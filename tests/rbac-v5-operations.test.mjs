@@ -92,3 +92,26 @@ test('download authorization checks subject, recording, retention and current ro
  assert.equal((await as(coach,`SELECT public.sdl_004_media_can_access('${player}','read') AS allowed`))[0].allowed,false);
  assert.equal((await owner("SELECT count(*)::int AS n FROM sdl_rbac_v5.events WHERE action='download_authorized'"))[0].n,3);
 });
+
+test('session projections require a fresh standing receipt and respect a second guardian’s objection',async t=>{
+ const {as,owner,generation}=await rbacV5(t);
+ const enrollment=uuid(51);
+ const gen=await generation();
+ await owner(`INSERT INTO public.athlete_guardians(athlete_id,user_id,status) VALUES('${uuid(41)}','${outsider}','verified')`);
+ await as(coach,`SELECT public.sdl_004_pilot_submit_performance('${player}','exit-radar-v1',77,CURRENT_DATE,'radar fixture','${uuid(800)}',true)`);
+ const consent=policy=>`SELECT public.sdl_004_set_statistic_consent('${enrollment}','${gen}',true,ARRAY['broad_jump','throwing_velo','exit_velo','sprint_time'],'${policy}')`;
+ const sessions=`SELECT * FROM public.sdl_v5_clubhouse_sessions('${team}',null,10)`;
+ await as(parent,consent('sdl004-baseball-statistics-v1'));
+ assert.deepEqual(await as(adminUser,sessions),[]);
+ await as(parent,consent('baseball-sessions-v5'));
+ const rows=await as(adminUser,sessions);
+ assert.equal(rows.length,1);
+ assert.equal(Number(rows[0].value),77);
+ assert.deepEqual(await as(adminUser,sessions.replace('null',"'"+rows[0].id+"'")),[]);
+ await as(outsider,`SELECT public.sdl_004_set_statistic_consent('${enrollment}','${gen}',false,'{}',null)`);
+ await as(parent,consent('baseball-sessions-v5'));
+ assert.deepEqual(await as(coach,sessions),[]);
+ await assert.rejects(as(coach,sessions.replace(team,otherTeam)),{code:'42501'});
+ await as(outsider,consent('baseball-sessions-v5'));
+ assert.equal((await as(coach,sessions)).length,1);
+});
