@@ -115,3 +115,21 @@ test('session projections require a fresh standing receipt and respect a second 
  await as(outsider,consent('baseball-sessions-v5'));
  assert.equal((await as(coach,sessions)).length,1);
 });
+
+test('exports and audit views enforce explicit scope and current enrollment',async t=>{
+ const {as,owner}=await rbacV5(t);
+ await as(coach,`SELECT public.sdl_004_pilot_submit_performance('${player}','exit-radar-v1',77,CURRENT_DATE,'radar reading','${uuid(900)}',true)`);
+ const report=(scope,id)=>`SELECT * FROM public.sdl_v5_export_statistics('${scope}','${id}')`;
+ assert.equal((await as(parent,report('player',player))).length,1);
+ await assert.rejects(as(parent,report('team',team)),{code:'42501'});
+ await assert.rejects(as(coach,report('team',otherTeam)),{code:'42501'});
+ assert.equal((await as(adminUser,report('club',org))).length,1);
+ const history=(scope,id)=>`SELECT * FROM public.sdl_v5_audit_history('${scope}','${id}')`;
+ assert.deepEqual(await as(parent,history('downloads',player)),[]);
+ assert.equal((await as(adminUser,history('club',org))).length,2);
+ await assert.rejects(as(parent,history('club',org)),{code:'42501'});
+ await assert.rejects(as(parent,'SELECT * FROM sdl_rbac_v5.events'),{code:'42501'});
+ await owner(`UPDATE public.sdl_club_enrollments SET status='ended',ended_at=now() WHERE organization_id='${org}'`);
+ assert.deepEqual(await as(adminUser,report('club',org)),[]);
+ assert.equal((await as(parent,report('player',player))).length,1);
+});

@@ -77,3 +77,7 @@ Q19–Q24, F01, F10 and F12 now have object-specific decisions for playback and 
 ## Clubhouse and consent
 
 Q17, F06 and F09 have a synthetic integration test covering an official session, a legacy receipt, a fresh standing receipt, a second guardian's withdrawal, a later first-guardian grant, restored agreement and a foreign team. Five integration scenarios passed. Both video and statistics receipts consult category-specific preferences. The new session projection requires an explicitly classified protocol and matching notice. Approval of the notice, historical preference reconciliation and review of new categories remain release gates.
+
+## Exports and audit
+
+Q18 and Q25 include bounded official-statistics export pages and v5 audit pages. Role and generation checks apply to each page. Guardians can read only the download-authorized projection for their child. The test confirms current-club scope and historical guardian scope after enrollment ends. Six authenticated integration scenarios passed. Historical audit stream consolidation and additional export formats remain follow-up work.
