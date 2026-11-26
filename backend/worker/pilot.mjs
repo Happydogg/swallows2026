@@ -82,7 +82,7 @@ async function limitedBytes(request) {
   return {bytes};
 }
 export default {
-  async fetch(request,env) {
+  async fetch(request,env,submissionRouter) {
     const origin=request.headers.get('Origin');
     const url=new URL(request.url); const path=url.pathname.replace(/\/+$/,'')||'/';
     if(origin && !ORIGINS.has(origin)) return json({error:'Origin not allowed'},403);
@@ -107,6 +107,8 @@ export default {
       let p;try{ p=await request.json();}catch{return json({error:'Invalid JSON'},400,origin);}
       if(!validId(p?.player_id)||!['read','upload'].includes(p?.action))return json({error:'Invalid request'},400,origin);
       const allowed=await canAccess(env,identity.bearer,p.player_id,p.action);
+      if(allowed===false && submissionRouter)return submissionRouter.fetch(new Request(request.url,{
+        method:'POST',headers:request.headers,body:JSON.stringify({player_id:p.player_id,action:p.action})}),env);
       return allowed===null?json({error:'Authorization unavailable'},503,origin)
         :json({allowed,media_enabled:true},allowed?200:403,origin);
     }
@@ -114,7 +116,7 @@ export default {
       if(!validId(playerId))return json({error:'Invalid player_id'},400,origin);
       const allowed=await canAccess(env,identity.bearer,playerId,'upload');
       if(allowed===null)return json({error:'Authorization unavailable'},503,origin);
-      if(!allowed)return json({error:'Forbidden'},403,origin);
+      if(!allowed)return submissionRouter ? submissionRouter.fetch(request,env) : json({error:'Forbidden'},403,origin);
       if(request.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase()!=='video/mp4')
         return json({error:'Only video/mp4 accepted'},415,origin);
       const upload=await limitedBytes(request);
@@ -139,7 +141,7 @@ export default {
       if(!validId(playerId))return json({error:'Invalid player_id'},400,origin);
       const allowed=await canAccess(env,identity.bearer,playerId,'read');
       if(allowed===null)return json({error:'Authorization unavailable'},503,origin);
-      if(!allowed)return json({error:'Forbidden'},403,origin);
+      if(!allowed)return submissionRouter ? submissionRouter.fetch(request,env) : json({error:'Forbidden'},403,origin);
       let res;try{
         res=await adminQuery(env,`sdl_media_objects?select=id,player_id,byte_size,content_type,created_at&player_id=eq.${playerId}&order=created_at.desc&limit=30`);
       }catch{return json({error:'Metadata service unavailable'},503,origin);}
@@ -156,7 +158,7 @@ export default {
       if(!item)return json({error:'Not found'},404,origin);
       const allowed=await canAccess(env,identity.bearer,item.player_id,'read');
       if(allowed===null)return json({error:'Authorization unavailable'},503,origin);
-      if(!allowed)return json({error:'Forbidden'},403,origin);
+      if(!allowed)return submissionRouter ? submissionRouter.fetch(request,env) : json({error:'Forbidden'},403,origin);
       const rangeHeader=request.headers.get('Range');
       if(rangeHeader && !/^bytes=\d+-\d*$/i.test(rangeHeader))return json({error:'Unsupported range'},416,origin);
       let obj;

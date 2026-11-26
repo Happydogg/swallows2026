@@ -89,3 +89,9 @@ Q07–Q08 now have roster ending, scoped internal requests, destination approval
 ## Local restrictions and verified unlinking
 
 Q13 and F04 have separate team/club participation restrictions and a global relationship transition that consumes an operator-verified case. The local restriction preserves own-child history and other roles, while blocking new affected guardian submissions. Verified grounds, dispute handling and recovery remain operational release requirements. All eight scenarios passed in PGlite and independently on an isolated native PostgreSQL 17 server using synthetic JWT/session fixtures.
+
+## Final integration and verification
+
+The private profile, family, team support, scoped history, audit and Worker contracts are now in the candidate. The final integration migration preserves the older RPC signatures, binds the review queue to current team membership, records team scope at event time and separates an explicit official correction reason from its source evidence. The packaged Worker recognizes v5, validates the requested object, and reauthorizes compatible legacy playback. A native competing-correction test identified a lock upgrade conflict. Locking the previous revision before inserting the replacement and using a compatible player lock resolved it.
+
+The final npm suite passed 360 tests with zero failures or skips. The Worker build and package check passed. A separate run on native PostgreSQL 17.12 passed all 11 authenticated integration scenarios and two competing-writer checks. A local PostgREST 16.6 process verified an allowed private-history RPC, an unauthorized account, direct-table denial and revocation. Both native services used synthetic records and local authentication. The SQL postflight passed on a fresh native fixture. The 347-test baseline preceded the implementation. See the decision matrix, API and release guide for the remaining acceptance gates.

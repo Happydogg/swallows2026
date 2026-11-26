@@ -126,7 +126,9 @@ test('exports and audit views enforce explicit scope and current enrollment',asy
  assert.equal((await as(adminUser,report('club',org))).length,1);
  const history=(scope,id)=>`SELECT * FROM public.sdl_v5_audit_history('${scope}','${id}')`;
  assert.deepEqual(await as(parent,history('downloads',player)),[]);
- assert.equal((await as(adminUser,history('club',org))).length,2);
+ const events=await as(adminUser,history('club',org));
+ assert.equal(events.filter(event=>event.action==='export_authorized').length,2);
+ assert.ok(events.some(event=>event.action==='pilot_coach_official_entry'));
  await assert.rejects(as(parent,history('club',org)),{code:'42501'});
  await assert.rejects(as(parent,'SELECT * FROM sdl_rbac_v5.events'),{code:'42501'});
  await owner(`UPDATE public.sdl_club_enrollments SET status='ended',ended_at=now() WHERE organization_id='${org}'`);
@@ -186,4 +188,43 @@ test('baseball edits invalidate sharing approval and family identities require s
  await as(parent,`SELECT public.sdl_v5_set_own_contact('${player}','555-0100')`);
  assert.deepEqual((await as(parent,contacts))[0].data.contacts,['555-0100']);
  assert.equal((await as(adminUser,contacts.replace('family_contacts\')','registration_contacts\')')))[0].data.last_name,'Synthetic');
+});
+
+test('manager transfers, audit scope and expired sessions stay independent across four teams',async t=>{
+ const {as,owner}=await rbacV5(t);
+ const dest=uuid(801),foreign=uuid(802),foreignOrg=uuid(32);
+ await owner(`INSERT INTO public.teams(id,organization_id,status) VALUES('${dest}','${org}','active'),('${foreign}','${foreignOrg}','active')`);
+ const assign=(tm,u,role)=>`SELECT public.sdl_v5_set_staff('${tm}','${u}','${role}',true,'synthetic delegation')`;
+ await as(adminUser,assign(team,coach,'manager'));
+ await as(adminUser,assign(dest,parent,'manager'));
+ const [request]=await as(coach,`SELECT public.sdl_v5_request_transfer('${player}','${team}','${dest}','new team') AS id`);
+ const approve=`SELECT public.sdl_v5_approve_transfer('${request.id}','destination',null,'approved') AS complete`;
+ await assert.rejects(as(coach,approve),{code:'42501'});
+ assert.equal((await as(parent,approve))[0].complete,true);
+ const privateRead=`SELECT * FROM public.sdl_v5_private_statistics('${player}')`;
+ await assert.rejects(as(coach,privateRead),{code:'42501'});
+ await as(parent,privateRead);
+ await assert.rejects(as(parent,`SELECT * FROM public.sdl_v5_audit_history('team','${foreign}')`),{code:'42501'});
+ const ownAudit=await as(parent,`SELECT * FROM public.sdl_v5_audit_history('team','${dest}')`);
+ assert.ok(ownAudit.some(event=>event.action==='private_history_read'));
+ await assert.rejects(as(parent,'SELECT * FROM public.sessions'),{code:'42501'});
+ await owner(`UPDATE auth.sessions SET not_after=now()-interval '1 minute' WHERE user_id='${parent}'`);
+ await assert.rejects(as(parent,privateRead),{code:'42501'});
+});
+
+test('official corrections keep a distinct reason and private exports retain growth units and access scope',async t=>{
+ const {as,owner}=await rbacV5(t);
+ const [prior]=await as(adminUser,`SELECT public.sdl_004_pilot_submit_performance('${player}','exit-radar-v1',77,CURRENT_DATE,'synthetic evidence','${uuid(821)}',true) AS r`);
+ const correct=`SELECT public.sdl_v5_correct_official('${prior.r.id}','exit-radar-v1',78,CURRENT_DATE,'second reading','${uuid(822)}','unit transcription') AS r`;
+ await assert.rejects(as(parent,correct),{code:'42501'});
+ const done=await as(adminUser,correct);
+ assert.deepEqual(await as(adminUser,correct),done);
+ await assert.rejects(as(adminUser,correct.replace('unit transcription','different reason')),{code:'PT409'});
+ await as(parent,`SELECT public.sdl_004_pilot_save_growth('${player}',CURRENT_DATE,150,48)`);
+ const query=`SELECT * FROM public.sdl_v5_export_private_history('${player}')`;
+ const rows=await as(parent,query);
+ assert.ok(rows.some(row=>Number(row.height_cm)===150&&Number(row.weight_kg)===48));
+ assert.equal(rows.filter(row=>row.exit_velo!==null).length,1);
+ await assert.rejects(as(outsider,query),{code:'42501'});
+ assert.equal((await owner("SELECT count(*)::int AS n FROM sdl_rbac_v5.events WHERE action='official_correction'"))[0].n,1);
 });
