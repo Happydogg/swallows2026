@@ -30,3 +30,20 @@ test('authenticated delegation and registration use current scope and preserve r
  await as(adminUser,set(team,coach,'manager',false));
  await assert.rejects(as(coach,register),{code:'42501'});
 });
+
+test('manager invitations recheck issuing scope and verified identity at redemption',async t=>{
+ const {as,owner}=await rbacV5(t);
+ const hash='b'.repeat(64);
+ const issue=`SELECT public.sdl_004_pilot_issue_invitation('${player}','${outsider}@example.test','${hash}')`;
+ await assert.rejects(as(coach,issue),{code:'42501'});
+ await as(adminUser,`SELECT public.sdl_v5_set_staff('${team}','${coach}','manager',true,'manager')`);
+ await as(coach,issue);
+ const redeem=`SELECT public.sdl_004_pilot_redeem_invitation('${hash}')`;
+ await assert.rejects(as(parent,redeem),{code:'42501'});
+ await owner(`UPDATE public.player_team_memberships SET status='inactive',end_date=CURRENT_DATE WHERE player_id='${player}'`);
+ await assert.rejects(as(outsider,redeem),{code:'PT410'});
+ const another=issue.replace(player,'00000000-0000-4000-8000-000000000012').replace(hash,'c'.repeat(64));
+ await as(coach,another);
+ await as(outsider,redeem.replace(hash,'c'.repeat(64)));
+ await assert.rejects(as(outsider,redeem.replace(hash,'c'.repeat(64))),{code:'PT409'});
+});
