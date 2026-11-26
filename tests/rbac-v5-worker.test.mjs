@@ -69,3 +69,20 @@ test('legacy and range requests check the current session and keep playback sepa
  assert.equal((await range(playback)).status,401);
  assert.deepEqual(actions,['sdl_v5_authorize_playback','sdl_v5_authorize_playback','sdl_v5_authorize_download']);
 });
+
+test('staging Worker preserves exact Pages origins with the submission gate closed',async()=>{
+ const h=await workerHarness();h.env.SUBMISSIONS_ENABLED='false';
+ for(const origin of ['https://sdl-staging.pages.dev','https://sdl-ux-live.pages.dev','http://localhost:5500','http://127.0.0.1:5500']){
+  const preflight=await h.packaged.fetch(h.request('/v2/submissions',{method:'OPTIONS',auth:false,origin}),h.env);
+  assert.equal(preflight.status,204);
+  assert.equal(preflight.headers.get('Access-Control-Allow-Origin'),origin);
+  const gated=await h.packaged.fetch(h.request('/v2/submissions',{origin}),h.env);
+  assert.equal(gated.status,503);
+ }
+ for(const origin of ['https://unrelated.pages.dev','https://sdl-staging.pages.dev.example.org']){
+  const denied=await h.packaged.fetch(h.request('/v2/submissions',{method:'OPTIONS',auth:false,origin}),h.env);
+  assert.equal(denied.status,403);
+  assert.equal(denied.headers.get('Access-Control-Allow-Origin'),null);
+ }
+ assert.equal(h.calls.length,0,'CORS and closed gate must not access Supabase');
+});
