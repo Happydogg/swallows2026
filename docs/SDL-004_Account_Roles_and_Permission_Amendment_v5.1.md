@@ -1,12 +1,12 @@
 # SDL-004 | Account Roles & Permission Amendment v5.1
 
 Date: 2026-11-27
-Status: Owner-selected P1 policy amendment; implementation and verification pending.
+Status: Owner-selected P1 policy amendment; MFA conflict resolved by owner on 2026-11-27; implementation and verification pending.
 Base: [v5.0 specification](SDL-004_Account_Roles_and_Permission_Specification_v5.0.md).
-Authority: Eleven owner selections and approval of mandatory engineering safeguards.
+Authority: Eleven owner selections, approval of mandatory engineering safeguards, and subsequent owner selection B resolving the MFA conflict on 2026-11-27.
 Scope: Targeted amendments only. Preserve all 38 v5.0 selections and earlier agreed requirements except where explicitly superseded. No hosted migration, deployment, privilege activation, deletion, merge or privacy release authorization follows from this amendment.
 
-## 1. Owner decision register (verbatim policy selections)
+## 1. Owner decision register (original policy selections)
 
 | ID | Owner-selected policy |
 |---|---|
@@ -19,8 +19,9 @@ Scope: Targeted amendments only. Preserve all 38 v5.0 selections and earlier agr
 | P1-04C | Keep existing valid consent active unless the new guardian objects; any objection blocks sharing. |
 | P1-04D | Every outstanding verified guardian objection must be explicitly resolved before sharing resumes. |
 | P1-05A | MFA only when downloading or exporting private data. |
-| P1-05B | Yes, independently scoped ordinary roles may work normally, but Platform Admin privileges require MFA. |
+| P1-05B | Yes, independently scoped ordinary roles may work normally, but Platform Admin privileges require MFA. (Original selection; the blanket MFA clause is superseded by P1-05R below.) |
 | P1-05C | Use a restricted, verified recovery process; never bypass MFA simply through an ordinary password reset. |
+| P1-05R | Final owner selection B (2026-11-27): MFA only for private downloads and exports, with separate authentication review for sensitive administrative writes. |
 
 The owner also approved the mandatory engineering safeguards in the P1 resolution proposal. P1-03 is a mandatory migration and release control, not a separate questionnaire choice.
 
@@ -62,15 +63,31 @@ Required implementation and release safeguards:
 
 Status: owner intent approved; automatic expansion is a privacy release gate, not authorization to execute blanket migration. No consent receipts may be altered or expanded on hosted systems by this assignment.
 
-## 4. Platform Admin MFA: conflicting selections
+## 4. Platform Admin MFA: owner resolution (P1-05R)
 
-P1-05A requests MFA only for private downloads and exports. P1-05B states that Platform Admin privileges require MFA, while independently scoped ordinary roles can function normally. The latter also aligns with the existing v5.0 AAL2 design. These selections conflict for global reads and administrative operations.
+On 2026-11-27 the owner selected B: MFA only for private downloads and exports, with separate authentication review for sensitive administrative writes. This resolves the conflict between P1-05A and P1-05B. It supersedes the blanket MFA requirement for all Platform Admin privileges in v5.0 and the original P1-05B selection. The independent ordinary-role rule and protected recovery decision remain valid.
 
-Pending explicit owner reconciliation, preserve the existing stricter AAL2 requirement for all Platform Admin-only operations. A separate ordinary role may function under its own authorization without invoking Platform Admin privileges. Never grant global access through the ordinary role path. Do not weaken current MFA enforcement or treat P1-05A as approval to remove it while P1-05B remains unresolved.
+### Target authentication policy
 
-Owner clarification required before changing authentication scope: select (A) MFA for all Platform Admin-only operations, or (B) MFA only for download/export, with a separately reviewed policy for global reads and sensitive administrative writes. If B is chosen, review whether protected provisioning, global guardian unlink, sensitive corrections, and recovery require stronger authentication before any weakening is implemented or released.
+| Operation | Target policy |
+|---|---|
+| Platform Admin private data viewing, including cross-club viewing and authorized video playback | Active authenticated session, active profile and active Platform Admin grant. MFA is not mandatory solely for viewing. |
+| Platform Admin private downloads and exports | MFA (AAL2 or independently verified equivalent), current session/grant and resource authorization, and audit logging required. |
+| Sensitive administrative writes | Separate authentication and security review required; no relaxation of existing stronger controls pending review. |
+| Independently scoped ordinary Coach, Manager, Club Admin or Guardian operation | Existing authentication and role-specific authorization; no global privileges inherited. |
+| Platform Admin MFA recovery | Restricted, verified recovery process; no ordinary password-reset bypass. |
+
+Sensitive writes include privileged account provisioning/revocation, global guardian unlinking, private identity corrections, permanent deletion and other high-impact administrative mutations. The review must explicitly determine authentication strength, reauthentication, approval, auditing and recovery requirements for each operation. The selection does not grant any new action permission. Existing stronger controls for these operations remain in place until the separate review and approval.
+
+### Engineering and verification boundary
+
+Separate active Platform Admin role eligibility from action-specific authentication. Do not globally remove the AAL2 condition from a shared helper without tracing every caller, including direct RPCs, RLS, reporting endpoints and Worker routes. Preserve MFA for private downloads and exports even when invoked through alternate routes; enforce on the server, not merely the interface. Independently scoped ordinary roles retain their legitimate permissions, but may not be used to bypass the MFA requirement for global privileged actions.
+
+Playback and viewing may deliver private data to a client; a user who can view content may be able to save it. Distinguish explicit download/export authorization from viewing, limit and audit sensitive access, and do not claim MFA on download endpoints prevents all copying or scraping. Review route equivalence, pagination and bulk retrieval, byte ranges, token reuse and alternate export paths before release. This residual risk is acknowledged without changing the owner's selection.
 
 Retain restricted verified MFA recovery. Ordinary password reset, Club Admin action or ordinary role membership cannot bypass the protected Platform Admin recovery process. Actual Supabase session and MFA behavior require staging acceptance.
+
+Status: owner policy conflict resolved; implementation, separate sensitive-write authentication review and independent security verification remain pending. No hosted privilege change or deployment is authorized by this amendment.
 
 ## 5. Mandatory engineering controls (approved)
 
@@ -78,14 +95,14 @@ P1-01: enforce active account and valid non-revoked session at every applicable 
 
 P1-03: reconcile exact hosted migration ledger, schema, RLS, table/column grants, function ownership and EXECUTE ACLs, exposed schemas, storage policies, Worker contract/bindings, consent/enrollment history, and recoverable backup and restore. Validate a disposable clone; rehearse rollback/containment without deleting records. Unexplained security-sensitive drift blocks installation. A passing synthetic preflight alone does not establish hosted readiness.
 
-P1-05: enforce the reconciled MFA policy, protected provisioning and recovery, session revocation and auditable sensitive operations. Maintain the stricter existing controls until the conflict is resolved.
+P1-05: enforce P1-05R with action-specific MFA for Platform Admin private downloads and exports, protected provisioning and recovery, session revocation and auditable sensitive operations. Retain existing stronger authentication for sensitive writes until the separate authentication review is approved.
 
 ## 6. Acceptance and release
 
 - Test historical access with independently authorized users, two clubs, multiple teams, assignment start/end dates, records before/during/after assignment, transfers, ended enrollments, role revocation, missing provenance, and current versus historic-only access. Include private retained media and negative download/export/mutation tests.
 - Test active and revoked sessions, suspended accounts, direct PostgREST and legacy RPCs, storage access, Worker media requests and cross-role/cross-club denial.
 - Test consent migration with legacy limited approvals, valid equivalent scopes, missing evidence, withdrawals, multiple guardians and conflicting preferences. Verify original receipts unchanged and expanded access fails closed without verified eligibility.
-- Test MFA and recovery with AAL1/AAL2 and independent ordinary roles; do not weaken the current gate pending owner clarification.
+- Test active AAL1 Platform Admin authorized reads/playback and denial of privileged downloads/exports; test AAL2 allowed downloads/exports subject to resource rights, session and role revocation; test independent ordinary roles and alternate API/Worker routes. Preserve stronger gates for sensitive writes until separately reviewed and approved. Verify protected recovery and audit evidence; independently review residual copying and bulk retrieval risks before release.
 - Re-run full application regression, Worker package checks, native PostgreSQL concurrency and PostgREST authorization tests. Document independent security review separately from implementation testing.
 - Keep existing external distribution, permanent deletion, rejected-media retention, private avatar and historical-consent gates intact. No real parent onboarding or staging activation until applicable blockers are resolved and separately authorized.
 
