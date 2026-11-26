@@ -133,3 +133,20 @@ test('exports and audit views enforce explicit scope and current enrollment',asy
  assert.deepEqual(await as(adminUser,report('club',org)),[]);
  assert.equal((await as(parent,report('player',player))).length,1);
 });
+
+test('cross-club transfer preserves identity and separates history until both clubs and family approve',async t=>{
+ const {as,owner}=await rbacV5(t);
+ const child=uuid(12),guardian=uuid(3),dst=uuid(32);
+ await owner(`INSERT INTO public.organization_memberships(organization_id,user_id,role,status) VALUES('${dst}','${outsider}','admin','active')`);
+ const [r]=await as(adminUser,`SELECT public.sdl_v5_request_transfer('${child}','${team}','${otherTeam}','relocation') AS id`);
+ const approve=role=>`SELECT public.sdl_v5_approve_transfer('${r.id}','${role}','28','confirmed') AS done`;
+ await assert.rejects(as(parent,approve('guardian')),{code:'42501'});
+ assert.equal((await as(outsider,approve('destination')))[0].done,false);
+ assert.equal((await as(guardian,approve('guardian')))[0].done,false);
+ assert.equal((await as(outsider,approve('destination')))[0].done,true);
+ const [after]=await owner(`SELECT id,athlete_id FROM public.players WHERE organization_id='${dst}' AND jersey='28'`);
+ assert.notEqual(after.id,child);
+ assert.equal(after.athlete_id,uuid(42));
+ assert.equal((await owner(`SELECT status FROM public.player_team_memberships WHERE player_id='${child}'`))[0].status,'inactive');
+ await assert.rejects(as(outsider,approve('destination')),{code:'PT409'});
+});

@@ -81,3 +81,7 @@ Q17, F06 and F09 have a synthetic integration test covering an official session,
 ## Exports and audit
 
 Q18 and Q25 include bounded official-statistics export pages and v5 audit pages. Role and generation checks apply to each page. Guardians can read only the download-authorized projection for their child. The test confirms current-club scope and historical guardian scope after enrollment ends. Six authenticated integration scenarios passed. Historical audit stream consolidation and additional export formats remain follow-up work.
+
+## Roster and transfers
+
+Q07–Q08 now have roster ending, scoped internal requests, destination approval, and a cross-club completion workflow. The latter requires source club, destination club and verified family authority. It creates a separate destination player record for the same athlete. The synthetic test checks the destination receives no source player record, the old assignment ends and approval cannot be replayed. Seven integration scenarios passed.
