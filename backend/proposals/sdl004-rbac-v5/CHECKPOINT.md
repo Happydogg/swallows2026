@@ -54,3 +54,6 @@ P = partially implemented. M = missing. C = conflicts with earlier semantics. B 
 | F11 | B | Club admin is sole operational approver; distribution requires rights review |
 | F12 | C | Independent staff video approval and consent-gated publication |
 
+## Phase 1
+
+The candidate private predicates now run through a fixture definer RPC under an authenticated SQL role. The predicates use the owner's private-table access while retaining the caller's identity. A restricted maintenance function performs initial platform grants or revocation with an immutable event in the same transaction. Revoked platform grants require separate recovery review. Platform MFA uses the validated JWT assurance claim. No user is seeded. The isolated foundation test passed before CLI migration generation. Operator identity is the database session user for maintenance events. A shared operator login requires a separately attributable operational approval.

@@ -1,6 +1,5 @@
--- SDL-004B-RBAC-01: v5 authorization foundation, review candidate only.
--- Do not apply to a hosted database. Move into a CLI-generated migration after local QA.
--- No existing RPCs or RLS policies are changed. No admin is provisioned.
+-- SDL-004 v5 private authorization foundation. Local candidate for review.
+-- The migration installs no platform administrators or public service endpoints.
 -- This private schema is not an API; role eligibility is not a complete resource authorization.
 BEGIN;
 CREATE SCHEMA sdl_rbac_v5;
@@ -17,7 +16,56 @@ CREATE TABLE sdl_rbac_v5.platform_admin_grants (
 );
 ALTER TABLE sdl_rbac_v5.platform_admin_grants ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE sdl_rbac_v5.platform_admin_grants FROM PUBLIC, anon, authenticated, service_role;
--- Provisioning/revocation and immutable audit are a separate restricted workflow.
+-- Administrative events are append-only for API roles and maintenance functions.
+CREATE TABLE sdl_rbac_v5.events (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  occurred_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  actor uuid,
+  operator_name name NOT NULL DEFAULT session_user,
+  action text NOT NULL,
+  organization_id uuid,
+  team_id uuid,
+  player_id uuid,
+  target_id uuid,
+  reason text NOT NULL CHECK (length(btrim(reason)) BETWEEN 1 AND 500)
+);
+ALTER TABLE sdl_rbac_v5.events ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON sdl_rbac_v5.events FROM PUBLIC, anon, authenticated, service_role;
+CREATE INDEX ON sdl_rbac_v5.events (organization_id, id);
+CREATE INDEX ON sdl_rbac_v5.events (team_id, id);
+CREATE INDEX ON sdl_rbac_v5.events (actor, id);
+
+CREATE FUNCTION sdl_rbac_v5.keep_event() RETURNS trigger
+LANGUAGE plpgsql SET search_path = '' AS $$
+BEGIN
+ RAISE EXCEPTION 'Audit events are immutable' USING ERRCODE='42501';
+END;
+$$;
+CREATE TRIGGER immutable_event BEFORE UPDATE OR DELETE OR TRUNCATE
+ON sdl_rbac_v5.events FOR EACH STATEMENT EXECUTE FUNCTION sdl_rbac_v5.keep_event();
+
+-- Offline grant operator only. API and application roles have no execution grant.
+-- A previously revoked platform grant requires separate recovery review.
+CREATE FUNCTION sdl_rbac_v5.set_platform_grant(p_user uuid,p_enable boolean,p_reason text)
+RETURNS void LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
+BEGIN
+ IF p_user IS NULL OR p_enable IS NULL OR p_reason IS NULL
+ OR length(btrim(p_reason)) NOT BETWEEN 1 AND 500 THEN
+   RAISE EXCEPTION 'Target, decision and reason required' USING ERRCODE='22023';
+ END IF;
+ IF p_enable THEN
+   PERFORM 1 FROM public.profiles WHERE id=p_user AND status='active' FOR UPDATE;
+   IF NOT FOUND THEN RAISE EXCEPTION 'Active target required'; END IF;
+   INSERT INTO sdl_rbac_v5.platform_admin_grants(user_id,reason) VALUES(p_user,p_reason);
+ ELSE
+   UPDATE sdl_rbac_v5.platform_admin_grants SET revoked_at=clock_timestamp()
+   WHERE user_id=p_user AND revoked_at IS NULL;
+   IF NOT FOUND THEN RAISE EXCEPTION 'No active grant'; END IF;
+ END IF;
+ INSERT INTO sdl_rbac_v5.events(action,target_id,reason)
+ VALUES(CASE WHEN p_enable THEN 'platform_granted' ELSE 'platform_revoked' END,p_user,p_reason);
+END;
+$$;
 -- Do not grant API roles access to this table.
 
 CREATE FUNCTION sdl_rbac_v5.active_actor() RETURNS boolean

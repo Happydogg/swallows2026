@@ -44,8 +44,8 @@ test('v5 foundation: scoped roles, denial, lifecycle and ACLs in synthetic SQL',
   for(const [team,id,role] of [[teamA,tm,'manager'],[teamA,co,'coach'],[teamB,dual,'coach'],[teamA,dual,'parent']])
    await db.query("INSERT INTO public.team_memberships VALUES ($1,$2,$3,'active')",[team,id,role]);
   for(const id of [gu,dual])await db.query("INSERT INTO public.athlete_guardians VALUES ($1,$2,'verified')",[athleteA,id]);
-  await db.exec(await readFile(new URL('../backend/proposals/sdl004-rbac-v5/01_role_foundation.review.sql',import.meta.url),'utf8'));
-  await db.query("INSERT INTO sdl_rbac_v5.platform_admin_grants(user_id,reason) VALUES ($1,'synthetic fixture only')",[pa]);
+  await db.exec(await readFile(new URL('../supabase/migrations/20261126151930_sdl004_v5_foundation.sql',import.meta.url),'utf8'));
+  await db.query("SELECT sdl_rbac_v5.set_platform_grant($1,true,'synthetic fixture only')",[pa]);
   async function actor(id,aal='aal1',session='active'){
    await db.query("SELECT set_config('test.actor',$1,false),set_config('test.aal',$2,false),set_config('test.session',$3,false)",[id??'',aal,session]);
   }
@@ -61,6 +61,20 @@ test('v5 foundation: scoped roles, denial, lifecycle and ACLs in synthetic SQL',
    const r=await db.query("SELECT has_schema_privilege($1,'sdl_rbac_v5','USAGE') AS schema_ok, has_function_privilege($1,'sdl_rbac_v5.player_role_gate(uuid,text)','EXECUTE') AS fn_ok, has_table_privilege($1,'sdl_rbac_v5.platform_admin_grants','SELECT') AS table_ok",[role]);
    assert.deepEqual(r.rows[0],{schema_ok:false,fn_ok:false,table_ok:false});
   }
+  // A definer RPC owns the private query. API callers cannot invoke the helper
+  // or provision administrators directly. The fixture-only RPC returns a boolean.
+  await db.exec(`CREATE FUNCTION public.fixture_gate(uuid,text) RETURNS boolean
+    LANGUAGE sql SECURITY DEFINER SET search_path='' AS
+    'SELECT sdl_rbac_v5.player_role_gate($1,$2)';
+    REVOKE ALL ON FUNCTION public.fixture_gate(uuid,text) FROM PUBLIC;
+    GRANT EXECUTE ON FUNCTION public.fixture_gate(uuid,text) TO authenticated;`);
+  await actor(pa,'aal2');
+  await db.exec('SET ROLE authenticated');
+  await assert.rejects(db.query("SELECT sdl_rbac_v5.set_platform_grant($1,true,'test')",[other]),{code:'42501'});
+  assert.equal((await db.query("SELECT public.fixture_gate($1,'read_private_statistics') AS ok",[playerB])).rows[0].ok,true);
+  await actor(gu);
+  assert.equal((await db.query("SELECT public.fixture_gate($1,'read_private_statistics') AS ok",[playerB])).rows[0].ok,false);
+  await db.exec('RESET ROLE');
   await actor(pa);await player(playerA,'read_private_statistics',false);
   await actor(pa,'aal2');await player(playerA,'read_private_statistics',true);await player(playerB,'read_private_statistics',true);
   await player(playerA,'enter_official_statistics',false);await player(playerA,'issue_guardian_invitation',false);
@@ -82,6 +96,9 @@ test('v5 foundation: scoped roles, denial, lifecycle and ACLs in synthetic SQL',
   await db.query("UPDATE public.team_memberships SET status='revoked' WHERE user_id=$1",[tm]);await player(playerA,'read_private_statistics',false);
   await actor(ca);await db.query("UPDATE public.sdl_club_enrollments SET status='ended',ended_at=now() WHERE athlete_id=$1",[athleteA]);await player(playerA,'read_private_statistics',false);
   await actor(gu);await player(playerA,'read_private_statistics',true);
-  await actor(pa,'aal2');await db.query("UPDATE sdl_rbac_v5.platform_admin_grants SET revoked_at=now() WHERE user_id=$1",[pa]);await player(playerA,'read_private_statistics',false);
+  await actor(pa,'aal2');await db.query("SELECT sdl_rbac_v5.set_platform_grant($1,false,'operator revocation')",[pa]);await player(playerA,'read_private_statistics',false);
+  const events=await db.query('SELECT action FROM sdl_rbac_v5.events ORDER BY id');
+  assert.deepEqual(events.rows.map(r=>r.action),['platform_granted','platform_revoked']);
+  await assert.rejects(db.exec('UPDATE sdl_rbac_v5.events SET reason=reason'),{code:'42501'});
  }finally{await db.close();}
 });
