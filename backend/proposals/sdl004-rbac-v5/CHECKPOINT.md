@@ -69,3 +69,7 @@ The family migration binds new manager invitations to an issuing team and rechec
 ## Official performance and growth
 
 Q14–Q16, F07 and F08 now use distinct named operations. Synthetic RPC tests cover club-admin direct entry, correction, duplicate retry, invalidation, denial of pending review and independent coach approval. Growth role attribution and manager permissions still need expanded tests. Correction evidence must document the reason for the replacement. Historical submissions and official revisions remain in place.
+
+## Media authorization
+
+Q19–Q24, F01, F10 and F12 now have object-specific decisions for playback and download, transactionally recorded download authorization, retention deadline checks, independent review and scoped publication. Staff and guardian uploads require current recording authorization at reservation and finish. Non-coach uploads are pending. The v1 player-level RPC denies requests following migration. Legacy-only media needs an independently verified provenance and client cutover plan. Four authenticated integration scenarios passed. Reject deadlines require an approved retention policy. External distribution stays closed.

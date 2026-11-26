@@ -170,7 +170,7 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
         const result = await call('sdl_004_clubhouse_videos', { p_team_id: teamId });
         return result.error ? error(result) : json({ items: result.value }, 200, origin);
       }
-      const match = path.match(/^\/v2\/submissions\/([^/]+)\/(review|publish|playback)$/);
+      const match = path.match(/^\/v2\/submissions\/([^/]+)\/(review|publish|playback|download)$/);
       if (!match || !validId(match[1])) return json({ error: 'Not found' }, 404, origin);
       const [, id, action] = match;
       if (['review','publish'].includes(action) && request.method === 'POST') {
@@ -186,8 +186,10 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
           :await call('sdl_004_publish_submission',{p_id:id,p_team_ids:body.team_ids,p_subject_athletes:body.subject_athletes??[]});
         return result.error ? error(result) : json({ updated: true }, 200, origin);
       }
-      if (action === 'playback' && request.method === 'GET') {
-        const allowed = await call('sdl_004_submission_can_read', { p_submission_id: id });
+      if (['playback','download'].includes(action) && request.method === 'GET') {
+        const allowed = action === 'download'
+          ? await call('sdl_v5_authorize_download', { p_id: id })
+          : await call('sdl_004_submission_can_read', { p_submission_id: id });
         if (allowed.error) return error(allowed);
         if (allowed.value !== true) return json({ error: 'Forbidden' }, 403, origin);
         let response, item;
@@ -197,6 +199,9 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
           item = (await response.json())?.[0];
         } catch { return json({ error: 'Metadata unavailable' }, 503, origin); }
         if (!item) return json({ error: 'Not found' }, 404, origin);
+        if (typeof item.object_key !== 'string' || !item.object_key.endsWith('/'+id+'.mp4') ||
+          !/^pilot\/[a-f0-9-]{36}\/[a-f0-9-]{36}\.mp4$/i.test(item.object_key))
+          return json({error:'Invalid media metadata'},503,origin);
         const range = request.headers.get('Range');
         if (range && !/^bytes=\d+-\d*$/i.test(range)) return json({ error: 'Unsupported range' }, 416, origin);
         let obj;
@@ -206,6 +211,7 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
         const headers = new Headers({ 'Content-Type': 'video/mp4', 'Cache-Control': 'private, no-store',
           'X-Content-Type-Options': 'nosniff', 'Accept-Ranges': 'bytes' });
         if (ORIGINS.has(origin)) { headers.set('Access-Control-Allow-Origin', origin); headers.set('Vary', 'Origin'); }
+        if (action === 'download') headers.set('Content-Disposition','attachment; filename="video.mp4"');
         if (obj.range) {
           headers.set('Content-Range', `bytes ${obj.range.offset}-${obj.range.offset+obj.range.length-1}/${obj.size}`);
           headers.set('Content-Length', String(obj.range.length));

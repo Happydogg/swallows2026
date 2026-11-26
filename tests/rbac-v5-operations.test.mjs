@@ -66,3 +66,29 @@ test('official entry, correction and independent parent review have separate sco
  assert.deepEqual(result,{source_kind:'club_admin',corrected:true,invalidated:true});
  await assert.rejects(as(parent,submit(702,true)),{code:'42501'});
 });
+
+test('download authorization checks subject, recording, retention and current role on every request',async t=>{
+ const {owner,as,upload}=await rbacV5(t);
+ await assert.rejects(upload(),{code:'42501'});
+ await owner(`UPDATE public.sdl_club_enrollments SET recording_storage_authorized=true,recording_permission_ref='synthetic approval' WHERE organization_id='${org}'`);
+ const adminUpload=await upload(adminUser);
+ assert.equal((await owner(`SELECT status FROM public.sdl_video_submissions WHERE id='${adminUpload}'`))[0].status,'pending');
+ const id=await upload();
+ const download=`SELECT public.sdl_v5_authorize_download('${id}') AS allowed`;
+ const allowed=async who=>(await as(who,download))[0].allowed;
+ assert.equal(await allowed(parent),false);
+
+ assert.equal(await allowed(parent),false);
+ await owner(`UPDATE public.sdl_video_submissions SET subject_scope='single_athlete',subject_confirmed_by='${coach}' WHERE id='${id}'`);
+ assert.equal(await allowed(parent),true);
+ assert.equal(await allowed(adminUser),true);
+ assert.equal(await allowed(outsider),false);
+ await owner(`UPDATE public.sdl_video_submissions SET status='rejected' WHERE id='${id}'`);
+ assert.equal(await allowed(parent),false);
+ await owner(`UPDATE public.sdl_video_submissions SET rejected_access_until=now()+interval '1 minute' WHERE id='${id}'`);
+ assert.equal(await allowed(parent),true);
+ await owner(`UPDATE public.profiles SET status='suspended' WHERE id='${parent}'`);
+ assert.equal(await allowed(parent),false);
+ assert.equal((await as(coach,`SELECT public.sdl_004_media_can_access('${player}','read') AS allowed`))[0].allowed,false);
+ assert.equal((await owner("SELECT count(*)::int AS n FROM sdl_rbac_v5.events WHERE action='download_authorized'"))[0].n,3);
+});
