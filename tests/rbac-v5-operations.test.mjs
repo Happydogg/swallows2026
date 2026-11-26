@@ -1,0 +1,32 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {rbacV5} from './helpers/rbacV5.mjs';
+import {uuid,parent,coach,team,org,otherTeam,outsider,player} from './helpers/submissionDatabase.mjs';
+import {adminUser} from './helpers/clubWorkflow.mjs';
+
+test('authenticated delegation and registration use current scope and preserve revoked assignments',async t=>{
+ const {as,owner}=await rbacV5(t);
+ const set=(scope,target,role,grant)=>`SELECT public.sdl_v5_set_staff('${scope}','${target}','${role}',${grant},'synthetic staff change')`;
+ await assert.rejects(as(parent,set(org,outsider,'club_admin',true)),{code:'42501'});
+ await owner(`SELECT sdl_rbac_v5.set_platform_grant('${parent}',true,'fixture')`);
+ await assert.rejects(as(parent,set(org,outsider,'club_admin',true)),{code:'42501'});
+ await owner("SELECT set_config('test.aal','aal2',false)");
+ await as(parent,set(org,outsider,'club_admin',true));
+ await as(parent,set(org,outsider,'club_admin',false));
+ await as(adminUser,set(team,coach,'manager',true));
+ await assert.rejects(as(coach,set(otherTeam,parent,'coach',true)),{code:'42501'});
+ await assert.rejects(as(coach,set(team,parent,'manager',true)),{code:'42501'});
+ await as(coach,set(team,parent,'coach',true));
+ await as(coach,set(team,parent,'coach',false));
+ const [prereq]=await owner(`SELECT status FROM public.organization_memberships WHERE user_id='${parent}' AND role='staff'`);
+ assert.equal(prereq.status,'revoked');
+ await assert.rejects(as(coach,set(team,parent,'coach',true)),{code:'PT409'});
+ const register=`SELECT public.sdl_v5_register_player('${team}','Synthetic player','14','${uuid(980)}','new roster') AS id`;
+ await assert.rejects(as(outsider,register),{code:'42501'});
+ const [registered]=await as(coach,register);
+ assert.deepEqual(await as(coach,register),[registered]);
+ assert.notEqual(registered.id,player);
+ await assert.rejects(as(coach,register.replace("'14'","'15'")),{code:'PT409'});
+ await as(adminUser,set(team,coach,'manager',false));
+ await assert.rejects(as(coach,register),{code:'42501'});
+});

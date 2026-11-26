@@ -57,3 +57,7 @@ P = partially implemented. M = missing. C = conflicts with earlier semantics. B 
 ## Phase 1
 
 The candidate private predicates now run through a fixture definer RPC under an authenticated SQL role. The predicates use the owner's private-table access while retaining the caller's identity. A restricted maintenance function performs initial platform grants or revocation with an immutable event in the same transaction. Revoked platform grants require separate recovery review. Platform MFA uses the validated JWT assurance claim. No user is seeded. The isolated foundation test passed before CLI migration generation. Operator identity is the database session user for maintenance events. A shared operator login requires a separately attributable operational approval.
+
+## Staff delegation and Q04
+
+The authenticated delegation and registration test applies both historical migrations and the v5 migrations. It exercises AAL2 club delegation, manager restrictions, atomic coach prerequisites, removal, registration retries and denial after role removal. Q04 is locally tested. Internal and cross-club transfers require additional workflow coverage.
