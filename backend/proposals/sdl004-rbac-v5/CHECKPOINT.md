@@ -85,3 +85,7 @@ Q18 and Q25 include bounded official-statistics export pages and v5 audit pages.
 ## Roster and transfers
 
 Q07–Q08 now have roster ending, scoped internal requests, destination approval, and a cross-club completion workflow. The latter requires source club, destination club and verified family authority. It creates a separate destination player record for the same athlete. The synthetic test checks the destination receives no source player record, the old assignment ends and approval cannot be replayed. Seven integration scenarios passed.
+
+## Local restrictions and verified unlinking
+
+Q13 and F04 have separate team/club participation restrictions and a global relationship transition that consumes an operator-verified case. The local restriction preserves own-child history and other roles, while blocking new affected guardian submissions. Verified grounds, dispute handling and recovery remain operational release requirements. All eight scenarios passed in PGlite and independently on an isolated native PostgreSQL 17 server using synthetic JWT/session fixtures.

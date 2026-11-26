@@ -150,3 +150,24 @@ test('cross-club transfer preserves identity and separates history until both cl
  assert.equal((await owner(`SELECT status FROM public.player_team_memberships WHERE player_id='${child}'`))[0].status,'inactive');
  await assert.rejects(as(outsider,approve('destination')),{code:'PT409'});
 });
+
+test('local restrictions preserve own-child history and global unlink requires a verified platform case',async t=>{
+ const {as,owner}=await rbacV5(t);
+ const restrict=`SELECT public.sdl_v5_restrict_guardian('${parent}','${org}','${team}','verified local request')`;
+ await assert.rejects(as(coach,restrict),{code:'42501'});
+ await as(adminUser,restrict);
+ const submit=`SELECT public.sdl_004_pilot_submit_performance('${player}','exit-radar-v1',77,CURRENT_DATE,'fixture','${uuid(999)}',false)`;
+ await assert.rejects(as(parent,submit),{code:'42501'});
+ const history=`SELECT * FROM public.sdl_004_player_statistics('${player}')`;
+ assert.deepEqual(await as(parent,history),[]);
+ const cid=uuid(998);
+ const unlink=`SELECT public.sdl_v5_unlink_guardian('${cid}','${uuid(41)}','${parent}','verified case')`;
+ await assert.rejects(as(adminUser,unlink),{code:'42501'});
+ await owner(`SELECT sdl_rbac_v5.set_platform_grant('${outsider}',true,'fixture')`);
+ await owner("SELECT set_config('test.aal','aal2',false)");
+ await assert.rejects(as(outsider,unlink),{code:'42501'});
+ await owner(`INSERT INTO sdl_rbac_v5.verified_cases(id,action,target_id,scope_id,expires_at) VALUES('${cid}','guardian_unlink','${parent}','${uuid(41)}',now()+interval '1 hour')`);
+ await as(outsider,unlink);
+ await assert.rejects(as(parent,history),{code:'42501'});
+ await assert.rejects(as(outsider,unlink),{code:'42501'});
+});
