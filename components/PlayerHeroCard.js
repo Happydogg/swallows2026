@@ -44,12 +44,11 @@ export const PlayerHeroCard = {
   },
   template: `
     <div v-if="variant === 'profile'"
-      class="print-card relative isolate overflow-hidden rounded-3xl border border-blue-400/30 bg-gradient-to-br from-blue-950 via-slate-900 to-slate-950 p-5 shadow-xl sm:p-7"
+      class="print-card sdl-panel relative isolate overflow-hidden p-4 sm:p-5"
       aria-label="Player identity and measurements">
-      <div class="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-cyan-500/15 blur-3xl no-print" aria-hidden="true"></div>
-      <div class="relative flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+      <div class="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div class="flex min-w-0 items-start gap-4 sm:gap-5">
-          <div class="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-blue-400/40 bg-blue-950 text-2xl font-black text-cyan-200 sm:h-28 sm:w-28">
+          <div class="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-blue-400/40 bg-blue-950 text-2xl font-black text-cyan-200 sm:h-20 sm:w-20">
             <img v-if="player.photo_url && !failedImgs[player.id]" :src="formatImgUrl(player.photo_url)"
               :alt="getPlayerDisplayName(player)" class="h-full w-full object-cover" referrerpolicy="no-referrer"
               @error="markImgFailed(player.id)">
@@ -73,8 +72,8 @@ export const PlayerHeroCard = {
             </p>
           </div>
         </div>
-        <div class="w-full shrink-0 space-y-3 rounded-2xl border border-slate-600/50 bg-slate-950/65 p-4 md:w-64">
-          <p class="text-xs font-bold uppercase tracking-wider text-sky-300">Latest recorded measurements</p>
+        <div class="w-full min-w-0 space-y-2 border-t border-slate-700 pt-3 lg:w-52 lg:shrink-0 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+          <p class="text-xs font-bold uppercase tracking-wider text-sky-300">Growth &amp; equipment</p>
           <p class="break-words text-sm font-semibold text-white">{{ formatHeightWeight(player.id) }}</p>
           <p v-if="calculateJumpRatio(player.id)" class="text-sm font-semibold" :class="getJumpRatioColor(calculateJumpRatio(player.id))">
             {{ t('jumpRatioLabel') }}: {{ calculateJumpRatio(player.id) }}x
@@ -86,8 +85,8 @@ export const PlayerHeroCard = {
       </div>
     </div>
 
-    <div v-else class="flex min-w-0 items-center gap-4 rounded-t-2xl bg-gradient-to-r from-blue-900/80 to-slate-900 p-5" aria-label="Player card">
-      <div class="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-blue-400/30 bg-blue-950 text-2xl font-black text-cyan-200" aria-hidden="true">
+    <div v-else class="flex min-w-0 items-center gap-3 p-4" aria-label="Player card">
+      <div class="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-blue-400/30 bg-blue-950 text-2xl font-black text-cyan-200" aria-hidden="true">
         <img v-if="player.photo_url" :src="formatImgUrl(player.photo_url)" alt="" class="h-full w-full object-cover" referrerpolicy="no-referrer">
         <span v-else>#{{ player.jersey || '–' }}</span>
       </div>
