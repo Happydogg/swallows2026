@@ -108,7 +108,7 @@ export async function harness(t, initialUser = null, options = {}) {
   BrowserURL.createObjectURL=()=> 'blob:synthetic';BrowserURL.revokeObjectURL=url=>h.revoked.push(url);
   const context = vm.createContext({ Vue, AbortController, DOMException, Blob, crypto:webcrypto, window: {
     supabase: { createClient: () => db },
-    location:{href:'https://synthetic.invalid/',pathname:'/',search:'',hash:options.invitationHash??''},
+    location:{href:'https://synthetic.invalid/',origin:options.origin,pathname:'/',search:'',hash:options.invitationHash??''},
     history:{replaceState(_a,_b,url){h.replacedUrl=url;}},
     initMediaPipe: async () => {
       h.poseCalls++;
