@@ -318,3 +318,27 @@ test('UX-IA-03 separates profile tasks without replacing existing chart, report,
   assert.match(index,/activeTab === 'team' && mediaOriginAllowed && visibleStagingPlayers.some/);
   assert.match(index,/performancePlayers.some\(row => row.id === selectedPlayer.id\)/);
 });
+
+test('UX-IA-04 uses shared screen-only surfaces and keeps print and synthetic preview separate',()=>{
+  const preview=fs.readFileSync(new URL('../preview/index.html',import.meta.url),'utf8');
+  const css= index.slice(index.indexOf('    /* SDL-UX-IA-04:'),index.indexOf('    @media print {')).trimEnd();
+  assert.ok(preview.includes(css),'shared visual tokens stay identical in live and synthetic preview');
+  assert.match(index,/name="viewport" content="width=device-width, initial-scale=1.0"/);
+  assert.match(shell,/class="sdl-shell min-h-screen/);
+  assert.match(shell,/class="sdl-content min-w-0"/);
+  assert.match(css,/focus-visible/);
+  assert.match(css,/min-height: 44px/);
+  assert.match(index,/\.profile-print-section \{ display: block !important; \}/);
+  for(const file of ['CoachHome','ParentHome','CoachTeamRoster','ManagedRoster','PlayerHeroCard','PlayerProfile','PerformanceWorkspace']){
+    const component=fs.readFileSync(new URL('../components/'+file+'.js',import.meta.url),'utf8');
+    assert.ok(component.includes('sdl-panel'),file);
+  }
+  const stats=fs.readFileSync(new URL('../components/AuthorizedStatsBoard.js',import.meta.url),'utf8');
+  assert.match(stats,/<svg v-if="points\(sessions,m\)"/);
+  assert.match(stats,/One recorded result · no comparison yet/);
+  assert.match(stats,/recordedMetrics.length > 1/);
+  assert.match(stats,/recordedMetrics.length > 3/);
+  assert.match(stats,/Only current recorded results appear here; superseded measurements remain in revision history/);
+  const performance=fs.readFileSync(new URL('../components/PerformanceWorkspace.js',import.meta.url),'utf8');
+  assert.match(performance,/row.superseded_by \? 'text-slate-400 line-through'/);
+});
