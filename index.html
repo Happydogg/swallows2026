@@ -216,6 +216,9 @@
             <p class="text-xs sdl-muted">Access is determined by your verified membership and guardian links.</p>
           </div>
         </div>
+        <!-- Synthetic staging consent acceptance surface; UX-003 owns final presentation. -->
+        <media-consent-panel v-if="activeTab === 'me' && workspaceMode === 'family' && isVerifiedGuardian && mediaOriginAllowed"
+          :key="authUser.id" :auth="loginController" :players="familyPlayers"></media-consent-panel>
         <section class="sdl-panel space-y-3 p-4 sm:p-5" aria-label="Preferences">
           <h2 class="sdl-section-title">Preferences</h2>
           <label class="block max-w-sm text-sm font-semibold text-slate-200">Language

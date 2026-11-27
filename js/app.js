@@ -25,6 +25,7 @@ import { useSubmissionWorkspace } from '../composables/useSubmissionWorkspace.js
 import { SubmissionWorkspace } from '../components/SubmissionWorkspace.js';
 import { usePrivateMedia } from '../composables/usePrivateMedia.js';
 import { PrivateMediaPanel } from '../components/PrivateMediaPanel.js';
+import { MediaConsentPanel } from '../components/MediaConsentPanel.js';
 import { useVideos } from '../composables/useVideos.js';
 import { useAnalytics } from '../composables/useAnalytics.js';
 import { useRosterCsv } from '../composables/useRosterCsv.js';
@@ -53,7 +54,7 @@ const { createApp, ref, onMounted, onUnmounted, markRaw, computed } = Vue;
 
 createApp({
   components: {
-    PilotWorkspace, PerformanceInbox, LoginLanding, AppShell, CoachHome, ParentHome, StatsHub, AuthorizedStatsBoard, StagingDataBrowser, AvatarManager, InviteOnboarding, AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
+    PilotWorkspace, PerformanceInbox, LoginLanding, AppShell, CoachHome, ParentHome, StatsHub, AuthorizedStatsBoard, StagingDataBrowser, AvatarManager, InviteOnboarding, AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, MediaConsentPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
     SessionFormModal, UploadVideoModal, ArAnalyzerModal, ManagedRoster, PerformanceWorkspace
   },
   setup() {
