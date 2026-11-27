@@ -257,3 +257,24 @@ test('private video room occupies the video section of authorized player profile
   assert.ok(index.includes(':controller="privateMediaController"'));
   assert.ok(index.includes('verified family members'));
 });
+
+test('UX-IA-01 places primary Team and Videos content before restricted submissions without enabling the gate',()=>{
+  const managed=fs.readFileSync(new URL('../components/ManagedRoster.js',import.meta.url),'utf8');
+  const coach=fs.readFileSync(new URL('../components/CoachTeamRoster.js',import.meta.url),'utf8');
+  const config=fs.readFileSync(new URL('../js/config.js',import.meta.url),'utf8');
+  const submission= index.indexOf('<submission-workspace');
+  assert.ok(submission>index.indexOf('<coach-team-roster'));
+  assert.ok(submission>index.lastIndexOf('<private-media-panel'));
+  assert.match(index,/<details :open="submissionController.enabled \? true : undefined"/);
+  assert.match(index,/<app-header class="hidden"/);
+  assert.match(index,/:show-review="submissionController.enabled"/);
+  assert.match(coach,/v-if="showReview"/);
+  assert.match(managed,/!home && !scopeOnly && !controller.denied.value/);
+  assert.match(managed,/!home && !scopeOnly && controller.pendingChange.value/);
+  assert.match(managed,/v-else-if="home"/);
+  assert.match(managed,/v-else-if="!scopeOnly"/);
+  assert.match(config,/SUBMISSION_FEATURES_ENABLED = false/);
+  assert.match(familyHome,/\$emit\('open-profile',player\)/);
+  assert.match(familyHome,/\$emit\('open-video',player\)/);
+  assert.match(index,/Language\s*<select :value="currentLang" @change="currentLang = \$event.target.value; saveLanguage\(\)"/);
+});

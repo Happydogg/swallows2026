@@ -223,9 +223,11 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
     platform:{view:false,export:false,sensitive_write:false}};
   h.rows.sdl_v5_authorized_roster={version:1,role:'club_admin',rows:[{id:'fixture-player',organization_id:'club-a',team_ids:['team-a1'],preferred_name:'Synthetic Roster Player',jersey:'10',position:'P',throws:'R',bats:'L'}],next_after:null};
   await h.app.signInAndLoad();await Vue.nextTick();
-  assert.match(flatten(host),/Club Admin Dashboard/);assert.match(flatten(host),/Synthetic Roster Player/);
+  assert.match(flatten(host),/Club Admin Dashboard/);assert.match(flatten(host),/Players loaded/);
+  assert.doesNotMatch(flatten(host),/Synthetic Roster Player|Register player|Change team assignment/);
   assert.match(flatten(host),/Empty Team/);
   h.app.navigateTab('team');await Vue.nextTick();assert.match(flatten(host),/Club Admin Roster/);
+  assert.match(flatten(host),/Synthetic Roster Player/);assert.match(flatten(host),/Register player/);
   h.rows.sdl_v5_authorized_roster={version:1,role:'club_admin',rows:[],next_after:null};
   await h.app.changeManagedTeam('empty');await Vue.nextTick();
   assert.match(flatten(host),/No players in this authorized scope/);

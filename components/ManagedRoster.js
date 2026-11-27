@@ -40,7 +40,7 @@ export const ManagedRoster = {
         </label>
         <p class="text-xs text-slate-400 sm:col-span-2">{{ controller.teams.value.length }} authorized team(s) in this club</p>
       </div>
-      <section v-if="!scopeOnly && !controller.denied.value && controller.teams.value.length"
+      <section v-if="!home && !scopeOnly && !controller.denied.value && controller.teams.value.length"
         class="space-y-3 rounded-xl border border-slate-700 bg-slate-900/80 p-4" aria-label="Scoped roster management">
         <button v-if="!controller.registrationOpen.value" type="button"
           :disabled="controller.writeBusy.value || controller.loading.value"
@@ -78,16 +78,16 @@ export const ManagedRoster = {
           </div>
         </form>
       </section>
-      <p v-if="controller.writeNotice.value && !scopeOnly" role="status"
+      <p v-if="!home && controller.writeNotice.value && !scopeOnly" role="status"
         class="rounded-lg border border-emerald-800 p-3 text-emerald-200">{{ controller.writeNotice.value }}</p>
-      <div v-if="controller.writeError.value && !scopeOnly" role="alert"
+      <div v-if="!home && controller.writeError.value && !scopeOnly" role="alert"
         class="space-y-2 rounded-lg border border-rose-800 p-3 text-rose-200">
         <p>{{ controller.writeError.value }}</p>
         <button type="button" @click="controller.fetchPage()"
           :disabled="controller.writeBusy.value || controller.loading.value || controller.denied.value"
           class="rounded-lg border border-rose-700 px-4 py-2 text-sm font-semibold disabled:opacity-50">Refresh authorized roster</button>
       </div>
-      <form v-if="!scopeOnly && controller.pendingChange.value" @submit.prevent="controller.commitRosterChange()"
+      <form v-if="!home && !scopeOnly && controller.pendingChange.value" @submit.prevent="controller.commitRosterChange()"
         class="space-y-3 rounded-xl border border-amber-600/60 bg-amber-950/20 p-4" aria-label="Confirm team membership change">
         <h2 class="font-bold">Review team assignment</h2>
         <p>{{ controller.pendingChange.value.add ? 'Add' : 'End assignment for' }}
@@ -111,6 +111,10 @@ export const ManagedRoster = {
       <p v-else-if="controller.loading.value && !controller.rows.value.length" role="status" class="p-4 text-slate-300">Loading authorized roster…</p>
       <p v-else-if="!controller.organizations.value.length || (controller.role.value === 'manager' && !controller.teams.value.length)" class="rounded-xl border border-slate-700 p-5 text-slate-400">No authorized teams or clubs are available.</p>
       <p v-else-if="!controller.rows.value.length" class="rounded-xl border border-slate-700 p-5 text-slate-400">No players in this authorized scope.</p>
+      <div v-else-if="home" class="grid grid-cols-2 gap-3" aria-label="Roster summary">
+        <div class="rounded-xl border border-slate-700 bg-slate-800 p-4"><p class="text-xs text-slate-400">Authorized teams in club</p><p class="mt-2 text-2xl font-bold">{{ controller.teams.value.length }}</p></div>
+        <div class="rounded-xl border border-slate-700 bg-slate-800 p-4"><p class="text-xs text-slate-400">Players loaded{{ controller.nextAfter.value ? ' (more available)' : '' }}</p><p class="mt-2 text-2xl font-bold">{{ controller.rows.value.length }}</p></div>
+      </div>
       <template v-else-if="!scopeOnly">
         <label class="block text-sm">Search loaded players<input v-model="search" type="search" class="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-950 p-3" /></label>
         <p class="text-sm text-slate-400">{{ controller.rows.value.length }} loaded players{{ controller.nextAfter.value ? ' · more available' : '' }}</p>
@@ -137,6 +141,6 @@ export const ManagedRoster = {
           </article>
         </div>
       </template>
-        <button v-if="controller.nextAfter.value" type="button" :disabled="controller.loading.value" class="w-full rounded-xl bg-slate-700 p-3 font-semibold disabled:opacity-50" @click="$emit('more')">{{ controller.loading.value ? 'Loading…' : 'Load more players' }}</button>
+        <button v-if="!home && controller.nextAfter.value" type="button" :disabled="controller.loading.value" class="w-full rounded-xl bg-slate-700 p-3 font-semibold disabled:opacity-50" @click="$emit('more')">{{ controller.loading.value ? 'Loading…' : 'Load more players' }}</button>
     </section>`
 };

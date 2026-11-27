@@ -153,11 +153,16 @@
           <div class="text-slate-400">{{ workspaceOptions.map(option=>option.label).join(' · ') || 'No enabled workspace' }}</div>
           <div class="text-xs text-slate-500">Authorized clubs: {{ ordinaryOrganizations.length }} · Authorized teams: {{ ordinaryTeams.length }} · Verified guardian links: {{ guardianLinks.length }}</div>
         </div>
+        <label class="block text-sm font-semibold text-slate-200">Language
+          <select :value="currentLang" @change="currentLang = $event.target.value; saveLanguage()" class="mt-1 block min-h-11 rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm">
+            <option value="en">English (EN)</option><option value="zh">繁體中文 (ZH)</option><option value="ja">日本語 (JA)</option>
+          </select>
+        </label>
         <button @click="signOutAndClear" :disabled="authBusy" class="bg-slate-700 px-4 py-2 rounded text-sm">Sign out</button>
       </section>
       <div v-if="authError" role="alert" class="mb-3 text-rose-300 text-sm no-print">{{ authError }} <button type="button" class="ml-2 underline" @click="reloadMemberships">Refresh account permissions</button></div>
     <!-- Top Header Bar (Hidden during printing) -->
-    <app-header :class="activeTab === 'team' || activeTab === 'stats' ? '' : 'hidden'" :t="t" :current-lang="currentLang" :current-view="currentView" :is-coach="isCoach"
+    <app-header class="hidden" :t="t" :current-lang="currentLang" :current-view="currentView" :is-coach="isCoach"
       @change-language="currentLang = $event; saveLanguage()"
       @navigate-overview="currentView = 'overview'; if (isVerifiedGuardian && !isTeamCoach) submissionController.changeTab('players')"
       @export-csv="exportTeamCSV" @import-csv="importTeamCSV($event)"
@@ -165,7 +170,6 @@
       @unlock-coach="unlockCoachMode"></app-header>
 
     <pilot-workspace :class="activeTab === 'me' && !isManagedWorkspace ? '' : 'hidden'" :controller="pilotController"></pilot-workspace>
-    <submission-workspace :class="!isManagedWorkspace && (activeTab === 'team' || activeTab === 'stats' || (activeTab === 'videos' && mediaOriginAllowed)) && currentView !== 'player' ? '' : 'hidden'" :controller="submissionController" :pilot-controller="pilotController" :t="t"></submission-workspace>
     <club-enrollment-admin :class="activeTab === 'me' && !isManagedWorkspace ? '' : 'hidden'" :controller="enrollmentAdminController"></club-enrollment-admin>
     <!-- Private staging avatars: all available profiles are server-filtered. -->
     <avatar-manager :controller="avatarController" :show-list="activeTab === 'me' && workspaceMode === 'admin'" @open-profile="openManagedPlayerProfile"></avatar-manager>
@@ -177,7 +181,7 @@
 
     <!-- SDL-001 / SDL-004: Verified parents land on My Players above, not the legacy Coach Overview -->
     <coach-team-roster v-else-if="currentView === 'overview' && isTeamCoach && workspaceMode === 'coach'" :key="coachOrganizationId + ':' + coachTeamId" :class="activeTab === 'team' ? '' : 'hidden'"
-      :roster="coachRosterDisplay" :show-team-filter="false" :loading="coachRosterLoading" :error="coachRosterError" @open-review="submissionController.enterReview($event)" @open-profile="selectCoachRosterPlayer"></coach-team-roster>
+      :roster="coachRosterDisplay" :show-team-filter="false" :show-review="submissionController.enabled" :loading="coachRosterLoading" :error="coachRosterError" @open-review="submissionController.enterReview($event)" @open-profile="selectCoachRosterPlayer"></coach-team-roster>
     <team-overview v-else-if="currentView === 'overview' && isCoach && workspaceMode === 'coach'" :class="activeTab === 'team' || activeTab === 'stats' ? '' : 'hidden'"
       :t="t"
       :players="players"
@@ -244,6 +248,14 @@
     <p v-if="activeTab === 'videos' && isManagedWorkspace" role="status" class="rounded-xl border border-slate-700 bg-slate-800 p-5 text-slate-300">Media is unavailable in this restricted workspace.</p>
     <private-media-panel v-if="activeTab === 'videos' && mediaOriginAllowed && !isManagedWorkspace"
       :controller="privateMediaController"></private-media-panel>
+
+    <!-- Keep the existing gated workspace mounted and reachable, after the primary roster/library.
+         The details disclosure changes presentation only; it does not enable any operation. -->
+    <details :open="submissionController.enabled ? true : undefined"
+      :class="!isManagedWorkspace && (activeTab === 'team' || activeTab === 'stats' || (activeTab === 'videos' && mediaOriginAllowed)) && currentView !== 'player' ? 'mt-4 rounded-xl border border-slate-700 p-3 no-print' : 'hidden'">
+      <summary class="min-h-11 cursor-pointer py-3 text-sm font-semibold text-slate-300">{{ submissionController.enabled ? 'Submissions and Clubhouse' : 'Submissions and Clubhouse · currently unavailable' }}</summary>
+      <submission-workspace :controller="submissionController" :pilot-controller="pilotController" :t="t"></submission-workspace>
+    </details>
 
     <!-- SDL-002: Unified Player Form (Add / Edit) -->
     <player-form-modal

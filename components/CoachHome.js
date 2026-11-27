@@ -11,7 +11,7 @@ export const CoachHome = {
   emits: ['navigate', 'open-profile', 'open-video'],
   setup(props) {
     const teamCount = Vue.computed(() => props.authorizedTeamCount ?? new Set(props.roster.map(p => p.team_id).filter(Boolean)).size);
-    const preview = Vue.computed(() => props.roster); // Full authorized roster; no five-player truncation.
+    const preview = Vue.computed(() => props.roster.slice(0, 3)); // Home preview only; Team owns the complete roster.
     const avatarFor = player => {
       const approved=String(player?.photo_url||'');
       if (/^https:\/\//.test(approved) || /^\/assets\/demo-players\/(2[1-9]|3[0-5])\.svg$/.test(approved)) return approved;
@@ -24,11 +24,11 @@ export const CoachHome = {
   template: `
   <section class="space-y-5" aria-label="Coach home">
     <header class="flex flex-wrap items-center justify-between gap-3">
-      <h1 class="text-2xl font-black tracking-tight text-white sm:text-3xl">Coach Dashboard</h1>
+      <h1 class="text-2xl font-black tracking-tight text-white sm:text-3xl">Team overview</h1>
       <button type="button" @click="$emit('navigate','team')" class="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-500">Open team roster</button>
     </header>
     <p v-if="error" class="rounded-xl border border-rose-700/60 bg-rose-950/30 p-3 text-sm text-rose-200" role="alert">{{ error }}</p>
-    <div class="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+    <div class="grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-3">
       <div class="rounded-2xl border border-slate-700 bg-slate-800/70 p-4">
         <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Authorized teams</p>
         <p class="mt-2 text-3xl font-black text-white">{{ loading ? '…' : teamCount }}</p>
@@ -37,20 +37,12 @@ export const CoachHome = {
         <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Roster players</p>
         <p class="mt-2 text-3xl font-black text-cyan-300">{{ loading ? '…' : roster.length }}</p>
       </div>
-      <div class="rounded-2xl border border-slate-700 bg-slate-800/70 p-4">
-        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Player performance</p>
-        <button type="button" @click="$emit('navigate','stats')" class="mt-2 text-left text-sm font-bold text-cyan-300 underline underline-offset-4">Open stats</button>
-      </div>
-      <div class="rounded-2xl border border-slate-700 bg-slate-800/70 p-4">
-        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Private media</p>
-        <button type="button" @click="$emit('navigate','videos')" class="mt-2 text-left text-sm font-bold text-cyan-300 underline underline-offset-4">Open videos</button>
-      </div>
     </div>
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-5">
       <div class="rounded-2xl border border-slate-700 bg-slate-900/90 p-5 lg:col-span-3">
         <div class="mb-4 flex items-center justify-between gap-2">
-          <h2 class="text-lg font-bold">Full team roster</h2>
-          <button type="button" @click="$emit('navigate','team')" class="text-sm font-semibold text-cyan-300">View all</button>
+          <h2 class="text-lg font-bold">Player shortcuts</h2>
+          <span class="text-xs text-slate-400">Up to 3 players</span>
         </div>
         <p v-if="loading" class="text-sm text-slate-400" role="status">Loading authorized players…</p>
         <p v-else-if="!roster.length" class="rounded-xl border border-dashed border-slate-700 p-5 text-sm text-slate-400">No players are available in your verified team roster yet.</p>
@@ -77,11 +69,9 @@ export const CoachHome = {
       </div>
       <div class="space-y-3 rounded-2xl border border-slate-700 bg-slate-900/90 p-5 lg:col-span-2">
         <h2 class="text-lg font-bold">Quick access</h2>
-        <button type="button" @click="$emit('navigate','team')" class="flex w-full items-center justify-between rounded-xl bg-blue-700/25 p-4 text-left text-sm font-semibold hover:bg-blue-700/40">
-          <span>Team and roster</span><span aria-hidden="true">›</span>
-        </button>
+
         <button type="button" @click="$emit('navigate','stats')" class="flex w-full items-center justify-between rounded-xl bg-slate-800 p-4 text-left text-sm font-semibold hover:bg-slate-700">
-          <span>Performance and approvals</span><span aria-hidden="true">›</span>
+          <span>Performance</span><span aria-hidden="true">›</span>
         </button>
         <button type="button" @click="$emit('navigate','videos')" class="flex w-full items-center justify-between rounded-xl bg-slate-800 p-4 text-left text-sm font-semibold hover:bg-slate-700">
           <span>Private video library</span><span aria-hidden="true">›</span>
