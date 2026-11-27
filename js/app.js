@@ -121,7 +121,13 @@ createApp({
       if (workspaceOptions.value.some(option => option.id === requestedWorkspace.value)) return requestedWorkspace.value;
       return workspaceOptions.value[0]?.id || 'member';
     });
-    const managedRoster = useManagedRoster({auth, mode: workspaceMode});
+    const managedRoster = useManagedRoster({auth, mode: workspaceMode, onUpdated: () => {
+      // A successful roster mutation invalidates cached player projections and photos.
+      selectedPlayer.value = null;
+      currentView.value = 'overview';
+      clearProfileHistory();
+      avatarManager.reset();
+    }});
     const isManagedWorkspace = computed(() => ['admin','manager'].includes(workspaceMode.value));
     const coachOrganizations = computed(() => (auth.accountContext.value?.organizations || []).filter(row => row.roles.includes('coach')));
     const coachTeams = computed(() => (auth.accountContext.value?.teams || []).filter(row => row.roles.includes('coach') &&
