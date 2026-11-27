@@ -22,11 +22,12 @@ test('synthetic growth is marked nonofficial and private videos keep their origi
  assert.match(index,/mediaOriginAllowed &&/);
 });
 
-test('Coach Home renders entire authorized roster with direct photo and name navigation',()=>{
+test('Coach Home has a bounded preview; Team retains the entire authorized roster and direct profile navigation',()=>{
  const home=read('components/CoachHome.js'),detail=read('components/CoachTeamRoster.js');
  const index=read('index.html'),app=read('js/app.js');
- assert.match(home,/const preview = Vue.computed\(\(\) => props.roster\)/);
- assert.doesNotMatch(home,/roster\.slice\(/);
+ assert.match(home,/const preview = Vue.computed\(\(\) => props.roster\.slice\(0, 3\)\)/);
+ assert.doesNotMatch(detail,/roster\.slice\(/);
+ assert.match(detail,/return props.roster.filter/);
  assert.match(home,/<button type="button" @click="\$emit\('open-profile',player\)"/);
  assert.match(home,/<img v-if="avatarFor\(player\)"/);
  assert.match(index,/<coach-home[\s\S]*?@open-profile="selectCoachRosterPlayer"/);
