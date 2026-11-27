@@ -1,5 +1,13 @@
 # Swallows DataLab | Repository Master Index (Coordination Mirror)
 
+## 2026-11-27 latest ADMIN handoff
+
+**Owner acceptance:** `SDL-UX-002-ADMIN-01` is accepted and closed **for staging UX only** following owner-reported 5/5 browser checks. PR [#9](https://github.com/Happydogg/swallows2026/pull/9) merged at `c9ad810459db6e5ad4c5834f7e4882970842f987`; Cloudflare UX Live deployment succeeded with 155 automated tests and one UI smoke test passing. This is not independent backend security acceptance or a production pilot sign-off.
+
+**New approved workstream:** `SDL-UX-002-ADMIN-02` staff role management. Backend `SDL-004B-RBAC-02` owns the authoritative scoped staff directory and role-assignment read contract. Existing write RPC `sdl_v5_set_staff` is present, but the read contract for current assignments and eligible staff is not yet available. Avoid enabling blind assignment controls. See [staff contract](docs/SDL-UX-002-ADMIN-02-STAFF-CONTRACT.md). Staging prototype source must remain on an isolated branch until contract/security QA.
+
+---
+
 **Updated:** 2026-11-27. **Status:** Working GitHub coordination mirror. Reconcile against the independent SDL Master Directory before calling this authoritative.
 
 ## 2026-11-27 E2E Round 2 functional acceptance handoff
