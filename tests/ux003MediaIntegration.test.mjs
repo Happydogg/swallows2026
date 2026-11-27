@@ -41,8 +41,9 @@ test('Library and Clubhouse are mutually exclusive and gated by original origin'
  assert.match(index,/<private-media-panel v-if="activeTab === 'videos' && mediaOriginAllowed && videoSection==='library'"/);
  assert.match(index,/<clubhouse-media-panel v-if="activeTab === 'videos' && mediaOriginAllowed && !authError && videoSection==='clubhouse' && clubhouseMediaTeams.length"/);
  assert.match(index,/ref="publicationPanel"/);
- assert.match(index,/central review inbox is not yet available/);
- assert.doesNotMatch(index,/<video-review-inbox/);
+ assert.match(index,/<video-review-inbox/);
+ assert.match(index,/<action-center/);
+ assert.match(index,/<private-media-panel review-only/);
 });
 function coachContext(h){
  h.app.accountContext.value={...h.app.accountContext.value,roles:['coach'],organizations:[{id:'org',name:'Club',roles:['coach']}],teams:[{id:'team',name:'Team',organization_id:'org',roles:['coach']}]};
@@ -63,7 +64,8 @@ test('authorized subnavigation resets private state and blocks concurrent mutati
  const before=h.calls.length;
  assert.equal(h.app.changeVideoSection('clubhouse'),true);
  assert.equal(h.app.videoSection.value,'clubhouse');assert.equal(m.mediaPlayerId.value,'');assert.equal(m.mediaItems.value.length,0);assert.equal(m.mediaPlaybackUrl.value,'');assert.ok(h.revoked.includes('blob:ux003-private'));assert.equal(h.calls.length,before);
- assert.equal(h.app.changeVideoSection('review'),false);
+ assert.equal(h.app.changeVideoSection('review'),true);
+ assert.equal(h.app.videoSection.value,'review');
  assert.equal(h.app.changeVideoSection('library'),true);assert.equal(h.app.videoSection.value,'library');
 });
 test('unapproved origin and absent team cannot open Clubhouse section',async t=>{
