@@ -14,7 +14,8 @@ export const PerformanceWorkspace = {
     mode:{type:String,required:true},
     players:{type:Array,required:true},
     fixedPlayerId:{type:String,default:null},
-    teams:{type:Array,default:()=>[]}
+    teams:{type:Array,default:()=>[]},
+    organized:{type:Boolean,default:false}
   },
   emits:['updated'],
   setup(props,{emit}) {
@@ -36,31 +37,68 @@ export const PerformanceWorkspace = {
     Vue.watch(()=>[props.mode,context(),props.teams.map(team=>team.id).join('|')],([mode])=>{
       reviewTeam.value = mode==='coach' ? props.teams[0]?.id || '' : '';
     },{immediate:true});
+    // Layout state never changes access or the selected player/review controllers.
+    const section = Vue.ref('overview');
+    const sections = Vue.computed(()=>[
+      {id:'overview',label:'Overview'},
+      {id:'record',label:'Record'},
+      ...(props.mode==='coach' && props.teams.length ? [{id:'review',label:'Review'}] : [])
+    ]);
+    const sectionBusy = Vue.computed(()=>workspace.busy.value || review.busy.value);
+    function chooseSection(id) {
+      if (!sectionBusy.value && sections.value.some(item=>item.id===id)) section.value=id;
+    }
+    Vue.watch(()=>[props.mode,context()],()=>{
+      section.value='overview';
+      choice.value='';
+    },{flush:'sync'});
+    Vue.watch(()=>props.players.map(player=>player.id).join('|'),()=>{
+      if (choice.value && !props.players.some(player=>player.id===choice.value)) choice.value='';
+    },{flush:'sync'});
+    Vue.watch(sections,items=>{
+      if (!items.some(item=>item.id===section.value)) section.value='overview';
+    },{flush:'sync'});
     function startCorrection(row) {
       workspace.correct(row);
-      if (workspace.correcting.value) void Vue.nextTick(()=>protocolField.value?.focus?.());
+      if (workspace.correcting.value) {
+        if (props.organized) section.value='record';
+        void Vue.nextTick(()=>protocolField.value?.focus?.());
+      }
     }
-    return {...workspace,startCorrection,protocolField,playerId,choice,reviewTeam,inboxController:Vue.markRaw(review),
+    return {...workspace,startCorrection,protocolField,playerId,choice,reviewTeam,section,sections,sectionBusy,chooseSection,inboxController:Vue.markRaw(review),
       inputClass,buttonClass,statuses,today:measurementToday,
       earlier:row=>workspace.rows.value.find(item=>item.id===row.supersedes)};
   },
   template:`
     <section class="my-4 space-y-4 rounded-2xl border border-slate-700 bg-slate-900/90 p-4 sm:p-6" aria-label="Performance measurements">
-      <header class="flex flex-wrap items-center justify-between gap-3">
+      <header v-if="!organized" class="flex flex-wrap items-center justify-between gap-3">
         <h2 class="text-xl font-bold">Performance measurements</h2>
         <button v-if="playerId" type="button" :class="buttonClass" :disabled="busy" @click="refresh">Refresh measurements</button>
       </header>
+      <slot v-if="organized" name="player-context" :section="section"></slot>
       <label v-if="fixedPlayerId===null" class="block max-w-lg text-sm font-semibold">Choose player
         <select v-model="choice" :class="inputClass">
           <option value="">Select an authorized player</option>
           <option v-for="p in players" :key="p.id" :value="p.id">{{ p.preferred_name || 'Player' }}{{ p.jersey ? ' · #'+p.jersey : '' }}</option>
         </select>
       </label>
+      <nav v-if="organized" class="flex flex-wrap gap-2 rounded-xl border border-slate-700 bg-slate-950 p-1.5" aria-label="Statistics sections">
+        <button v-for="item in sections" :key="item.id" type="button" :aria-pressed="section===item.id"
+          :disabled="sectionBusy" @click="chooseSection(item.id)"
+          :class="section===item.id ? 'bg-blue-700 text-white' : 'text-slate-300 hover:bg-slate-800'"
+          class="min-h-11 flex-1 rounded-lg px-3 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:opacity-60">{{ item.label }}</button>
+      </nav>
+      <slot v-if="organized && section==='overview'" name="overview"></slot>
+      <header v-if="organized && section!=='review'" class="flex flex-wrap items-center justify-between gap-2">
+        <h2 class="text-lg font-bold">{{ section==='record' ? 'Record measurement' : 'Performance measurements' }}</h2>
+        <button v-if="playerId" type="button" :class="buttonClass" :disabled="busy" @click="refresh">Refresh measurements</button>
+      </header>
+      <p v-if="organized && !playerId && players.length && section!=='review'" class="text-sm text-slate-300">Choose an authorized player to continue.</p>
       <p v-if="!players.length" class="text-sm text-slate-300">No players are available in this scope.</p>
       <p v-if="busy" class="text-sm text-slate-300" role="status">Updating performance measurements…</p>
       <p v-if="error" class="break-words text-sm text-rose-300" role="alert">{{ error }}</p>
       <p v-if="notice" class="text-sm text-emerald-200" role="status">{{ notice }}</p>
-      <form v-if="ready" class="space-y-4 border-t border-slate-700 pt-4" @submit.prevent="save">
+      <form v-if="ready && (!organized || section==='record')" class="space-y-4 border-t border-slate-700 pt-4" @submit.prevent="save">
         <h3 class="font-semibold">{{ correcting ? 'Correct official measurement' : (official ? 'Enter official measurement' : 'Submit for coach review') }}</h3>
         <fieldset :disabled="busy" class="space-y-3">
           <div class="grid gap-3 sm:grid-cols-2">
@@ -89,7 +127,7 @@ export const PerformanceWorkspace = {
           </div>
         </fieldset>
       </form>
-      <div v-if="ready" class="space-y-3">
+      <div v-if="ready && (!organized || section==='overview')" class="space-y-3">
         <h3 class="font-semibold">Measurement history</h3>
         <p v-if="!rows.length" class="text-sm text-slate-300">No measurements have been entered.</p>
         <article v-for="row in rows" :key="row.id" class="space-y-2 rounded-xl border border-slate-700 bg-slate-950 p-3">
@@ -109,7 +147,7 @@ export const PerformanceWorkspace = {
           <button v-if="official && row.status==='approved' && !row.superseded_by && protocols.some(p=>p.id===row.protocol_id)" type="button" :class="buttonClass" :disabled="busy" @click="startCorrection(row)">Correct official result</button>
         </article>
       </div>
-      <template v-if="mode==='coach' && teams.length">
+      <template v-if="mode==='coach' && teams.length && (!organized || section==='review')">
         <label class="block max-w-lg text-sm font-semibold">Team to review
           <select v-model="reviewTeam" :class="inputClass">
             <option v-for="team in teams" :key="team.id" :value="team.id">{{ team.name }}</option>
