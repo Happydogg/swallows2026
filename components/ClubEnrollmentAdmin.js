@@ -2,7 +2,7 @@ export const ClubEnrollmentAdmin={
   name:'ClubEnrollmentAdmin',props:{controller:{type:Object,required:true}},
   setup(props){return {...props.controller};},
   template:`
-<section v-if="visible" class="my-6 rounded-xl border border-slate-700 bg-slate-800 p-4 space-y-4 no-print" aria-label="Club enrollment administration">
+<section v-if="visible" class="mt-3 space-y-4 border-t border-slate-700 pt-4 no-print" aria-label="Club enrollment administration">
   <h2 class="font-bold text-xl">Club enrollment administration</h2>
   <p class="text-sm text-slate-300">Manual pilot for authorized club administrators. Team transfers within a club do not end enrollment: leave these records active when changing teams.</p>
   <p v-if="!enabled" role="status" class="text-sm text-amber-300">Enrollment administration awaits backend deployment and live authorization testing. All v2 operations remain disabled.</p>

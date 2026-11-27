@@ -1,7 +1,7 @@
 export const PilotWorkspace={name:'PilotWorkspace',props:{controller:{type:Object,required:true}},setup(props){return {...props.controller};},template:`
-<section class="my-6 p-4 rounded-xl bg-slate-800 border border-slate-700 space-y-4 no-print" aria-label="Family and staff pilot workspace">
+<section class="mt-3 space-y-4 border-t border-slate-700 pt-4 no-print" aria-label="Family and staff pilot workspace">
  <h2 class="font-bold text-xl">Family and staff workspace</h2>
- <p v-if="!enabled" role="status" class="text-amber-300 text-sm">Onboarding, growth and official-statistic workflows await approved staging deployment and live authorization tests. Private video tools remain available.</p>
+ <p v-if="!enabled" role="status" class="text-amber-300 text-sm">These additional family and staff workflows are currently unavailable. Existing authorized measurements remain in Stats; private video availability depends on the media service and access checks.</p>
  <button v-if="enabled&&!ready" @click="load" :disabled="busy" class="p-3 rounded bg-blue-700">Load authorized workspace</button>
  <p v-if="busy" role="status">Working securely…</p><p v-if="error" role="alert" class="text-rose-300 whitespace-pre-wrap">{{ error }}</p><p v-if="notice" role="status" class="text-emerald-300">{{ notice }}</p>
  <details class="border border-slate-600 rounded p-3"><summary class="py-2 font-semibold">Accept a guardian invitation</summary>

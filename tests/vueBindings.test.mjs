@@ -156,6 +156,25 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   assert.match(flatten(host),/Verified Guardian Access/);
   assert.doesNotMatch(flatten(host),/Active Roster|Arm Safety Flags|2015-06-15|HKLL-PRIVATE-007|\+85291234567|HiddenLast/);
 
+  h.app.navigateTab('me');await Vue.nextTick();
+  const meArea=()=>elements(host).find(n=>n.props['aria-label']==='Account and settings');
+  const meTools=()=>elements(host).find(n=>n.props['aria-label']==='Additional family and staff tools');
+  const enrollmentTools=()=>elements(host).find(n=>n.props['aria-label']==='Enrollment tools');
+  assert.doesNotMatch(String(meArea().props.class),/hidden/);
+  assert.match(flatten(meArea()),/Family · Active/);
+  assert.match(flatten(meArea()),/Preferences.*Language.*Sign out/s);
+  assert.match(flatten(meTools()),/currently unavailable/);
+  assert.equal(meTools().props.open,undefined);
+  assert.match(String(enrollmentTools().props.class),/hidden/);
+  const language=elements(meArea()).find(n=>n.type==='select');
+  const priorLang=h.app.currentLang.value;
+  language.props.onChange({target:{value:'ja'}});await Vue.nextTick();
+  assert.equal(h.app.currentLang.value,'ja');
+  language.props.onChange({target:{value:priorLang}});await Vue.nextTick();
+  h.app.navigateTab('home');await Vue.nextTick();
+  assert.match(String(meArea().props.class),/hidden/);
+  assert.match(String(meTools().props.class),/hidden/);
+
   const linkedChild=h.app.players.value[0];
   h.rows.sdl_004_pilot_workspace={protocols:[{id:'throw-radar-v1',metric:'throwing_velo',label:'Radar throwing',unit:'km/h'}]};
   h.rows.sdl_004_pilot_performance=[{id:'22222222-2222-4222-8222-222222222222',player_id:linkedChild.id,

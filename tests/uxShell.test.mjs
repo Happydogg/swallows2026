@@ -342,3 +342,19 @@ test('UX-IA-04 uses shared screen-only surfaces and keeps print and synthetic pr
   const performance=fs.readFileSync(new URL('../components/PerformanceWorkspace.js',import.meta.url),'utf8');
   assert.match(performance,/row.superseded_by \? 'text-slate-400 line-through'/);
 });
+
+test('UX-IA-05 groups account preferences and gated tools without changing role scope',()=>{
+  assert.match(index,/<section :class="activeTab === 'me' \? '' : 'hidden'"[^>]+aria-label="Account and settings"/);
+  assert.match(index,/workspaceOptions.find\(option=>option.id===workspaceMode\)/);
+  assert.match(index,/aria-label="Preferences"/);
+  assert.match(index,/Language\s*<select :value="currentLang" @change="currentLang = \$event.target.value; saveLanguage\(\)"/);
+  assert.match(index,/aria-label="Account session"[\s\S]*?@click="signOutAndClear" :disabled="authBusy"/);
+  assert.match(index,/<details :class="activeTab === 'me' && !isManagedWorkspace \? '[^']+' : 'hidden'" :open="pilotController.enabled \? true : undefined"/);
+  assert.match(index,/<details :class="activeTab === 'me' && !isManagedWorkspace && enrollmentAdminController.visible.value \? '[^']+' : 'hidden'" :open="enrollmentAdminController.enabled \? true : undefined"/);
+  assert.match(index,/<pilot-workspace :controller="pilotController"/);
+  assert.match(index,/<club-enrollment-admin :controller="enrollmentAdminController"/);
+  assert.match(index,/:show-list="activeTab === 'me' && workspaceMode === 'admin'"/);
+  const pilot=fs.readFileSync(new URL('../components/PilotWorkspace.js',import.meta.url),'utf8');
+  assert.match(pilot,/private video availability depends on the media service and access checks/);
+  assert.match(pilot,/:disabled="!enabled\|\|busy"/);
+});
