@@ -2,6 +2,19 @@
 
 **Updated:** 2026-11-27. **Status:** Working GitHub coordination mirror. Reconcile against the independent SDL Master Directory before calling this authoritative.
 
+## SDL-000 UX-003 P0/P1 fixes handoff (2026-11-28)
+
+**Current coordination update; prior dated source-QA and CI checkpoints below remain historical.** [Draft PR #21](https://github.com/Happydogg/swallows2026/pull/21) is **open, draft and unmerged** into `feature/SDL-UX-002-login-redesign` at `4590f86c458cacc461f45a8e62aeeda470e8646e`. Exact tested source reported `8f8c9813aef064bba0e9a782a865793934370d90`; remote tip `f4b452105fd23c5e37a09bf41b32742da83e370f` adds **only** `docs/design/SDL-UX-003/P0P1-QA-HANDOFF.md`. Against prior accepted UX-003 candidate `0120c6b...`, only two runtime components, three test files and one new handoff changed; no backend, Worker, SQL, grants, RLS, storage, media API service or gates changed.
+
+- **P0 UX-QA-01:** isolated synthetic authenticated *loopback* preview at `http://127.0.0.1:5500` **planned/prepared only**; compiled allowlist present per [handoff](https://github.com/Happydogg/swallows2026/blob/f4b452105fd23c5e37a09bf41b32742da83e370f/docs/design/SDL-UX-003/P0P1-QA-HANDOFF.md), hosted Worker version/config and Auth redirect/current fixture access require independent live readback. A physical phone does not access the test computer via its own `127.0.0.1`; mobile testing needs a separately approved accessible origin that preserves CORS/Auth restrictions. No activation/deployment was authorized.
+- **P1 UX-QA-02:** source fix invalidates prior guardian consent status on identity/context/readiness/guardian-link changes, aborts stale work, and reads current consent generation before each explicit mutation; stale generation requires a fresh guardian choice. Preserve one voluntary v2 decision, objections and role restrictions. **Source-implemented + local tests reported PASS; authenticated UAT/RBAC-05 review pending.**
+- **P1 UX-QA-03:** save-ready message is now rendered only with the live 60-second temporary URL; expiry/close revokes URL and removes stale text. **Source-implemented + local tests reported PASS; native-device save/expiry behavior pending.**
+- **P1 UX-QA-04/05:** verified intentional private Library selection clearing / re-authorization, and independent authoritative Home/Review counts with stale-response invalidation and receipt-based refresh; tests reported passing. Device usability and live concurrency acceptance remain open.
+- **Verification claim:** Codex handoff reports **530/530 local full tests, 73/73 focused UX-003, Vue 8/8, UX build 178/178**, local Worker package PASS with release-preservation warning still open. SDL-000 read source/diff and confirmed no PR-head GitHub statuses or workflow runs at time checked; **530 local result is reported, not independently reproduced in CI**. Prior [pinned CI 516/516](https://github.com/Happydogg/swallows2026/actions/runs/46025411813/job/140595434819) applies only to prior `0120c6b...`.
+- **Release hold:** UX-QA-01 remains **Prepared / Approval Pending**; UX-QA-02/03 source fixes are ready for validation, not staged/production verified. Require RBAC-05 review of consent read-then-mutate generation, live Worker/Origin/Auth settings and synthetic fixture; refreshed exact-candidate CI evidence; approved preview target and rollback; UX-002/owner authenticated Coach, Club Admin, Manager, Guardian and dual-role testing. No automatic merge, staging promotion, real-family onboarding or production authorization.
+
+---
+
 ## SDL-000 UX-002 independent QA / UX-003 automated validation checkpoint (2026-11-27)
 
 **Current coordination checkpoint.** Supersedes the earlier UX source/head, device-acceptance and media-planning summaries below **for current status only**. Preserve older sections as historical evidence. This GitHub file remains a **working mirror**, pending reconciliation with the independent SDL Master Directory.
