@@ -1,11 +1,13 @@
 import { createPrivateMediaService, validateMediaFile } from '../js/privateMediaService.js';
 import { extractVideoThumbnail } from '../js/videoThumbnail.js';
+import {scopeKey,validReviewRow} from '../js/mediaReviewModel.js';
 const { ref, computed } = Vue;
 
 // Separate media permissions from isCoach: media access never unlocks official stats.
 export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {value:[]}, analyzer, service = createPrivateMediaService({ auth }),
-  urls = URL, timeoutMs = 125000, thumbnailExtractor = extractVideoThumbnail }) {
+  urls = URL, timeoutMs = 125000, thumbnailExtractor = extractVideoThumbnail, getReviewScope = () => null }) {
   const mediaPlayerId = ref('');
+  const inboxReviewMode=ref(false),inboxReviewPlayerLabel=ref(''),mediaReviewEvent=ref(null);
   const mediaItems = ref([]);
   const mediaReadAllowed = ref(false);
   const mediaUploadAllowed = ref(false);
@@ -120,6 +122,7 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
     pending.clear();
     discardThumbnails();
     releasePlayback();
+    inboxReviewMode.value=false;inboxReviewPlayerLabel.value='';
     mediaPlayerId.value = '';
     mediaItems.value = [];
     mediaReadAllowed.value = false;
@@ -159,7 +162,7 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
     };
   }
   async function refreshMedia() {
-    if (!mediaPlayerId.value || !mediaReadAllowed.value) return;
+    if (inboxReviewMode.value || !mediaPlayerId.value || !mediaReadAllowed.value) return;
     const op = operation();
     mediaLoading.value = true; mediaError.value = '';
     // Do not retain a previously playable URL while rechecking permissions.
@@ -195,6 +198,36 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
       if (upload.status === 'rejected') mediaUploadError.value = upload.reason.message || 'Media upload unavailable.';
     } catch (error) { op.failed(error); }
     finally { if (op.ownsState()) mediaLoading.value = false; op.finish(); }
+  }
+  // Narrow MEDIA-03B-06 adapter: an exact server lookup, never a roster/library bypass
+  // based on client data. The single transient review context owns no upload/archive authority.
+  async function openInboxReview(candidate,teamId='') {
+    const scope=getReviewScope(),key=scopeKey(scope);
+    if(!validReviewRow(candidate,scope,{teamId})||mediaUploading.value||mediaArchiving.value||mediaReviewing.value)return {opened:false};
+    resetMedia();
+    const op=operation();mediaLoading.value=true;inboxReviewMode.value=true;
+    const current=()=>op.current()&&key===scopeKey(getReviewScope());
+    try {
+      const response=await service.reviewInbox(scope,{mediaId:candidate.id,playerId:candidate.playerId,...(teamId?{teamId}:{})},{signal:op.signal});
+      if(!current())return {opened:false};
+      const row=response.items?.[0];
+      if(response.items?.length!==1||response.filteredTotal!==1||!validReviewRow(row,scope,{mediaId:candidate.id,playerId:candidate.playerId,teamId})){
+        resetMedia();mediaError.value='This clip is no longer available for independent review.';return {opened:false};
+      }
+      // Do not add to the bounded ordinary library, grant archive, or start thumbnails.
+      const item={id:row.id,player_id:row.playerId,category:row.category,status:'pending',created_at:row.createdAt??null,can_review:true};
+      mediaPlayerId.value=row.playerId;inboxReviewPlayerLabel.value=row.playerLabel;
+      mediaItems.value=[item];mediaReadAllowed.value=true;mediaLoading.value=false;
+      const opened=await playPrivateMedia(item);
+      if(!current()||opened!==true){
+        if(op.ownsState()){const message=mediaError.value;resetMedia();mediaError.value=message||'Private playback is unavailable.';}
+        return {opened:false,status:typeof opened==='number'?opened:undefined};
+      }
+      return {opened:true};
+    }catch(error){
+      if(op.ownsState()){resetMedia();if(error.name!=='AbortError')mediaError.value=error.message||'Review lookup unavailable.';}
+      return {opened:false,status:error.status};
+    }finally{if(op.ownsState())mediaLoading.value=false;op.finish();}
   }
   function selectMediaFile(event) {
     uploadRequest = undefined;
@@ -234,9 +267,19 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
     try {
       await service.review(item.id,decision,note,single,{signal:op.signal});
       if(!op.current())return;
-      mediaNotice.value=decision==='approved'?'Video approved privately. Not published.':'Video rejected. Playback blocked.';
-      await refreshMedia();
-    }catch(error){op.failed(error);}
+      const notice=decision==='approved'?'Video approved privately. Not published.':'Video rejected. Playback blocked.';
+      if(inboxReviewMode.value){resetMedia();mediaNotice.value=notice;}
+      else {mediaNotice.value=notice;await refreshMedia();}
+      mediaReviewEvent.value={type:'changed'};
+    }catch(error){
+      if(op.ownsState()){
+        const isInbox=inboxReviewMode.value;
+        if(error.status===409&&isInbox){resetMedia();mediaError.value='This review changed. Refresh the queue before retrying.';}
+        else op.failed(error);
+        if(error.status===409)mediaReviewEvent.value={type:'conflict'};
+        if(error.status===401||error.status===403)mediaReviewEvent.value={type:'denied'};
+      }
+    }
     finally{if(op.ownsState())mediaReviewing.value=false;op.finish();}
   }
   async function archivePrivateMedia(item) {
@@ -263,10 +306,12 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
       if (!op.current() || playback !== playbackGeneration) return;
       mediaPlaybackUrl.value = urls.createObjectURL(blob);
       mediaPlaybackId.value = item.id;
+      return true;
     } catch (error) {
       // A permission failure invalidates this session's media even if a refresh
       // or newer playback replaced the original card while the request ran.
       if (playback === playbackGeneration || error.status === 401 || error.status === 403) op.failed(error);
+      return error.status||false;
     }
     finally {
       if (op.ownsState() && playback === playbackGeneration) mediaPlaybackLoading.value = false;
@@ -295,6 +340,7 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
     mediaError.value = 'This browser could not decode the video. For wider compatibility, use H.264 (iPhone Camera > Formats > Most Compatible).';
   }
   return { mediaPlayers, mediaPlayerId, mediaItems, mediaReadAllowed, mediaUploadAllowed, mediaLoading,
+    inboxReviewMode,inboxReviewPlayerLabel,mediaReviewEvent,openInboxReview,
     mediaUploading, mediaArchiving, mediaReviewing, reviewSingleSubject, reviewVideoNote, reviewItem, reviewPrivateMedia, mediaProgress, mediaError, mediaUploadError, mediaNotice, mediaFile, uploadCategory, mediaPlaybackUrl, mediaPlaybackId,
     mediaPlaybackLoading, analysisCategory, analysisFps, mediaThumbnails, mediaThumbnailBusy, mediaThumbnailFailed,
     submissionsEnabled, ensureMediaThumbnail, retryMediaThumbnail,
