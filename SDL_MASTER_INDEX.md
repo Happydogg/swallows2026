@@ -2,6 +2,16 @@
 
 **Updated:** 2026-11-27. **Status:** Working GitHub coordination mirror. Reconcile against the independent SDL Master Directory before calling this authoritative.
 
+## 2026-11-27 E2E Round 2 functional acceptance handoff
+
+**Latest owner-reported result:** 12 of 12 E2E Round 2 scenarios PASS. The owner accepts **roster integration for staging UX**. This supersedes the earlier reported Round 1 functional roster result of 8 PASS, 3 FAIL and 1 PENDING **for the scenarios actually rerun**. Raw assertion logs, identities, test date/time, exact frontend build and direct API coverage were not supplied to SDL-000; do not infer additional coverage.
+
+**Coordination decision:** Continue approved MVP completion, with zero new feature expansion. Preserve passing Coach, Guardian and multi-role workflows, complete remaining frontend functionality and owner-led smoke tests. SDL-004 backend still owns server-side authorization/security remediation, evidence and restricted function gates. Full security acceptance, PR merges, unrestricted media access, real-family onboarding and production deployment are NOT authorized.
+
+**Previous checkpoint note:** The earlier note that 12 synthetic identities were merely prepared reflects the earlier stage; their actual provisioned identities and scope ledger must be reconciled from Round 2 evidence. Do not mark provisioning verified without the ledger.
+
+---
+
 ## 2026-11-27 coordination checkpoint: RBAC v5.1 and frontend-first completion
 
 **Status:** Working coordination mirror, not the independent SDL Master Directory or a security approval. This checkpoint supersedes the older environment and priority snapshot below where they conflict; historical entries remain preserved.
