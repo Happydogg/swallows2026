@@ -80,8 +80,13 @@ export const ManagedRoster = {
       </section>
       <p v-if="controller.writeNotice.value && !scopeOnly" role="status"
         class="rounded-lg border border-emerald-800 p-3 text-emerald-200">{{ controller.writeNotice.value }}</p>
-      <p v-if="controller.writeError.value && !scopeOnly" role="alert"
-        class="rounded-lg border border-rose-800 p-3 text-rose-200">{{ controller.writeError.value }}</p>
+      <div v-if="controller.writeError.value && !scopeOnly" role="alert"
+        class="space-y-2 rounded-lg border border-rose-800 p-3 text-rose-200">
+        <p>{{ controller.writeError.value }}</p>
+        <button type="button" @click="controller.fetchPage()"
+          :disabled="controller.writeBusy.value || controller.loading.value || controller.denied.value"
+          class="rounded-lg border border-rose-700 px-4 py-2 text-sm font-semibold disabled:opacity-50">Refresh authorized roster</button>
+      </div>
       <form v-if="!scopeOnly && controller.pendingChange.value" @submit.prevent="controller.commitRosterChange()"
         class="space-y-3 rounded-xl border border-amber-600/60 bg-amber-950/20 p-4" aria-label="Confirm team membership change">
         <h2 class="font-bold">Review team assignment</h2>
