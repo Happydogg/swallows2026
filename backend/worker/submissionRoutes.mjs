@@ -15,7 +15,8 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
   return {
     async fetch(request, env) {
       const origin = request.headers.get('Origin');
-      const url = new URL(request.url), path = url.pathname.replace(/\/+$/, '');
+      const url = new URL(request.url);
+      let path = url.pathname.replace(/\/+$/, '');
       if (origin && !ORIGINS.has(origin)) return json({ error: 'Origin not allowed' }, 403);
       // Existing Worker should handle OPTIONS, including GET/POST and auth headers.
       if (!configOk(env)) return json({ error: 'Staging configuration incomplete' }, 503, origin);
@@ -24,10 +25,33 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
       const call = (name, body) => rpc(env, identity.bearer, name, body);
       const active = await call('sdl_004_session_active', {});
       if (active.error) return json({error:'Session verification unavailable'},503,origin);
+      if (active.value !== true && path==='/v2/onboarding/invitations/redeem' && request.method==='POST') {
+        // The redemption RPC validates the session, verified email and invite,
+        // and can create the first profile. All other operations require one.
+        return pilotWorkflowRoute({request,url,path,contract:{pilotWorkflow:'sdl004-final-pilot-v1'},call,validId,json,origin});
+      }
       if (active.value !== true) return json({error:'Session expired or revoked'},401,origin);
       const contract = await call('sdl_004_submission_contract', {});
       if (contract.error || contract.value?.revision !== 'sdl004-club-enrollment-v2') return json({error:'Backend contract unavailable'},503,origin);
-      if (path === '/v2/capabilities' && request.method === 'GET') return json({pilotWorkflow:contract.value.pilotWorkflow??null,revision:'sdl004-club-enrollment-v2',submissions:true,review:true,clubhouse:true,clubConsent:true,enrollmentAdmin:contract.value.enrollmentAdmin===true,clubhouseRoster:contract.value.clubhouseRoster===true,clubhouseLeaderboard:contract.value.clubhouseLeaderboard===true,parentStatistics:contract.value.parentStatistics===true,statisticsConsent:contract.value.statisticsConsent===true},200,origin);
+      if (path.startsWith('/v1/')) {
+        if (contract.value.rbacVersion!==5) return json({error:'Forbidden'},403,origin);
+        const mediaId=path.match(/^\/v1\/media\/([^/]+)$/)?.[1];
+        if (validId(mediaId) && request.method==='GET') path='/v2/submissions/'+mediaId+'/playback';
+        else if (path==='/v1/media' && request.method==='POST') path='/v2/submissions';
+        else if (path==='/v1/media' && request.method==='GET') {
+          const result=await call('sdl_v5_legacy_media',{p_player:url.searchParams.get('player_id')});
+          return result.error ? json({error:'Media unavailable'},result.status,origin) : json({items:result.value},200,origin);
+        } else if (path==='/v1/authorize' && request.method==='POST') {
+          const input=await request.json();
+          const upload=input.action==='upload';
+          const result=upload ? await call('sdl_004_submission_can_submit',{p_player_id:input.player_id})
+            : await call('sdl_v5_legacy_media',{p_player:input.player_id});
+          if(result.error)return json({error:'Media unavailable'},result.status,origin);
+          const allowed=upload ? result.value===true : Array.isArray(result.value)&&result.value.length>0;
+          return json({allowed,media_enabled:true},allowed?200:403,origin);
+        } else return json({error:'Forbidden'},403,origin);
+      }
+      if (path === '/v2/capabilities' && request.method === 'GET') return json({...(contract.value.rbacVersion===5?{rbacVersion:5}:{}),pilotWorkflow:contract.value.pilotWorkflow??null,revision:'sdl004-club-enrollment-v2',submissions:true,review:true,clubhouse:true,clubConsent:true,enrollmentAdmin:contract.value.enrollmentAdmin===true,clubhouseRoster:contract.value.clubhouseRoster===true,clubhouseLeaderboard:contract.value.clubhouseLeaderboard===true,parentStatistics:contract.value.parentStatistics===true,statisticsConsent:contract.value.statisticsConsent===true},200,origin);
       const pilotResult=await pilotWorkflowRoute({request,url,path,contract:contract.value,call,validId,json,origin});
       if(pilotResult)return pilotResult;
       // Narrow caller-JWT RPCs: authorization and column restrictions live in PostgreSQL.
@@ -170,7 +194,7 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
         const result = await call('sdl_004_clubhouse_videos', { p_team_id: teamId });
         return result.error ? error(result) : json({ items: result.value }, 200, origin);
       }
-      const match = path.match(/^\/v2\/submissions\/([^/]+)\/(review|publish|playback)$/);
+      const match = path.match(/^\/v2\/submissions\/([^/]+)\/(review|publish|playback|download)$/);
       if (!match || !validId(match[1])) return json({ error: 'Not found' }, 404, origin);
       const [, id, action] = match;
       if (['review','publish'].includes(action) && request.method === 'POST') {
@@ -186,8 +210,12 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
           :await call('sdl_004_publish_submission',{p_id:id,p_team_ids:body.team_ids,p_subject_athletes:body.subject_athletes??[]});
         return result.error ? error(result) : json({ updated: true }, 200, origin);
       }
-      if (action === 'playback' && request.method === 'GET') {
-        const allowed = await call('sdl_004_submission_can_read', { p_submission_id: id });
+      if (['playback','download'].includes(action) && request.method === 'GET') {
+        const allowed = action === 'download'
+          ? await call('sdl_v5_authorize_download', { p_id: id })
+          : contract.value.rbacVersion===5
+            ? await call('sdl_v5_authorize_playback', {p_id:id})
+            : await call('sdl_004_submission_can_read', { p_submission_id: id });
         if (allowed.error) return error(allowed);
         if (allowed.value !== true) return json({ error: 'Forbidden' }, 403, origin);
         let response, item;
@@ -197,6 +225,9 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
           item = (await response.json())?.[0];
         } catch { return json({ error: 'Metadata unavailable' }, 503, origin); }
         if (!item) return json({ error: 'Not found' }, 404, origin);
+        if (typeof item.object_key !== 'string' || !item.object_key.endsWith('/'+id+'.mp4') ||
+          !/^pilot\/[a-f0-9-]{36}\/[a-f0-9-]{36}\.mp4$/i.test(item.object_key))
+          return json({error:'Invalid media metadata'},503,origin);
         const range = request.headers.get('Range');
         if (range && !/^bytes=\d+-\d*$/i.test(range)) return json({ error: 'Unsupported range' }, 416, origin);
         let obj;
@@ -206,6 +237,7 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
         const headers = new Headers({ 'Content-Type': 'video/mp4', 'Cache-Control': 'private, no-store',
           'X-Content-Type-Options': 'nosniff', 'Accept-Ranges': 'bytes' });
         if (ORIGINS.has(origin)) { headers.set('Access-Control-Allow-Origin', origin); headers.set('Vary', 'Origin'); }
+        if (action === 'download') headers.set('Content-Disposition','attachment; filename="video.mp4"');
         if (obj.range) {
           headers.set('Content-Range', `bytes ${obj.range.offset}-${obj.range.offset+obj.range.length-1}/${obj.size}`);
           headers.set('Content-Length', String(obj.range.length));

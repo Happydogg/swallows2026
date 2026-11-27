@@ -5,7 +5,7 @@ const submissions=createSubmissionRoutes({verifyIdentity,adminQuery,limitedBytes
 export default {
   async fetch(request,env,ctx) {
     const path=new URL(request.url).pathname;
-    if(!path.startsWith('/v2/')) return pilot.fetch(request,env,ctx);
+    if(!path.startsWith('/v2/')) return pilot.fetch(request,env,env.SUBMISSIONS_ENABLED==='true' ? submissions : undefined);
     const origin=request.headers.get('Origin');
     if(origin&&!ORIGINS.has(origin)) return json({error:'Origin not allowed'},403);
     if(request.method==='OPTIONS') {
