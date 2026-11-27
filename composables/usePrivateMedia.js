@@ -8,6 +8,7 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
   urls = URL, timeoutMs = 125000, thumbnailExtractor = extractVideoThumbnail, getReviewScope = () => null }) {
   const mediaPlayerId = ref('');
   const inboxReviewMode=ref(false),inboxReviewPlayerLabel=ref(''),mediaReviewEvent=ref(null);
+  let inboxReviewScopeKey='';
   const mediaItems = ref([]);
   const mediaReadAllowed = ref(false);
   const mediaUploadAllowed = ref(false);
@@ -41,7 +42,7 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
     mediaThumbnails.value={};mediaThumbnailBusy.value={};mediaThumbnailFailed.value={};
   }
   function ensureMediaThumbnail(item){
-    if(!mediaReadAllowed.value || !mediaPlayerId.value || !item
+    if(inboxReviewMode.value || !mediaReadAllowed.value || !mediaPlayerId.value || !item
       || !mediaItems.value.some(x=>x.id===item.id&&x.status!=='rejected')
       || mediaThumbnails.value[item.id] || mediaThumbnailFailed.value[item.id]
       || thumbnailQueued.has(item.id))return;
@@ -122,7 +123,7 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
     pending.clear();
     discardThumbnails();
     releasePlayback();
-    inboxReviewMode.value=false;inboxReviewPlayerLabel.value='';
+    inboxReviewMode.value=false;inboxReviewPlayerLabel.value='';inboxReviewScopeKey='';
     mediaPlayerId.value = '';
     mediaItems.value = [];
     mediaReadAllowed.value = false;
@@ -205,11 +206,11 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
     const scope=getReviewScope(),key=scopeKey(scope);
     if(!validReviewRow(candidate,scope,{teamId})||mediaUploading.value||mediaArchiving.value||mediaReviewing.value)return {opened:false};
     resetMedia();
-    const op=operation();mediaLoading.value=true;inboxReviewMode.value=true;
+    const op=operation();mediaLoading.value=true;inboxReviewMode.value=true;inboxReviewScopeKey=key;
     const current=()=>op.current()&&key===scopeKey(getReviewScope());
     try {
       const response=await service.reviewInbox(scope,{mediaId:candidate.id,playerId:candidate.playerId,...(teamId?{teamId}:{})},{signal:op.signal});
-      if(!current())return {opened:false};
+      if(!current()){if(op.ownsState()){resetMedia();mediaError.value='Review lookup expired or the scope changed.';}return {opened:false};}
       const row=response.items?.[0];
       if(response.items?.length!==1||response.filteredTotal!==1||!validReviewRow(row,scope,{mediaId:candidate.id,playerId:candidate.playerId,teamId})){
         resetMedia();mediaError.value='This clip is no longer available for independent review.';return {opened:false};
@@ -257,6 +258,7 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
     finally { if (op.ownsState()) mediaUploading.value = false; op.finish(); }
   }
   async function reviewPrivateMedia(decision) {
+    if(inboxReviewMode.value&&inboxReviewScopeKey!==scopeKey(getReviewScope())){resetMedia();return;}
     const item=reviewItem.value;
     if(!item||!mediaPlaybackUrl.value||mediaReviewing.value||mediaArchiving.value||mediaUploading.value||mediaPlaybackLoading.value)return;
     if(!['approved','rejected'].includes(decision))return;
@@ -268,15 +270,15 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
       await service.review(item.id,decision,note,single,{signal:op.signal});
       if(!op.current())return;
       const notice=decision==='approved'?'Video approved privately. Not published.':'Video rejected. Playback blocked.';
-      if(inboxReviewMode.value){resetMedia();mediaNotice.value=notice;}
-      else {mediaNotice.value=notice;await refreshMedia();}
-      mediaReviewEvent.value={type:'changed'};
+      if(inboxReviewMode.value){resetMedia();mediaNotice.value=notice;mediaReviewEvent.value={type:'changed'};}
+      else {mediaNotice.value=notice;await refreshMedia();if(op.current())mediaReviewEvent.value={type:'changed'};}
     }catch(error){
       if(op.ownsState()){
         const isInbox=inboxReviewMode.value;
-        if(error.status===409&&isInbox){resetMedia();mediaError.value='This review changed. Refresh the queue before retrying.';}
-        else op.failed(error);
-        if(error.status===409)mediaReviewEvent.value={type:'conflict'};
+        if(error.status===409){
+          if(isInbox){resetMedia();mediaError.value='This review changed. Refresh the queue before retrying.';mediaReviewEvent.value={type:'conflict'};}
+          else {await refreshMedia();if(op.current()){mediaError.value='This review changed. Refresh before retrying.';mediaReviewEvent.value={type:'conflict'};}}
+        }else op.failed(error);
         if(error.status===401||error.status===403)mediaReviewEvent.value={type:'denied'};
       }
     }
