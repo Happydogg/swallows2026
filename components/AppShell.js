@@ -46,8 +46,8 @@ export const AppShell = {
     return { destinations: DESTINATIONS, displayOptions };
   },
   template: `
-    <div class="min-h-screen text-slate-100 md:flex md:gap-6">
-      <aside class="hidden md:sticky md:top-4 md:z-30 md:flex md:h-[calc(100vh-2rem)] md:max-h-[calc(100dvh-2rem)] md:w-52 lg:w-60 md:shrink-0 md:self-start md:flex-col md:overflow-y-auto md:overscroll-contain md:rounded-3xl md:border md:border-slate-700/70 md:bg-slate-950/95 md:p-4 md:shadow-xl no-print" aria-label="App navigation">
+    <div class="sdl-shell min-h-screen text-slate-100 md:flex md:gap-5">
+      <aside class="hidden md:sticky md:top-4 md:z-30 md:flex md:h-[calc(100vh-2rem)] md:max-h-[calc(100dvh-2rem)] md:w-48 lg:w-56 md:shrink-0 md:self-start md:flex-col md:overflow-y-auto md:overscroll-contain md:rounded-2xl md:border md:border-slate-700/70 md:bg-slate-950/95 md:p-4 no-print" aria-label="App navigation">
         <div class="flex items-center gap-3 border-b border-slate-700/70 px-2 pb-6 pt-2">
           <img src="./logo.png" alt="" class="h-11 w-11 rounded-xl object-contain">
           <div class="text-sm font-black leading-tight tracking-wider">SWALLOWS<br><span class="text-cyan-400">DATALAB</span></div>
@@ -70,7 +70,7 @@ export const AppShell = {
       </aside>
 
       <div class="min-w-0 flex-1 pb-24 md:pb-5">
-        <header class="mb-5 flex items-center justify-between gap-3 rounded-2xl border border-slate-700/70 bg-slate-950/80 px-4 py-3 md:px-5 no-print">
+        <header class="mb-4 flex items-center justify-between gap-3 rounded-xl border border-slate-700/70 bg-slate-950/80 px-3 py-3 sm:px-4 no-print">
           <div class="flex min-w-0 items-center gap-3">
             <img src="./logo.png" alt="" class="h-9 w-9 rounded-lg object-contain md:hidden"/>
             <div class="min-w-0">
@@ -90,7 +90,7 @@ export const AppShell = {
           </div>
         </header>
 
-        <main id="sdl-workspace-content" class="min-w-0" tabindex="-1">
+        <main id="sdl-workspace-content" class="sdl-content min-w-0" tabindex="-1">
           <slot></slot>
         </main>
       </div>
@@ -99,7 +99,7 @@ export const AppShell = {
         class="fixed bottom-0 left-0 right-0 z-40 grid grid-cols-5 border-t border-slate-700 bg-slate-950/95 pb-[env(safe-area-inset-bottom)] shadow-2xl backdrop-blur-lg md:hidden no-print">
         <button v-for="item in destinations" :key="item.id" type="button" @click="$emit('navigate',item.id)"
           :aria-current="activeTab===item.id ? 'page' : undefined"
-          :class="activeTab===item.id ? 'text-cyan-300' : 'text-slate-400'"
+          :class="activeTab===item.id ? 'bg-blue-950/70 text-cyan-200' : 'text-slate-400'"
           class="flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-2 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">
           <app-nav-icon :name="item.id"></app-nav-icon><span>{{ item.text }}</span>
         </button>
