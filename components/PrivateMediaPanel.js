@@ -1,5 +1,8 @@
 // SDL-UX-005: Phone-first video hub. The original private-media controller
 // keeps sole ownership of authorization, playback blobs, uploads and cleanup.
+export function filterPrivateLibrary(rows,category='',status='') {
+  return Array.isArray(rows) ? rows.filter(row=>row && (!category || row.category===category) && (!status || row.status===status)) : [];
+}
 export const PrivateMediaPanel = {
   name: 'PrivateMediaPanel',
   props: { controller: { type: Object, required: true }, profilePlayerId: { type: String, default: '' } },
@@ -18,7 +21,19 @@ export const PrivateMediaPanel = {
       unmounted(el){el.__sdlObserver?.disconnect();delete el.__sdlObserver;}
     }
   },
-  setup(props) { return { ...props.controller }; },
+  setup(props) {
+    const categoryFilter=Vue.ref(''),statusFilter=Vue.ref(''),playbackSection=Vue.ref(null);
+    const clearFilters=()=>{categoryFilter.value='';statusFilter.value='';};
+    const visibleMedia=Vue.computed(()=>filterPrivateLibrary(props.controller.mediaItems.value,categoryFilter.value,statusFilter.value));
+    Vue.watch([props.controller.mediaPlayerId,props.controller.mediaReadAllowed],clearFilters,{flush:'sync'});
+    Vue.watch(props.controller.mediaPlaybackId,id=>{
+      if(id && props.controller.mediaPlaybackUrl.value && playbackSection.value) {
+        playbackSection.value.focus({preventScroll:true});
+        playbackSection.value.scrollIntoView?.({block:'start',behavior:'auto'});
+      }
+    },{flush:'post'});
+    return { ...props.controller,categoryFilter,statusFilter,clearFilters,visibleMedia,playbackSection };
+  },
   template: `
 <section class="mb-4 space-y-4 no-print" aria-label="Private player videos">
   <header class="flex flex-wrap items-center justify-between gap-2">
@@ -62,17 +77,32 @@ export const PrivateMediaPanel = {
         <button type="button" @click="refreshMedia" :disabled="mediaUploading || mediaPlaybackLoading"
           class="rounded-xl border border-blue-500/50 bg-blue-900/40 px-4 py-3 text-sm font-bold text-sky-200 hover:bg-blue-800/60 disabled:cursor-not-allowed disabled:opacity-50">Refresh videos</button>
       </div>
+      <div v-if="mediaItems.length" class="grid grid-cols-1 gap-2 sm:grid-cols-2" aria-label="Private video filters">
+        <label class="min-w-0 text-xs font-semibold text-slate-300">Category
+          <select v-model="categoryFilter" class="mt-1 min-h-11 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 text-sm text-white">
+            <option value="">All categories</option><option value="pitching">Pitching</option><option value="batting">Batting</option><option value="throwing">Throwing</option>
+          </select>
+        </label>
+        <label class="min-w-0 text-xs font-semibold text-slate-300">Review status
+          <select v-model="statusFilter" class="mt-1 min-h-11 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 text-sm text-white">
+            <option value="">All statuses</option><option value="pending">Pending review</option><option value="approved">Approved privately</option><option value="rejected">Rejected</option>
+          </select>
+        </label>
+        <p role="status" class="text-xs text-slate-400">{{visibleMedia.length}} of {{mediaItems.length}} loaded clips</p>
+        <button v-if="categoryFilter || statusFilter" type="button" @click="clearFilters" class="min-h-11 rounded-lg border border-slate-600 px-3 text-sm text-slate-200">Clear filters</button>
+      </div>
       <div v-if="!mediaItems.length" class="rounded-xl border border-dashed border-slate-600 bg-slate-950/60 p-6 text-center">
         <p class="text-2xl" aria-hidden="true">🎞️</p>
         <p class="mt-2 text-sm font-bold text-white">No private clips found</p>
         <p class="mt-1 text-xs text-slate-400">Select another player or check again after a private video has been uploaded.</p>
       </div>
+      <p v-else-if="!visibleMedia.length" role="status" class="rounded-xl border border-slate-700 p-4 text-sm text-slate-300">No loaded clips match these filters.</p>
       <ul v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2" aria-label="Authorized private video library">
-        <li v-for="(item, index) in mediaItems" :key="item.id" v-media-visible="item"
+        <li v-for="(item, index) in visibleMedia" :key="item.id" v-media-visible="item"
           class="flex min-w-0 overflow-hidden rounded-2xl border border-slate-700 bg-slate-950/80 sm:block">
           <button type="button" @click="playPrivateMedia(item)" :disabled="mediaPlaybackLoading || mediaReviewing || item.status==='rejected'"
             :aria-label="'Play private practice clip '+(index+1)"
-            class="relative flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden bg-slate-900 sm:aspect-video sm:h-auto sm:w-full disabled:opacity-60">
+            class="relative flex h-24 w-24 shrink-0 self-start items-center justify-center overflow-hidden rounded-br-lg bg-slate-900 sm:aspect-video sm:h-auto sm:w-full disabled:opacity-60">
             <img v-if="mediaThumbnails[item.id]" :src="mediaThumbnails[item.id]"
               :alt="'Frame preview of private practice clip '+(index+1)" loading="lazy"
               class="h-full w-full object-cover">
@@ -87,8 +117,8 @@ export const PrivateMediaPanel = {
           </button>
           <div class="flex min-w-0 flex-1 flex-col justify-between gap-2 p-3 sm:p-4">
             <div>
-              <p class="text-sm font-bold text-white">Practice clip {{ index + 1 }}</p>
-              <p class="mt-1 text-xs font-semibold text-slate-300">{{ {pending:'Awaiting independent review',approved:'Approved privately',rejected:'Rejected · playback blocked'}[item.status] }}</p>
+              <p class="break-words text-sm font-bold capitalize text-white">{{item.category || 'Practice'}} clip</p>
+              <p class="mt-1 text-xs font-semibold" :class="item.status==='pending'?'text-amber-200':item.status==='approved'?'text-emerald-200':'text-slate-300'">{{ {pending:'Awaiting independent review',approved:'Approved privately',rejected:'Rejected · playback blocked'}[item.status] }}</p>
               <p class="mt-1 text-xs leading-relaxed text-slate-400">
                 {{ item.created_at ? new Date(item.created_at).toLocaleDateString() : 'New private clip' }}
                 <span v-if="item.category">· {{ item.category }}</span>
@@ -108,7 +138,7 @@ export const PrivateMediaPanel = {
         </li>
       </ul>
       <p v-if="mediaPlaybackLoading" role="status" class="rounded-xl border border-slate-700 bg-slate-950 p-4 text-sm text-slate-300">Loading private playback…</p>
-      <section v-if="mediaPlaybackUrl" class="space-y-3 rounded-2xl border border-cyan-400/30 bg-slate-950 p-3 sm:p-4" aria-label="Selected private video player">
+      <section v-if="mediaPlaybackUrl" ref="playbackSection" tabindex="-1" class="scroll-mt-4 space-y-3 rounded-2xl border border-cyan-400/30 bg-slate-950 p-3 sm:p-4" aria-label="Selected private video player">
         <div class="flex flex-wrap items-center justify-between gap-2 px-1">
           <h4 class="text-sm font-bold text-white">Now watching</h4>
           <span class="text-xs font-semibold text-emerald-300">Authorized playback</span>
@@ -164,7 +194,7 @@ export const PrivateMediaPanel = {
       </div>
       <label class="block text-sm font-semibold text-slate-300">
         Video category
-        <select v-model="uploadCategory" :disabled="mediaUploading" class="block rounded bg-slate-950 p-2">
+        <select v-model="uploadCategory" :disabled="mediaUploading" class="mt-2 block min-h-11 w-full rounded-xl border border-slate-600 bg-slate-950 px-3 py-2 text-base text-white">
           <option value="" disabled>Choose a category</option>
           <option value="pitching">Pitching</option>
           <option value="batting">Batting</option>
@@ -183,7 +213,7 @@ export const PrivateMediaPanel = {
         {{ mediaUploading ? 'Uploading…' : 'Upload private clip' }}
       </button>
       <div v-if="mediaUploading" role="status" class="space-y-2">
-        <progress :value="mediaProgress" max="100" class="h-2 w-full"></progress>
+        <progress :value="mediaProgress" max="100" aria-label="Private video upload progress" class="h-3 w-full accent-cyan-400"></progress>
         <p class="text-xs text-slate-300">{{ mediaProgress }}% · {{ mediaProgress >= 99 ? 'Saving securely…' : 'Sending video…' }}</p>
       </div>
     </div>
