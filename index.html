@@ -313,17 +313,16 @@
           :fixed-player-id="selectedPlayer.id" @updated="refreshPerformanceHistory"></performance-workspace>
       </template>
       <template #private-media>
-        <private-media-panel v-if="activeTab === 'team' && mediaOriginAllowed && visibleStagingPlayers.some(row => row.id === selectedPlayer.id)"
+        <private-media-panel v-if="activeTab === 'team' && mediaOriginAllowed && privateMediaController.mediaPlayers.value.some(row => row.id === selectedPlayer.id)"
           :controller="privateMediaController" :profile-player-id="selectedPlayer.id"></private-media-panel>
         <p v-else class="rounded-xl border border-slate-700 bg-slate-900 p-4 text-sm text-slate-300">
-          Private videos are available only to permitted team coaches or verified family members on the authorized staging site.
+          Private videos require an authorized player and staging session.
         </p>
       </template>
     </player-profile>
 
     <!-- The same protected media state is available in the Videos tab. -->
-    <p v-if="activeTab === 'videos' && isManagedWorkspace" role="status" class="rounded-xl border border-slate-700 bg-slate-800 p-5 text-slate-300">Media is unavailable in this restricted workspace.</p>
-    <private-media-panel v-if="activeTab === 'videos' && mediaOriginAllowed && !isManagedWorkspace"
+    <private-media-panel v-if="activeTab === 'videos' && mediaOriginAllowed"
       :controller="privateMediaController"></private-media-panel>
 
     <!-- Keep the existing gated workspace mounted and reachable, after the primary roster/library.

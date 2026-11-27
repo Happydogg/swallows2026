@@ -1,4 +1,5 @@
 // Local metadata only. Never contacts Cloudflare or reads secret values.
+import {disabledMediaBindings} from './mediaGates.mjs';
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {isDeepStrictEqual} from 'node:util';
@@ -14,6 +15,9 @@ export function reviewedBaseline(baseline) {
  // The baseline lists binding metadata, never credentials. Unknown bindings block release.
  const expected={...pilotBindings};
  if(Object.hasOwn(baseline.env||{},'SUBMISSIONS_ENABLED'))expected.SUBMISSIONS_ENABLED={type:'json',value:'false'};
+ for(const [name,binding] of Object.entries(disabledMediaBindings)){
+  if(Object.hasOwn(baseline.env||{},name))expected[name]=binding;
+ }
  assert.ok(isDeepStrictEqual(baseline.env,expected),'Binding drift: preserve all existing bindings; secret values are forbidden');
  assert.ok(Object.hasOwn(baseline,'observability'),'Explicit existing observability settings required, including null if absent');
  assert.ok(baseline.observability===null||typeof baseline.observability==='object'&&!Array.isArray(baseline.observability),'Invalid observability baseline');
@@ -40,7 +44,7 @@ export function preservedObservability(baseline) {
 export function verifyPreservation(config,baseline) {
  reviewedBaseline(baseline);
  assert.equal(config.name,baseline.name);assert.equal(config.compatibilityDate,baseline.compatibilityDate);
- assert.ok(isDeepStrictEqual(config.env,{...baseline.env,SUBMISSIONS_ENABLED:{type:'json',value:'false'}}),'Generated binding metadata drift');
+ assert.ok(isDeepStrictEqual(config.env,{...baseline.env,SUBMISSIONS_ENABLED:{type:'json',value:'false'},...disabledMediaBindings}),'Generated binding metadata drift');
  for(const key of ['workersDev','previewUrls','compatibilityFlags','logpush','tailConsumers'])assert.ok(isDeepStrictEqual(config[key],baseline.workerSettings[key]),'Worker setting drift: '+key);
  for(const key of ['domains','routes','triggers','placement','limits','tags'])assert.equal(config[key],undefined,'Unexpected managed setting: '+key);
  assert.deepEqual(config.observability??null,baseline.observability,'Observability drift: rebuild with the reviewed baseline');

@@ -205,7 +205,8 @@ createApp({
     const privateMedia = usePrivateMedia({
       auth, analyzer: arAnalyzer,
       players: computed(() => workspaceMode.value === 'family' ? familyPlayers.value : []),
-      coachRoster: computed(() => workspaceMode.value === 'coach' ? coachRoster.value : [])
+      coachRoster: computed(() => workspaceMode.value === 'coach' ? coachRoster.value : []),
+      managedPlayers: computed(() => isManagedWorkspace.value ? managedRoster.rows.value : [])
     });
     const submissionWorkspace = useSubmissionWorkspace({
       auth,
@@ -435,6 +436,7 @@ createApp({
       clearProfileHistory();
       drillVideos.value=[];
       playerFeature.selectPlayer({...managed,photo_url:workspaceMode.value==='admin'?avatarForPlayer(managed):''});
+      if (mediaOriginAllowed.value) void privateMedia.selectMediaPlayer(managed.id);
       activeTab.value='team';
     };
     const leavePlayerProfile = () => {

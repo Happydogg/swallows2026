@@ -322,7 +322,8 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   navButton(mobileNav,'Stats').props.onClick();await Vue.nextTick();
   assert.ok(sectionButton('Overview'));assert.ok(sectionButton('Record'));assert.equal(sectionButton('Review'),undefined);
   navButton(mobileNav,'Videos').props.onClick();await Vue.nextTick();
-  assert.match(flatten(host),/Media is unavailable in this restricted workspace/);
+  assert.match(flatten(host),/Video Room|Open the authorized video viewer/);
+  assert.doesNotMatch(flatten(host),/Upload private clip|Delete video/);
   navButton(mobileNav,'Me').props.onClick();await Vue.nextTick();
   assert.match(flatten(meArea()),/Team Manager · Active/);
   assert.match(String(meTools().props.class),/hidden/);

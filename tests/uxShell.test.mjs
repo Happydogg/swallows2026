@@ -128,15 +128,15 @@ test('new preview host does not claim private Worker CORS eligibility', async t 
 test('media fallback links to original staging host for unapproved origins',()=>{
   assert.match(index,/href="https:\/\/sdl-staging\.pages\.dev\/"/);
   assert.match(index,/v-if="activeTab === 'videos' && !mediaOriginAllowed"/);
-  assert.ok(index.includes("v-if=\"activeTab === 'videos' && mediaOriginAllowed && !isManagedWorkspace\""));
-  assert.ok(index.includes("activeTab === 'team' && mediaOriginAllowed && visibleStagingPlayers.some"));
+  assert.ok(index.includes("v-if=\"activeTab === 'videos' && mediaOriginAllowed\""));
+  assert.ok(index.includes("activeTab === 'team' && mediaOriginAllowed && privateMediaController.mediaPlayers.value.some"));
 });
 
 test('approved live UX hostname enables the existing private-media panel without changing Worker calls', () => {
   assert.ok(appSource.includes('https://sdl-ux-live.pages.dev'));
   assert.match(appSource,/mediaOriginAllowed = computed/);
-  assert.ok(index.includes("v-if=\"activeTab === 'videos' && mediaOriginAllowed && !isManagedWorkspace\""));
-  assert.ok(index.includes("activeTab === 'team' && mediaOriginAllowed && visibleStagingPlayers.some"));
+  assert.ok(index.includes("v-if=\"activeTab === 'videos' && mediaOriginAllowed\""));
+  assert.ok(index.includes("activeTab === 'team' && mediaOriginAllowed && privateMediaController.mediaPlayers.value.some"));
   assert.match(index,/<private-media-panel/);
   assert.match(index,/v-if="activeTab === 'videos' && !mediaOriginAllowed"/);
 });
@@ -252,10 +252,10 @@ test('private video room occupies the video section of authorized player profile
   const index=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
   assert.ok(profile.includes('<slot name="private-media">'), 'legacy gallery retained only as fallback');
   assert.ok(index.includes('<template #private-media>'));
-  assert.ok(index.includes("activeTab === 'team' && mediaOriginAllowed && visibleStagingPlayers.some"));
+  assert.ok(index.includes("activeTab === 'team' && mediaOriginAllowed && privateMediaController.mediaPlayers.value.some"));
   assert.ok(index.includes("activeTab === 'videos' && mediaOriginAllowed"));
   assert.ok(index.includes(':controller="privateMediaController"'));
-  assert.ok(index.includes('verified family members'));
+  assert.ok(index.includes('Private videos require an authorized player and staging session.'));
 });
 
 test('UX-IA-01 places primary Team and Videos content before restricted submissions without enabling the gate',()=>{
@@ -315,7 +315,7 @@ test('UX-IA-03 separates profile tasks without replacing existing chart, report,
   assert.match(profile,/@click="triggerPrintReport"/);
   assert.match(index,/\.profile-print-section \{ display: block !important; \}/);
   assert.match(index,/:key="workspaceMode \+ ':' \+ selectedPlayer.id"/);
-  assert.match(index,/activeTab === 'team' && mediaOriginAllowed && visibleStagingPlayers.some/);
+  assert.match(index,/activeTab === 'team' && mediaOriginAllowed && privateMediaController.mediaPlayers.value.some/);
   assert.match(index,/performancePlayers.some\(row => row.id === selectedPlayer.id\)/);
 });
 

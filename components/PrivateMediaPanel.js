@@ -90,13 +90,17 @@ export const PrivateMediaPanel = {
               <p class="text-sm font-bold text-white">Practice clip {{ index + 1 }}</p>
               <p class="mt-1 text-xs leading-relaxed text-slate-400">
                 {{ item.created_at ? new Date(item.created_at).toLocaleDateString() : 'New private clip' }}
-                · {{ (item.byte_size / 1048576).toFixed(1) }} MiB
+                <span v-if="item.category">· {{ item.category }}</span>
               </p>
             </div>
             <button v-if="mediaThumbnailFailed[item.id]" type="button" @click="retryMediaThumbnail(item)" class="rounded-lg border border-slate-600 px-3 py-2 text-sm text-white">Retry preview</button>
             <button type="button" @click="playPrivateMedia(item)" :disabled="mediaPlaybackLoading"
               class="min-h-10 w-full rounded-xl bg-blue-600 px-3 py-2 text-sm font-bold text-white hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:opacity-50">
               ▶ Play privately
+            </button>
+            <button v-if="item.can_archive === true" type="button" @click="archivePrivateMedia(item)" :disabled="mediaArchiving || mediaUploading || mediaPlaybackLoading"
+              class="min-h-10 w-full rounded-xl border border-rose-700 px-3 py-2 text-sm font-semibold text-rose-200 disabled:opacity-50">
+              {{ mediaArchiving ? 'Removing…' : 'Delete video' }}
             </button>
           </div>
         </li>
@@ -137,15 +141,24 @@ export const PrivateMediaPanel = {
       </section>
     </div>
 
-    <div v-else class="rounded-2xl border border-amber-600/30 bg-amber-950/20 p-5 text-sm text-amber-200">
+    <div v-else-if="!mediaError" class="rounded-2xl border border-amber-600/30 bg-amber-950/20 p-5 text-sm text-amber-200">
       You do not have permission to view private clips for this player.
     </div>
 
     <div v-if="mediaUploadAllowed" class="space-y-3 rounded-2xl border border-slate-700 bg-slate-900/90 p-4 sm:p-5">
       <div>
         <h3 class="text-lg font-bold text-white">Add a practice clip</h3>
-        <p class="mt-1 text-xs text-slate-400">Uploads remain private. Supported format: MP4, maximum 20 MiB.</p>
+        <p class="mt-1 text-xs text-slate-400">Synthetic staging footage only. Do not upload recordings of real children. Private MP4, maximum 20 MiB.</p>
       </div>
+      <label class="block text-sm font-semibold text-slate-300">
+        Video category
+        <select v-model="uploadCategory" :disabled="mediaUploading" class="block rounded bg-slate-950 p-2">
+          <option value="" disabled>Choose a category</option>
+          <option value="pitching">Pitching</option>
+          <option value="batting">Batting</option>
+          <option value="throwing">Throwing</option>
+        </select>
+      </label>
       <label class="block text-sm font-semibold text-slate-300" for="sdl-private-upload">
         Upload a private pilot clip (MP4, up to 20 MiB)
         <input id="sdl-private-upload" type="file" accept="video/mp4,.mp4"
@@ -153,7 +166,7 @@ export const PrivateMediaPanel = {
           class="mt-2 block w-full rounded-xl border border-slate-600 bg-slate-950 px-3 py-3 text-sm text-slate-200"/>
       </label>
       <p v-if="mediaFile" class="text-xs text-slate-400">{{ mediaFile.name }}</p>
-      <button type="button" @click="uploadPrivateMedia" :disabled="!mediaFile || mediaUploading"
+      <button type="button" @click="uploadPrivateMedia" :disabled="!mediaFile || !uploadCategory || mediaUploading"
         class="w-full rounded-xl bg-purple-600 px-4 py-3 text-sm font-bold text-white hover:bg-purple-500 disabled:opacity-50 sm:w-auto">
         {{ mediaUploading ? 'Uploading…' : 'Upload private clip' }}
       </button>
@@ -162,7 +175,8 @@ export const PrivateMediaPanel = {
         <p class="text-xs text-slate-300">{{ mediaProgress }}% · {{ mediaProgress >= 99 ? 'Saving securely…' : 'Sending video…' }}</p>
       </div>
     </div>
-    <p v-else class="rounded-xl border border-slate-700 bg-slate-900 p-4 text-xs text-slate-400">Uploads are unavailable for this player. Verified guardians can view permitted private clips.</p>
+    <p v-else-if="mediaUploadError" role="status" class="rounded-xl border border-slate-700 bg-slate-900 p-4 text-xs text-slate-400">{{ mediaUploadError }}</p>
+    <p v-else class="rounded-xl border border-slate-700 bg-slate-900 p-4 text-xs text-slate-400">You do not have upload permission for this player.</p>
   </template>
 
   <details class="rounded-2xl border border-slate-700 bg-slate-900/75 p-4 text-sm">
