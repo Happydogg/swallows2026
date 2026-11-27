@@ -293,7 +293,57 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   await h.app.changeManagedTeam('empty');await Vue.nextTick();
   assert.match(flatten(host),/No players in this authorized scope/);
   assert.doesNotMatch(flatten(host),/Synthetic Roster Player/);
+  // IA-06: real Vue render navigation for the scoped managed role, then a fresh identity.
+  const primaryNav=()=>elements(host).find(n=>n.props['aria-label']==='Primary navigation');
+  const mobileNav=()=>elements(host).find(n=>n.props['aria-label']==='Mobile primary navigation');
+  const navButton=(nav,name)=>elements(nav()).find(n=>n.type==='button' && flatten(n).trim()===name);
+  for(const [tab,label] of [['home','Home'],['team','Team'],['stats','Stats'],['videos','Videos'],['me','Me']]){
+    navButton(mobileNav,label).props.onClick();await Vue.nextTick();
+    assert.equal(h.app.activeTab.value,tab);
+    assert.equal(navButton(primaryNav,label).props['aria-current'],'page');
+    assert.equal(navButton(mobileNav,label).props['aria-current'],'page');
+  }
+  assert.match(flatten(meArea()),/Club Admin · Active/);
+  assert.match(String(meTools().props.class),/hidden/);
+  assert.match(String(enrollmentTools().props.class),/hidden/);
   await h.app.signOutAndClear();await Vue.nextTick();
+  h.loginUser=user('manager-fixture');
+  h.rows.sdl_v5_account_context={version:1,user_id:'manager-fixture',roles:['manager'],
+    direct_memberships:{organizations:[],teams:[],guardian_links:0},
+    organizations:[{id:'club-a',name:'Synthetic Club A',roles:['manager']}],
+    teams:[{id:'team-a1',organization_id:'club-a',name:'Synthetic Team A1',roles:['manager']}],
+    platform:{view:false,export:false,sensitive_write:false}};
+  h.rows.sdl_v5_authorized_roster={version:1,role:'manager',rows:[{id:'manager-player',organization_id:'club-a',team_ids:['team-a1'],preferred_name:'Manager Scoped Player',jersey:'11'}],next_after:null};
+  await h.app.signInAndLoad();await Vue.nextTick();
+  assert.match(flatten(host),/Team Manager Dashboard/);
+  navButton(primaryNav,'Team').props.onClick();await Vue.nextTick();
+  assert.match(flatten(host),/Manager Scoped Player/);
+  assert.doesNotMatch(flatten(host),/Synthetic Roster Player/);
+  navButton(mobileNav,'Stats').props.onClick();await Vue.nextTick();
+  assert.ok(sectionButton('Overview'));assert.ok(sectionButton('Record'));assert.equal(sectionButton('Review'),undefined);
+  navButton(mobileNav,'Videos').props.onClick();await Vue.nextTick();
+  assert.match(flatten(host),/Media is unavailable in this restricted workspace/);
+  navButton(mobileNav,'Me').props.onClick();await Vue.nextTick();
+  assert.match(flatten(meArea()),/Team Manager · Active/);
+  assert.match(String(meTools().props.class),/hidden/);
+  assert.match(String(enrollmentTools().props.class),/hidden/);
+  await h.app.signOutAndClear();await Vue.nextTick();
+  assert.doesNotMatch(flatten(host),/Manager Scoped Player|Synthetic Roster Player/);
+  h.loginUser=user('coach-fixture');
+  h.rows.sdl_v5_account_context={version:1,user_id:'coach-fixture',roles:['coach'],
+    direct_memberships:{organizations:[],teams:[],guardian_links:0},
+    organizations:[{id:'club-a',name:'Synthetic Club A',roles:['coach']}],
+    teams:[{id:'team-a1',organization_id:'club-a',name:'Synthetic Team A1',roles:['coach']}],
+    platform:{view:false,export:false,sensitive_write:false}};
+  h.rows.roster=[{id:'11111111-1111-4111-8111-111111111111',team_id:'team-a1',preferred_name:'Coach Scoped Player',jersey:'12'}];
+  await h.app.signInAndLoad();await Vue.nextTick();
+  assert.match(flatten(host),/Team overview/);
+  navButton(primaryNav,'Stats').props.onClick();await Vue.nextTick();
+  assert.ok(sectionButton('Review'));
+  navButton(mobileNav,'Me').props.onClick();await Vue.nextTick();
+  assert.match(flatten(meArea()),/Coach · Active/);
+  await h.app.signOutAndClear();await Vue.nextTick();
+  assert.doesNotMatch(flatten(host),/Coach Scoped Player|Manager Scoped Player/);
   assert.equal(errors.length, 0, errors.map(String).join('\n'));
   assert.equal(warnings.length, 0, warnings.join('\n'));
 });
