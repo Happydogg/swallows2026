@@ -17,6 +17,7 @@ export function mediaAction(path, method) {
   if (path === '/v2/submissions/upload-eligibility' && method === 'GET') return 'upload';
   if (path === '/v2/media/consent' && ['GET','POST'].includes(method)) return 'consent';
   if (['/v2/media/publication-eligibility','/v2/media/clubhouse'].includes(path) && method==='GET') return 'publish';
+  if (/^\/v2\/media\/[^/]+\/shared-download$/.test(path) && method==='GET') return 'download';
   if (/^\/v2\/media\/[^/]+\/shared-playback$/.test(path) && method==='GET') return 'publish';
   if (/^\/v2\/media\/[^/]+\/(publish|unpublish)$/.test(path) && method==='POST') return 'publish';
   if (path === '/v2/clubhouse' && method === 'GET') return 'playback';

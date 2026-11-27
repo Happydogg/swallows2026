@@ -204,6 +204,10 @@ export function createPrivateMediaService({ auth, client = supabaseClient, baseU
     },
     sharedMedia(teamId,cursor,options) {return request(`/v2/media/clubhouse?team_id=${playerIdValue(teamId)}${cursor?'&cursor='+encodeURIComponent(cursor):''}`,options);},
     sharedPlayback(mediaId,teamId,options) {return request(`/v2/media/${id(mediaId)}/shared-playback?team_id=${playerIdValue(teamId)}`,{...options,blob:true});},
+    // Fresh authorized attachment request, never reuse a playback blob for saving.
+    sharedDownload(mediaId,teamId,options) {
+      return request(`/v2/media/${id(mediaId)}/shared-download?team_id=${playerIdValue(teamId)}`,{...options,blob:true});
+    },
     async archive(mediaId,options) {
       const result=await request(`/v2/submissions/${id(mediaId)}/archive`,{...options,method:'POST'});
       if(result?.archived!==true||typeof result.deleted!=='boolean')throw new MediaError('Removal status unknown. Refresh before retrying.');

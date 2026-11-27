@@ -48,7 +48,7 @@ export const MediaConsentPanel={
   <template v-if="status">
    <p class="font-semibold">{{status.organization_name}} · {{status.active ? 'Consent active' : 'Not sharing'}}</p>
    <p class="text-sm text-slate-300">Optional standing consent for this continuous club enrollment. Private storage and statistics sharing are separate. Only independently approved, explicitly published single-athlete clips may be shared with authorized current team members.</p>
-   <p class="text-sm text-slate-300">Consent includes viewing and downloading. Downloads are still disabled in this staging phase. Withdrawal stops future shared access; copies already delivered cannot be remotely deleted. Leaving the club ends consent.</p>
+   <p class="text-sm text-slate-300">Consent includes viewing and downloading. Authorized team members may save explicitly published clips when the download feature is enabled. Withdrawal stops future shared access; copies already delivered cannot be remotely deleted. Leaving the club ends consent.</p>
    <p class="text-xs text-slate-400">Policy: {{status.policy_version}}</p>
    <p v-if="status.active && status.accepted_at" class="text-xs text-slate-400">Accepted: {{new Date(status.accepted_at).toLocaleString()}}</p>
    <template v-if="!status.active && status.can_accept">

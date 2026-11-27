@@ -247,6 +247,8 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
       const consentRoute=path==='/v2/media/consent';
       const shareRoute=path.startsWith('/v2/media/')&&!consentRoute;
       const sharePlayback=path.match(/^\/v2\/media\/([^/]+)\/shared-playback$/);
+      const shareDownload=path.match(/^\/v2\/media\/([^/]+)\/shared-download$/);
+      const downloadEnabled=env.MEDIA_DOWNLOAD_ENABLED==='true'&&env.MEDIA_PLAYBACK_ENABLED==='true'&&contract.value.mediaDownloadRevision==='team-download-v1';
       const parseSmallJson=async()=>{
         const reader=request.body?.getReader();if(!reader)throw Error('Invalid JSON');
         let size=0;const parts=[];
@@ -289,12 +291,16 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
           let before=null,beforeId=null;
           if(cursor!==null){const parts=cursor.split('|');if(parts.length!==2||parts[0].length>48||!/^\d{4}-\d{2}-\d{2}T/.test(parts[0])||!Number.isFinite(Date.parse(parts[0]))||!validId(parts[1]))return json({error:'Invalid cursor'},400,origin);[before,beforeId]=parts;}
           const result=await call('sdl_v5_shared_media_list',{p_team:team,p_before:before,p_before_id:beforeId});
-          return result.error?error(result):json(result.value,200,origin);
+          if(result.error)return error(result);
+          if(!Array.isArray(result.value?.items)||result.value.items.length>30)return json({error:'Invalid shared list'},503,origin);
+          return json({...result.value,items:result.value.items.map(item=>({...item,can_download:downloadEnabled}))},200,origin);
         }
-        if(!sharePlayback||request.method!=='GET')return json({error:'Not found'},404,origin);
+        if((!sharePlayback&&!shareDownload)||request.method!=='GET')return json({error:'Not found'},404,origin);
+        if(shareDownload&&!downloadEnabled)return json({error:'Download disabled',code:'media_disabled'},503,origin);
+        if(shareDownload&&([...url.searchParams.keys()].some(k=>k!=='team_id')||url.searchParams.getAll('team_id').length!==1||request.headers.has('Range')))return json({error:'Full-file download requires exactly one team_id and no Range'},400,origin);
         if(env.MEDIA_PLAYBACK_ENABLED!=='true')return json({error:'Playback disabled',code:'media_disabled'},503,origin);
       }
-      const match = sharePlayback ? [null,sharePlayback[1],'shared-playback'] : path.match(/^\/v2\/submissions\/([^/]+)\/(review|publish|playback|download|archive)$/);
+      const match = shareDownload ? [null,shareDownload[1],'shared-download'] : sharePlayback ? [null,sharePlayback[1],'shared-playback'] : path.match(/^\/v2\/submissions\/([^/]+)\/(review|publish|playback|download|archive)$/);
       if (!match || !validId(match[1])) return json({ error: 'Not found' }, 404, origin);
       const [, id, action] = match;
       if(action==='archive' && request.method==='POST'){
@@ -321,12 +327,12 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
           :await call('sdl_004_publish_submission',{p_id:id,p_team_ids:body.team_ids,p_subject_athletes:body.subject_athletes??[]});
         return result.error ? error(result) : json({ updated: true }, 200, origin);
       }
-      if (['playback','download','shared-playback'].includes(action) && request.method === 'GET') {
-        const team=action==='shared-playback'?url.searchParams.get('team_id'):null;
-        if(action==='shared-playback'&&!validPlayerId(team))return json({error:'Invalid team ID'},400,origin);
-        const allowed = action==='shared-playback' ? await call('sdl_v5_authorize_shared_playback',{p_id:id,p_team:team}) : action === 'download'
-          ? await call('sdl_v5_authorize_download', { p_id: id })
-          : await call('sdl_v5_authorize_playback', {p_id:id});
+      if(action==='download')return json({error:'Private download disabled',code:'media_disabled'},503,origin);
+      if (['playback','shared-download','shared-playback'].includes(action) && request.method === 'GET') {
+        const shared=action==='shared-playback'||action==='shared-download';
+        const team=shared?url.searchParams.get('team_id'):null;
+        if(shared&&!validPlayerId(team))return json({error:'Invalid team ID'},400,origin);
+        const allowed = shared ? await call('sdl_v5_authorize_shared_playback',{p_id:id,p_team:team}) : await call('sdl_v5_authorize_playback',{p_id:id});
         if (allowed.error) return error(allowed);
         if (allowed.value !== true) return json({ error: 'Forbidden' }, 403, origin);
         let response, item;
@@ -365,10 +371,22 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
             (hasRange && !obj.range) ||
             (obj.range && (obj.range.offset!==first || obj.range.length!==length)))
           return json({error:'Invalid media size or range'},503,origin);
+        // Recheck current membership/consent and commit authorization audit after
+        // validated storage lookup, before any bytes are returned to the caller.
+        if(action==='shared-download'){
+          const audited=await call('sdl_v5_authorize_shared_download',{p_id:id,p_team:team});
+          if(audited.error||audited.value!==true){
+            try{await obj.body.cancel?.();}catch{}
+            return audited.error?error(audited):json({error:'Forbidden'},403,origin);
+          }
+        }
         const headers = new Headers({ 'Content-Type': item.content_type, 'Cache-Control': 'private, no-store',
           'X-Content-Type-Options': 'nosniff', 'Accept-Ranges': 'bytes' });
         if (ORIGINS.has(origin)) { headers.set('Access-Control-Allow-Origin', origin); headers.set('Vary', 'Origin'); }
-        if (action === 'download') headers.set('Content-Disposition','attachment; filename="video.'+(item.content_type==='video/quicktime'?'mov':'mp4')+'"');
+        if(action==='shared-download'){
+          headers.set('Content-Disposition','attachment; filename="sdl-practice-video.'+(item.content_type==='video/quicktime'?'mov':'mp4')+'"');
+          headers.set('Accept-Ranges','none');
+        }
         if (hasRange) headers.set('Content-Range', 'bytes '+first+'-'+end+'/'+obj.size);
         headers.set('Content-Length', String(length));
         return new Response(obj.body, { status: hasRange ? 206 : 200, headers });
