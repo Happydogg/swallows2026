@@ -38,10 +38,23 @@ test('undeployed workspace never makes requests and leaves submission operation 
 test('own-child selection loads history, unrelated selection makes no request',async t=>{
  let n=0;const {c}=await setup(t,{list:async()=>{n++;return[row];}});await c.selectPlayer('unrelated');assert.equal(n,0);await c.selectPlayer(P);assert.equal(n,1);
 });
-test('MP4 picking creates a local preview and invalid files are rejected',async t=>{
- const {c}=await setup(t);c.pickFile({target:{files:[file],value:'x'}});assert.ok(c.previewUrl.value);
- c.pickFile({target:{files:[{...file,type:'video/quicktime'}],value:'x'}});assert.equal(c.file.value,null);assert.match(c.error.value,/MP4/);
- c.pickFile({target:{files:[{...file,size:20971521}],value:'x'}});assert.equal(c.file.value,null);assert.match(c.error.value,/20 MiB/);
+test('MP4 and MOV picking create local previews, including generic mobile MIME and the exact 40 MiB limit',async t=>{
+ const {c,revoked}=await setup(t);const max=40*1024*1024;
+ for(const candidate of [file,{...file,name:'clip.mov',type:'video/quicktime'},{...file,name:'clip.MOV',type:'application/octet-stream'},{...file,type:'video/quicktime'},{...file,type:'',size:max}]){
+  c.pickFile({target:{files:[candidate],value:'x'}});assert.ok(c.previewUrl.value);assert.equal(c.file.value.name,candidate.name);assert.equal(c.file.value.size,candidate.size);assert.equal(c.error.value,'');
+ }
+ assert.ok(revoked.length>=4);
+});
+test('file picker rejects unsupported extension or MIME, empty and over-limit clips without retaining a preview',async t=>{
+ const {c}=await setup(t);
+ for(const candidate of [{...file,name:'clip.webm',type:'video/webm'},{...file,name:'clip.exe'},{...file,type:'image/png'}]){
+  c.pickFile({target:{files:[file],value:'x'}});assert.ok(c.previewUrl.value);
+  c.pickFile({target:{files:[candidate],value:'x'}});assert.equal(c.file.value,null);assert.equal(c.previewUrl.value,'');assert.match(c.error.value,/MP4 or MOV/);
+ }
+ for(const size of [0,40*1024*1024+1]){
+  c.pickFile({target:{files:[file],value:'x'}});assert.ok(c.previewUrl.value);
+  c.pickFile({target:{files:[{...file,size}],value:'x'}});assert.equal(c.file.value,null);assert.equal(c.previewUrl.value,'');assert.match(c.error.value,/40 MiB/);
+ }
 });
 test('successful parent submission is private with no per-video consent parameters',async t=>{
  const {c,calls,revoked}=await setup(t);await c.load();await c.selectPlayer(P);c.pickFile({target:{files:[file],value:''}});c.category.value='throwing';await c.submit();
