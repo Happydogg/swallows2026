@@ -384,5 +384,5 @@ test('deterministic PostgreSQL player UUIDs reach the authorized media APIs', as
   assert.deepEqual(await listing.service.list(demo),[]);
   const uploaded=await serviceHarness(t,{xhrFactory:()=>xhrMock(201,{...row,player_id:demo})});
   assert.equal((await uploaded.service.upload(demo,file,{submission:{category:'pitching',key:VIDEO}})).player_id,demo);
-  await assert.rejects(uploaded.service.upload(demo,file,{submission:{category:'pitching',key:demo}}),/Invalid media or player ID/);
+  assert.throws(()=>uploaded.service.upload(demo,file,{submission:{category:'pitching',key:demo}}),/Invalid media or player ID/);
 });
