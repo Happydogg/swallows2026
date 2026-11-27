@@ -2,7 +2,7 @@ import {PerformanceInbox} from './PerformanceInbox.js';
 import {translations} from '../js/translations.js';
 // No privileged flags are derived from form fields; server capabilities remain required.
 export const SubmissionWorkspace={
-  name:'SubmissionWorkspace',components:{PerformanceInbox},props:{controller:{type:Object,required:true},pilotController:{type:Object,default:null},t:{type:Function,default:key=>translations.en[key]||key}},
+  name:'SubmissionWorkspace',components:{PerformanceInbox},props:{controller:{type:Object,required:true},pilotController:{type:Object,default:null},showPerformanceReview:{type:Boolean,default:true},t:{type:Function,default:key=>translations.en[key]||key}},
   setup(props){return {...props.controller,pilot:props.pilotController,t:props.t};},
   template:`
 <section class="my-6 rounded-xl border border-slate-700 bg-slate-800 p-4 space-y-4 no-print" aria-label="Player and video workspace">
@@ -132,7 +132,7 @@ export const SubmissionWorkspace={
   <div v-if="tab==='review'||tab==='clubhouse'" class="space-y-4">
     <label class="block">Authorized team<select :value="teamId" @change="selectTeam($event.target.value,tab)" class="mt-1 block w-full bg-slate-900 p-3 rounded"><option value="">Select a team</option><option v-for="team in teams" :key="team.id" :value="team.id">{{ team.name }}</option></select></label>
     <template v-if="tab==='review'">
-      <performance-inbox v-if="pilot" :controller="pilot" :team-id="teamId"></performance-inbox>
+      <performance-inbox v-if="pilot && showPerformanceReview" :controller="pilot" :team-id="teamId"></performance-inbox>
       <p class="text-sm text-slate-400">{{ ready?'Pending among the displayed submissions: '+pendingCount:'Review counts await the authorized backend.' }} Up to 50 items are displayed.</p>
       <select v-model="reviewFilter" @change="refreshQueue" :disabled="!enabled||!ready||busy" class="p-3 bg-slate-900 rounded"><option value="pending">Pending</option><option value="all">All statuses</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select>
       <button @click="refreshQueue" :disabled="!enabled||!ready||!teamId||busy" class="p-3 ml-2 bg-slate-700 rounded disabled:opacity-50">Refresh reviews</button>
