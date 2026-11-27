@@ -2,6 +2,20 @@
 
 **Updated:** 2026-11-27. **Status:** Working GitHub coordination mirror. Reconcile against the independent SDL Master Directory before calling this authoritative.
 
+## SDL-000 UX-IA-05 deployed checkpoint (2026-11-27)
+
+**This is the latest coordination status for Issue #12 and supersedes earlier UX-IA-01 candidate-only notes below. Preserve the old records as history.**
+
+[Issue #12 latest handoff](https://github.com/Happydogg/swallows2026/issues/12#issuecomment-7215859630) reports that UX-IA-01, 02, 03, 04 and 05 have been merged to `feature/SDL-UX-002-login-redesign` and deployed to the UX staging review sites. GitHub confirms PR #13–17 merged. **Owner acceptance:** IA-01, IA-02 and IA-04 accepted; IA-03 non-video portions accepted with video still blocked; IA-05 visual review pending. IA-06 mobile/cross-role QA is next, not yet accepted.
+
+**IA-05:** [PR #17](https://github.com/Happydogg/swallows2026/pull/17) merged at `9437a44faf3d8bfaca7f9f65ddeabae7cf52cb4c`, source candidate `261a216bb4b1c7a0b2c038c8436323440aa6a967`. Me/account/preferences grouped; restricted family/staff/enrollment components remain gated; existing photo directory retained. Six presentation/test files, no intended RBAC/backend/media modifications. Configured isolated regression build passed; 8/8 Vue/performance smoke checks visible, other test output truncated.
+
+**Directly verified deployments:** Cloudflare Pages `sdl-ux-live` deployment `2c151c7b-68c6-4260-840c-f18f0cae23dc` success, and `sdl-ux-preview` deployment `ad310875-8399-423f-aca2-36c41f0c0d86` success, both commit `9437a44faf3d8bfaca7f9f65ddeabae7cf52cb4c`. These are Pages project 'production' environments *within UX review projects*, NOT SDL production pilot approval.
+
+**Backend handoff:** SDL-004 owns the private-media compatibility/authorization blocker from IA-03. Legacy media RPC fail-closed status must not be bypassed. No unrestricted playback, storage exposure or media/RBAC gate relaxation. SDL-UX owns accurate unavailable-vs-denied UI feedback and IA-06 cross-role usability QA. Production pilot and full independent security acceptance remain pending.
+
+---
+
 ## 2026-11-27 UX-IA-01 approved implementation candidate
 
 **Supersedes Issue #12's earlier 'approval pending' status for UX-IA-01 only.** The owner approved **UX-IA-01** after the current-desktop visual evidence supplement. [Issue #12](https://github.com/Happydogg/swallows2026/issues/12) now has two comments: [visual evidence supplement](https://github.com/Happydogg/swallows2026/issues/12#issuecomment-7214518696) and [approval/implementation candidate](https://github.com/Happydogg/swallows2026/issues/12#issuecomment-7214618734).
