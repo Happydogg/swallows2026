@@ -5,7 +5,8 @@ export function filterPrivateLibrary(rows,category='',status='') {
 }
 export const PrivateMediaPanel = {
   name: 'PrivateMediaPanel',
-  props: { controller: { type: Object, required: true }, profilePlayerId: { type: String, default: '' } },
+  props: { controller: { type: Object, required: true }, profilePlayerId: { type: String, default: '' }, reviewOnly: {type:Boolean,default:false} },
+  emits:['close-review'],
   directives: {
     // Demand-driven previews: only visible cards fetch their authorized MP4.
     'media-visible': {
@@ -36,12 +37,12 @@ export const PrivateMediaPanel = {
   },
   template: `
 <section class="mb-4 space-y-4 no-print" aria-label="Private player videos">
-  <header class="flex flex-wrap items-center justify-between gap-2">
+  <header v-if="!reviewOnly" class="flex flex-wrap items-center justify-between gap-2">
     <div><p class="text-xs font-semibold text-slate-400">Video Room</p><h2 class="text-2xl font-bold text-white">Private videos</h2></div>
     <span class="rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-300">Private staging media</span>
   </header>
 
-  <div v-if="!profilePlayerId" class="rounded-2xl border border-slate-700 bg-slate-900/90 p-4 sm:p-5">
+  <div v-if="!reviewOnly && !profilePlayerId" class="rounded-2xl border border-slate-700 bg-slate-900/90 p-4 sm:p-5">
     <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
       <div>
         <h3 class="text-lg font-bold text-white">Choose a player</h3>
@@ -60,6 +61,7 @@ export const PrivateMediaPanel = {
     <p v-if="!mediaPlayers.length" class="mt-4 rounded-xl border border-dashed border-slate-600 p-5 text-sm text-slate-400">No linked or coached players are available. Check your club membership or verified guardian link.</p>
   </div>
 
+  <div v-if="reviewOnly && inboxReviewMode" class="flex flex-wrap items-center justify-between gap-2"><h3 class="text-lg font-bold text-white">{{inboxReviewPlayerLabel || 'Opening review…'}}</h3><button type="button" :disabled="mediaReviewing" @click="$emit('close-review')" class="sdl-secondary min-h-11 px-3 text-sm">Close review</button></div>
   <p v-if="mediaError" role="alert" class="rounded-xl border border-rose-700/70 bg-rose-950/30 p-4 text-sm text-rose-200">{{ mediaError }}</p>
   <p v-if="mediaNotice" role="status" class="rounded-xl border border-emerald-700/50 bg-emerald-950/30 p-4 text-sm text-emerald-200">{{ mediaNotice }}</p>
   <div v-if="mediaLoading" class="flex items-center gap-3 rounded-2xl border border-slate-700 bg-slate-900 p-5 text-sm text-slate-300" role="status">
@@ -69,6 +71,7 @@ export const PrivateMediaPanel = {
 
   <template v-if="mediaPlayerId && !mediaLoading && (!profilePlayerId || profilePlayerId === mediaPlayerId)">
     <div v-if="mediaReadAllowed" class="space-y-4 rounded-2xl border border-slate-700 bg-slate-900/90 p-4 sm:p-5">
+      <template v-if="!reviewOnly">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 class="text-lg font-bold text-white">Private clips</h3>
@@ -137,6 +140,7 @@ export const PrivateMediaPanel = {
           </div>
         </li>
       </ul>
+      </template>
       <p v-if="mediaPlaybackLoading" role="status" class="rounded-xl border border-slate-700 bg-slate-950 p-4 text-sm text-slate-300">Loading private playback…</p>
       <section v-if="mediaPlaybackUrl" ref="playbackSection" tabindex="-1" class="scroll-mt-4 space-y-3 rounded-2xl border border-cyan-400/30 bg-slate-950 p-3 sm:p-4" aria-label="Selected private video player">
         <div class="flex flex-wrap items-center justify-between gap-2 px-1">
@@ -187,6 +191,7 @@ export const PrivateMediaPanel = {
       You do not have permission to view private clips for this player.
     </div>
 
+    <template v-if="!reviewOnly">
     <div v-if="mediaUploadAllowed" class="space-y-3 rounded-2xl border border-slate-700 bg-slate-900/90 p-4 sm:p-5">
       <div>
         <h3 class="text-lg font-bold text-white">Add a practice clip</h3>
@@ -219,9 +224,10 @@ export const PrivateMediaPanel = {
     </div>
     <p v-else-if="mediaUploadError" role="status" class="rounded-xl border border-slate-700 bg-slate-900 p-4 text-xs text-slate-400">{{ mediaUploadError }}</p>
     <p v-else class="rounded-xl border border-slate-700 bg-slate-900 p-4 text-xs text-slate-400">You do not have upload permission for this player.</p>
+    </template>
   </template>
 
-  <details class="rounded-2xl border border-slate-700 bg-slate-900/75 p-4 text-sm">
+  <details v-if="!reviewOnly" class="rounded-2xl border border-slate-700 bg-slate-900/75 p-4 text-sm">
     <summary class="cursor-pointer py-2 font-bold text-white">Parent submissions and Team Clubhouse</summary>
     <p class="pt-2 text-sm leading-relaxed text-slate-400">The separate submissions and coach-review workspace remains available through the existing controls. Private clips are never automatically approved or shared.</p>
   </details>
