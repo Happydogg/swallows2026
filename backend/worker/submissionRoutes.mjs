@@ -1,6 +1,7 @@
 import {mediaAction} from './mediaGates.mjs';
 import {pilotWorkflowRoute} from './pilotWorkflowRoutes.mjs';
-// Staging release candidate. Not deployed.
+const PLAYER_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const validPlayerId = value => typeof value === 'string' && PLAYER_UUID.test(value);
 export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedBytes, configOk, validId, json, ORIGINS }) {
   async function rpc(env, bearer, name, body) {
     try {
@@ -132,7 +133,7 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
       const error = result => json({ error: result.status===409?'Upload or review conflict; refresh before retrying':'Authorization or submission service unavailable' }, result.status || 503, origin);
       if (path === '/v2/submissions/upload-eligibility' && request.method === 'GET') {
         const playerId=url.searchParams.get('player_id');
-        if(!validId(playerId)) return json({error:'Invalid player_id'},400,origin);
+        if(!validPlayerId(playerId)) return json({error:'Invalid player_id'},400,origin);
         const allowed=await call('sdl_004_submission_can_submit',{p_player_id:playerId});
         if(allowed.error) return error(allowed);
         return json({allowed:allowed.value===true},200,origin);
@@ -140,7 +141,7 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
       if (path === '/v2/submissions' && request.method === 'POST') {
         const playerId = url.searchParams.get('player_id'), category = url.searchParams.get('category');
         if(url.searchParams.has('share_with_team')||url.searchParams.has('team_ids'))return json({error:'Uploads are private; manage standing club consent separately'},400,origin);
-        if(!validId(playerId)||!['pitching','batting','throwing'].includes(category))return json({error:'Invalid submission'},400,origin);
+        if(!validPlayerId(playerId)||!['pitching','batting','throwing'].includes(category))return json({error:'Invalid submission'},400,origin);
         const allowed=await call('sdl_004_submission_can_submit',{p_player_id:playerId});
         if(allowed.error)return error(allowed);
         if(allowed.value!==true)return json({error:'Private upload authorization required'},403,origin);
@@ -185,7 +186,7 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
       }
       if (path === '/v2/submissions' && request.method === 'GET') {
         const playerId = url.searchParams.get('player_id');
-        if (!validId(playerId)) return json({ error: 'Invalid player_id' }, 400, origin);
+        if (!validPlayerId(playerId)) return json({ error: 'Invalid player_id' }, 400, origin);
         const result = await call('sdl_004_list_submissions', { p_player_id: playerId });
         if(result.error) return error(result);
         // An unavailable archive capability never blocks the library or grants removal.
@@ -237,7 +238,7 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
           item = (await response.json())?.[0];
         } catch { return json({ error: 'Metadata unavailable' }, 503, origin); }
         if (!item) return json({ error: 'Not found' }, 404, origin);
-        if (!validId(item.player_id) || item.object_key!==`pilot/${item.player_id}/${id}.mp4` ||
+        if (!validPlayerId(item.player_id) || item.object_key!==`pilot/${item.player_id}/${id}.mp4` ||
           item.content_type!=='video/mp4' || !Number.isSafeInteger(item.byte_size) || item.byte_size<12 ||
           item.byte_size>20*1024*1024)
           return json({error:'Invalid media metadata'},503,origin);

@@ -20,6 +20,8 @@ const messages = {
 };
 const disabled = () => Object.assign(new MediaError('This media feature is currently disabled.', 503), {code:'media_disabled'});
 const failure = status => new MediaError(messages[status] || 'The media request failed. Please retry.', status);
+const PLAYER_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const playerIdValue = value => { if (typeof value !== 'string' || !PLAYER_UUID.test(value)) throw new MediaError('Invalid media or player ID.'); return value; };
 const id = value => { if (!UUID.test(value ?? '')) throw new MediaError('Invalid media or player ID.'); return value; };
 export function validateMediaFile(file) {
   if (!file || file.type !== 'video/mp4' || !/\.mp4$/i.test(file.name ?? '')) throw failure(415);
@@ -82,7 +84,7 @@ export function createPrivateMediaService({ auth, client = supabaseClient, baseU
     }
   }
   async function uploadRoute(playerId, file, { signal, onProgress = () => {}, submission } = {}) {
-      id(playerId); validateMediaFile(file);
+      playerIdValue(playerId); validateMediaFile(file);
       const { token, identity } = await bearer(signal);
       return new Promise((resolve, reject) => {
         if (signal?.aborted) { reject(new DOMException('Cancelled', 'AbortError')); return; }
@@ -134,7 +136,7 @@ export function createPrivateMediaService({ auth, client = supabaseClient, baseU
     async authorize(playerId, action, options) {
       if (action !== 'upload') throw new MediaError('Unsupported media action.');
       try {
-        const result = await request(`/v2/submissions/upload-eligibility?player_id=${id(playerId)}`, options);
+        const result = await request(`/v2/submissions/upload-eligibility?player_id=${playerIdValue(playerId)}`, options);
         if (typeof result.allowed !== 'boolean') throw new MediaError('Invalid authorization response.');
         return result.allowed;
       } catch (error) {
@@ -143,7 +145,7 @@ export function createPrivateMediaService({ auth, client = supabaseClient, baseU
       }
     },
     async list(playerId, options) {
-      const result = await request(`/v2/submissions?player_id=${id(playerId)}`, options);
+      const result = await request(`/v2/submissions?player_id=${playerIdValue(playerId)}`, options);
       if (!Array.isArray(result.items) || result.items.length > 30) throw new MediaError('Invalid media listing.');
       return result.items.map(item => {
         if (!UUID.test(item?.id) || item.player_id !== playerId ||

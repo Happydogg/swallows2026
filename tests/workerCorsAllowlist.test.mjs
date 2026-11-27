@@ -56,3 +56,28 @@ test('v2 CORS still permits exact origin while backend feature gate stays off',a
   assert.equal(denied.status,503);
   assert.match(await denied.text(),/disabled/);
 });
+
+test('deterministic player UUID reaches server role check; malformed IDs and missing auth still fail',async t=>{
+ const prior=globalThis.fetch;
+ t.after(()=>{globalThis.fetch=prior;});
+ const demo='abcdef12-3456-d789-0123-abcdef123456';
+ const calls=[];
+ globalThis.fetch=async(url,init)=>{
+   const path=new URL(url).pathname;
+   if(path==='/auth/v1/user')return Response.json({id:'11111111-1111-4111-8111-111111111111'});
+   if(path.endsWith('/sdl_004_session_active'))return Response.json(true);
+   if(path.endsWith('/sdl_004_submission_contract'))return Response.json({rbacVersion:5,revision:'sdl004-club-enrollment-v2',mediaRevision:'v5.1-clean-start'});
+   calls.push([path,JSON.parse(init.body)]);
+   if(path.endsWith('/sdl_004_submission_can_submit'))return Response.json(false);
+   if(path.endsWith('/sdl_004_list_submissions'))return Response.json([]);
+   throw Error('Unexpected request');
+ };
+ const env={SUPABASE_URL:'https://wvurolqbjhuckkkjiiiv.supabase.co',SUPABASE_PUBLISHABLE_KEY:'sb_publishable_synthetic',SUPABASE_SECRET_KEY:'sb_secret_synthetic',MEDIA_BUCKET:{},MEDIA_UPLOAD_ENABLED:'true',MEDIA_PLAYBACK_ENABLED:'true'};
+ const run=path=>entry.fetch(new Request(WORKER+path,{headers:{Origin:LIVE,Authorization:'Bearer synthetic'}}),env);
+ assert.equal((await run('/v2/submissions/upload-eligibility?player_id='+demo)).status,200);
+ assert.deepEqual(calls[0][1],{p_player_id:demo});
+ assert.equal((await run('/v2/submissions?player_id='+demo)).status,200);
+ assert.deepEqual(calls[1][1],{p_player_id:demo});
+ assert.equal((await run('/v2/submissions?player_id=bad')).status,400);
+ assert.equal(calls.length,2);
+});

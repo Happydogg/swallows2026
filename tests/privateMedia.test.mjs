@@ -372,3 +372,17 @@ test('media transport distinguishes disabled delivery, outage, denied scope and 
   next=Response.json({error:'Denied'},{status:403});
   await assert.rejects(service.list(PLAYER),error=>error.status===403);
 });
+
+test('deterministic PostgreSQL player UUIDs reach the authorized media APIs', async t => {
+  const demo = 'abcdef12-3456-d789-0123-abcdef123456';
+  const {service,requests,xhr}=await serviceHarness(t);
+  assert.equal(await service.authorize(demo,'upload'),true);
+  assert.ok(requests[0].url.endsWith(demo));
+  await assert.rejects(service.authorize('../bad','upload'),/Invalid media or player ID/);
+  assert.equal(requests.length,1);
+  const listing=await serviceHarness(t,{fetchImpl:async(url)=>{assert.ok(url.endsWith(demo));return Response.json({items:[]});}});
+  assert.deepEqual(await listing.service.list(demo),[]);
+  const uploaded=await serviceHarness(t,{xhrFactory:()=>xhrMock(201,{...row,player_id:demo})});
+  assert.equal((await uploaded.service.upload(demo,file,{submission:{category:'pitching',key:VIDEO}})).player_id,demo);
+  await assert.rejects(uploaded.service.upload(demo,file,{submission:{category:'pitching',key:demo}}),/Invalid media or player ID/);
+});
