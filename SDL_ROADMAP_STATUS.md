@@ -1,5 +1,16 @@
 # Swallows DataLab | Roadmap Status (Evidence-based)
 
+## 2026-11-27 | ADMIN-01 acceptance and ADMIN-02 handoff (latest workstream checkpoint)
+
+- **SDL-UX-002-ADMIN-01: Staging-verified for tested UI flows, owner accepted / closed for staging.** Owner reported five of five authenticated browser checks PASS: Club Admin registration, Team Manager registration, scoped denial, team assignment removal and existing-functionality regressions. This is owner browser evidence, not independent direct-RPC security QA.
+- **Independent release evidence:** GitHub PR [#9](https://github.com/Happydogg/swallows2026/pull/9) merged into `feature/SDL-UX-002-login-redesign` at `c9ad810459db6e5ad4c5834f7e4882970842f987`; Cloudflare `sdl-ux-live` production-environment *of the staging UX site* reports success at that SHA. Build logs: 155 automated PASS, 0 failures, one UI smoke PASS. No production pilot changes, database migrations, media gate changes or privacy-waiver approval.
+- **SDL-UX-002-ADMIN-02: Approved to prepare; integration dependency unresolved.** Existing `sdl_v5_set_staff` has backend-authenticated role writes for Manager/Coach. Existing `sdl_004_pilot_administration` cannot enumerate current role assignments or full eligibility for safe, truthful role controls. Do not expose blind grant/revoke controls or switch on the disabled pilot gate. See [ADMIN-02 staff contract](docs/SDL-UX-002-ADMIN-02-STAFF-CONTRACT.md). SDL-004B-RBAC-02 owns independent read-contract/security review; SDL-UX owns subsequent UI, synthetic regression and owner UAT.
+- **Next action:** Secure an approved server-scoped staff directory/current assignment read contract; then implement frontend on isolated branch. Independent backend access reviews, backup/recovery and release approval are still required for any production pilot.
+
+This checkpoint is newer than the historical snapshots below. Historical statements about pending Round 2 integration and unmerged future PRs do not override the verified PR #9 status.
+
+---
+
 **As of:** 2026-11-27. **Scope:** Current GitHub branch and independently checked staging services; not a production readiness certificate.
 
 ## E2E Round 2 update: 2026-11-27
