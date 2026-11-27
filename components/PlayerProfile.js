@@ -1,6 +1,7 @@
 // SDL-003: player profile and historical session presentation; stats supplied as props.
 import { PlayerHeroCard } from './PlayerHeroCard.js';
 import { DemoGrowthLab } from './DemoGrowthLab.js';
+import { clearPlayerChart } from '../js/chartManager.js';
 
 export const PlayerProfile = {
   name: "PlayerProfile",
@@ -57,6 +58,7 @@ export const PlayerProfile = {
       if (!sections.includes(next)) return;
       section.value = next;
       if (next === 'Growth' || next === 'Stats') props.setChartMode(next === 'Growth' ? 'growth' : 'velocity');
+      else clearPlayerChart();
     };
     Vue.watch(()=>props.selectedPlayer?.id,()=>{ section.value='Overview'; },{flush:'sync'});
     const metric = (key,unit) => {
