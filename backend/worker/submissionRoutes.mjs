@@ -229,24 +229,37 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
           item.byte_size>20*1024*1024)
           return json({error:'Invalid media metadata'},503,origin);
         const range = request.headers.get('Range');
-        const bounds = range && /^bytes=(\d+)-(\d*)$/i.exec(range);
-        if (range && (!bounds || Number(bounds[1])>=item.byte_size ||
-            (bounds[2] && Number(bounds[2])<Number(bounds[1]))))
-          return json({error:'Unsupported range'},416,origin);
+        const hasRange = range !== null;
+        const bounds = hasRange && /^bytes=(\d+)-(\d*)$/i.exec(range);
+        const first = bounds ? Number(bounds[1]) : 0;
+        const last = bounds?.[2] ? Number(bounds[2]) : item.byte_size-1;
+        if (hasRange && (!bounds || !Number.isSafeInteger(first) || !Number.isSafeInteger(last) ||
+            first>=item.byte_size || last<first)) {
+          const rejected = json({error:'Unsupported range'},416,origin);
+          rejected.headers.set('Content-Range', 'bytes */'+item.byte_size);
+          rejected.headers.set('Accept-Ranges', 'bytes');
+          return rejected;
+        }
+        const end = Math.min(last,item.byte_size-1);
+        const length = end-first+1;
         let obj;
-        try { obj = await env.MEDIA_BUCKET.get(item.object_key, range ? { range: new Headers({ Range: range }) } : undefined); }
+        try { obj = await env.MEDIA_BUCKET.get(item.object_key, hasRange
+          ? {range:new Headers({Range:'bytes='+first+'-'+end})} : undefined); }
         catch { return json({ error: 'Object unavailable' }, 503, origin); }
         if (!obj?.body) return json({ error: 'Not found' }, 404, origin);
-        if (obj.size!==item.byte_size || (range && !obj.range)) return json({error:'Invalid media size'},503,origin);
+        // R2 can report a full-span range even when the request had no Range.
+        // Validate the returned span; only a client-requested range selects 206.
+        if (obj.size!==item.byte_size ||
+            (hasRange && !obj.range) ||
+            (obj.range && (obj.range.offset!==first || obj.range.length!==length)))
+          return json({error:'Invalid media size or range'},503,origin);
         const headers = new Headers({ 'Content-Type': 'video/mp4', 'Cache-Control': 'private, no-store',
           'X-Content-Type-Options': 'nosniff', 'Accept-Ranges': 'bytes' });
         if (ORIGINS.has(origin)) { headers.set('Access-Control-Allow-Origin', origin); headers.set('Vary', 'Origin'); }
         if (action === 'download') headers.set('Content-Disposition','attachment; filename="video.mp4"');
-        if (obj.range) {
-          headers.set('Content-Range', `bytes ${obj.range.offset}-${obj.range.offset+obj.range.length-1}/${obj.size}`);
-          headers.set('Content-Length', String(obj.range.length));
-        } else headers.set('Content-Length', String(obj.size));
-        return new Response(obj.body, { status: obj.range ? 206 : 200, headers });
+        if (hasRange) headers.set('Content-Range', 'bytes '+first+'-'+end+'/'+obj.size);
+        headers.set('Content-Length', String(length));
+        return new Response(obj.body, { status: hasRange ? 206 : 200, headers });
       }
       return json({ error: 'Method not allowed' }, 405, origin);
     }

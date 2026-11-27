@@ -124,3 +124,41 @@ test('enabled playback rejects stale media contracts and inconsistent metadata',
  delete h.records[0].player_id;
  assert.equal((await h.packaged.fetch(h.request(path),h.env)).status,503);
 });
+
+test('R2 full-span metadata does not turn a normal GET into 206',async()=>{
+ const h=await workerHarness();h.seed();h.env.MEDIA_PLAYBACK_ENABLED='true';
+ const path='/v2/submissions/'+VIDEO+'/playback';
+ const get=h.env.MEDIA_BUCKET.get.bind(h.env.MEDIA_BUCKET);
+ h.env.MEDIA_BUCKET.get=async(key,options)=>{
+   const result=await get(key,options);
+   if(result&&!options)result.range={offset:0,length:result.size};
+   return result;
+ };
+ const full=await h.packaged.fetch(h.request(path),h.env);
+ assert.equal(full.status,200);
+ assert.equal(full.headers.get('Content-Range'),null);
+ assert.equal(full.headers.get('Content-Length'),'12');
+ assert.equal((await full.arrayBuffer()).byteLength,12);
+ for(const [requested,status,contentRange,length] of [
+   ['bytes=0-11',206,'bytes 0-11/12',12],
+   ['bytes=3-',206,'bytes 3-11/12',9],
+   ['bytes=8-99',206,'bytes 8-11/12',4],
+   ['bytes=12-',416,'bytes */12',null],
+   ['bytes=5-2',416,'bytes */12',null]
+ ]){
+   const request=h.request(path);request.headers.set('Range',requested);
+   const response=await h.packaged.fetch(request,h.env);
+   assert.equal(response.status,status,requested);
+   assert.equal(response.headers.get('Content-Range'),contentRange,requested);
+   if(length!==null){
+     assert.equal(response.headers.get('Content-Length'),String(length));
+     assert.equal((await response.arrayBuffer()).byteLength,length);
+   }
+ }
+ h.env.MEDIA_BUCKET.get=async(key,options)=>{
+   const result=await get(key,options);
+   if(result)result.range={offset:1,length:result.size-1};
+   return result;
+ };
+ assert.equal((await h.packaged.fetch(h.request(path),h.env)).status,503);
+});
