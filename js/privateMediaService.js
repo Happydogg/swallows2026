@@ -137,7 +137,33 @@ export function createPrivateMediaService({ auth, client = supabaseClient, baseU
     id(metadata.key);
     return uploadRoute(playerId,file,{...options,submission:metadata});
   }
+  function reviewQuery(scope,filters={},summary=false){
+    if(!['coach','club_admin'].includes(scope?.role))throw new MediaError('Review workspace required.');
+    const params=new URLSearchParams({role:scope.role});
+    for(const [k,v] of [['organization_id',scope.organizationId],['scope_team_id',scope.scopeTeamId],...(!summary?[['team_id',filters.teamId],['player_id',filters.playerId]]:[])]){
+      if(v!==undefined&&v!==null&&v!=='')params.set(k,playerIdValue(v));
+    }
+    if(!summary){
+      if(filters.category){if(!['pitching','batting','throwing'].includes(filters.category))throw new MediaError('Invalid review category.');params.set('category',filters.category);}
+      if(filters.cursor){if(typeof filters.cursor!=='string'||filters.cursor.length>100)throw new MediaError('Invalid review cursor.');params.set('cursor',filters.cursor);}
+      if(filters.limit!==undefined){if(!Number.isInteger(filters.limit)||filters.limit<1||filters.limit>30)throw new MediaError('Invalid review page size.');params.set('limit',String(filters.limit));}
+      if(filters.mediaId)params.set('media_id',id(filters.mediaId));
+    }
+    return params.toString();
+  }
   return {
+    // Use the same scope for Home and Inbox. Never infer a zero from a failed request.
+    async reviewInbox(scope,filters={},options){
+      const data=await request('/v2/media/review-inbox?'+reviewQuery(scope,filters),options);
+      if(data?.revision!=='review-inbox-v1'||data.status!=='ready'||data.complete!==true||!Number.isSafeInteger(data.pendingTotal)||data.pendingTotal<0||!Number.isSafeInteger(data.filteredTotal)||data.filteredTotal<0||data.filteredTotal>data.pendingTotal||!Array.isArray(data.items)||data.items.length>30||!Array.isArray(data.teams)||!Array.isArray(data.players)||!(data.nextCursor===null||typeof data.nextCursor==='string'))throw new MediaError('Invalid review inbox response.');
+      return data;
+    },
+    async mediaActionSummary(scope,options){
+      const data=await request('/v2/media/action-summary?'+reviewQuery(scope,{},true),options);
+      const row=data?.items?.[0];
+      if(data?.revision!=='review-inbox-v1'||data.status!=='ready'||data.complete!==true||!Array.isArray(data.items)||data.items.length!==1||row?.kind!=='video_review'||row.available!==true||!Number.isSafeInteger(row.count)||row.count<0)throw new MediaError('Invalid action summary.');
+      return data;
+    },
     async authorize(playerId, action, options) {
       if (action !== 'upload') throw new MediaError('Unsupported media action.');
       try {

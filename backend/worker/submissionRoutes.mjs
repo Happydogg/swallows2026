@@ -39,6 +39,25 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
       if (mediaAction(path, request.method) && (contract.value.rbacVersion!==5 || contract.value.mediaRevision!=='v5.1-clean-start'))
         return json({error:'Media authorization contract unavailable'},503,origin);
       if (path === '/v2/capabilities' && request.method === 'GET') return json({...(contract.value.rbacVersion===5?{rbacVersion:5}:{}),pilotWorkflow:contract.value.pilotWorkflow??null,revision:'sdl004-club-enrollment-v2',submissions:true,review:true,clubhouse:true,clubConsent:true,enrollmentAdmin:contract.value.enrollmentAdmin===true,clubhouseRoster:contract.value.clubhouseRoster===true,clubhouseLeaderboard:contract.value.clubhouseLeaderboard===true,parentStatistics:contract.value.parentStatistics===true,statisticsConsent:contract.value.statisticsConsent===true},200,origin);
+      // MEDIA-03B-06: read-only queue/count, using caller JWT and the same SQL snapshot.
+      if(['/v2/media/review-inbox','/v2/media/action-summary'].includes(path)&&request.method==='GET'){
+        if(env.MEDIA_REVIEW_ENABLED!=='true'||env.MEDIA_PLAYBACK_ENABLED!=='true'||contract.value.mediaInboxRevision!=='review-inbox-v1'||contract.value.mediaReviewRevision!=='independent-review-v1')return json({error:'Review inbox disabled',code:'media_disabled'},503,origin);
+        const countOnly=path.endsWith('/action-summary'),params=url.searchParams;
+        const allowed=new Set(['role','organization_id','scope_team_id',...(!countOnly?['team_id','player_id','category','cursor','limit','media_id']:[])]);
+        if([...params.keys()].some(k=>!allowed.has(k)||params.getAll(k).length!==1||!params.get(k)))return json({error:'Invalid review query'},400,origin);
+        const role=params.get('role'),organization=params.get('organization_id'),scope=params.get('scope_team_id'),team=params.get('team_id'),player=params.get('player_id'),category=params.get('category'),media=params.get('media_id'),cursor=params.get('cursor'),limit=params.get('limit')??'30';
+        if(!['coach','club_admin'].includes(role)||[organization,scope,team,player].some(v=>v!==null&&!validPlayerId(v))||(media!==null&&!validId(media))||(category!==null&&!['pitching','batting','throwing'].includes(category))||!/^(?:[1-9]|[12][0-9]|30)$/.test(limit)||(media&&cursor))return json({error:'Invalid review filters'},400,origin);
+        let before=null,beforeId=null;
+        if(cursor!==null){const parts=cursor.split('|');if(parts.length!==2||parts[0].length>48||!/^\d{4}-\d{2}-\d{2}T/.test(parts[0])||!Number.isFinite(Date.parse(parts[0]))||!validId(parts[1]))return json({error:'Invalid cursor'},400,origin);[before,beforeId]=parts;}
+        const result=await call('sdl_v5_video_review_inbox',{p_role:role,p_organization:organization,p_scope_team:scope,p_team:team,p_player:player,p_category:category,p_before:before,p_before_id:beforeId,p_limit:Number(limit),p_count_only:countOnly,p_media:media});
+        if(result.error)return json({error:'Review access denied or unavailable'},result.status,origin);
+        const data=result.value;
+        if(data?.revision!=='review-inbox-v1'||data.status!=='ready'||data.complete!==true||!Number.isSafeInteger(data.pendingTotal)||data.pendingTotal<0)return json({error:'Invalid review response'},503,origin);
+        if(countOnly)return json({revision:data.revision,status:'ready',complete:true,items:[{kind:'video_review',available:true,count:data.pendingTotal,required:false}]},200,origin);
+        const fields=['id','playerId','playerLabel','teamId','teamLabel','teamIds','category','status','can_review','createdAt','sourceKind'];
+        if(!Number.isSafeInteger(data.filteredTotal)||data.filteredTotal<0||data.filteredTotal>data.pendingTotal||!Array.isArray(data.items)||data.items.length>Number(limit)||!Array.isArray(data.teams)||!Array.isArray(data.players)||!(data.nextCursor===null||typeof data.nextCursor==='string')||data.items.some(row=>!row||!validId(row.id)||!validPlayerId(row.playerId)||!(row.teamId===null||validPlayerId(row.teamId))||!Array.isArray(row.teamIds)||row.teamIds.some(x=>!validPlayerId(x))||row.status!=='pending'||row.can_review!==true||!['pitching','batting','throwing'].includes(row.category)))return json({error:'Invalid review listing'},503,origin);
+        return json({revision:data.revision,status:'ready',complete:true,pendingTotal:data.pendingTotal,filteredTotal:data.filteredTotal,items:data.items.map(row=>Object.fromEntries(fields.map(k=>[k,row[k]??null]))),teams:data.teams.map(t=>({id:t.id,label:t.label})),players:data.players.map(p=>({id:p.id,label:p.label,teamId:p.teamId,teamIds:p.teamIds})),nextCursor:data.nextCursor},200,origin);
+      }
       const pilotResult=await pilotWorkflowRoute({request,url,path,contract:contract.value,call,validId,json,origin});
       if(pilotResult)return pilotResult;
       // Narrow caller-JWT RPCs: authorization and column restrictions live in PostgreSQL.
