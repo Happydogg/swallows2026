@@ -1,0 +1,11 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
+const html=readFileSync(new URL('../docs/design/SDL-UX-003/media-experience-prototype.html',import.meta.url),'utf8');
+const model=html.match(/<script id="media-model">([\s\S]*?)<\/script>/)?.[1];
+assert.ok(model);
+const cases=vm.runInNewContext(model+'\nmediaChecks();');
+for(const c of cases)test(c.name,()=>assert.equal(c.pass,true,c.error));
+test('offline and synthetic only',()=>assert.doesNotMatch(html,/<script[^>]+src=|https?:\/\/|\/v2\/submissions|localStorage|sessionStorage|fetch\s*\(|type=["']file["']/i));
+test('UI script parses',()=>{assert.ok(html.match(/<script id="media-ui">([\s\S]*?)<\/script>/)?.[1]);new vm.Script(html.match(/<script id="media-ui">([\s\S]*?)<\/script>/)[1]);});
