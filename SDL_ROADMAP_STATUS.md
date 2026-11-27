@@ -2,6 +2,16 @@
 
 **As of:** 2026-11-27. **Scope:** Current GitHub branch and independently checked staging services; not a production readiness certificate.
 
+## UX restructuring proposal: issue #12 (2026-11-27)
+
+**Proposed, not authorized for implementation.** SDL-UX-002 read-only review at source baseline `c9ad810459db6e5ad4c5834f7e4882970842f987` reports overlapping headers/sections, duplicate Home roster, fragmented Stats context, long mixed-content Player Profile and misleading legacy/disabled controls. See https://github.com/Happydogg/swallows2026/issues/12. Source spot-check corroborates duplication, but device-level UX impact needs current authenticated screenshots.
+
+**Next critical path:** (1) Owner review/approval or revision of IA; (2) obtain synthetic-role mobile, tablet and desktop current captures; (3) approve bounded UX-IA-01 only after mapping regressions and actual current branch; (4) implement presentation-only changes, preserving approved five tabs, stats readers, roster, private-media controllers, role gates and disabled pathways; (5) rerun owner-reported Round 2 12/12, ADMIN-01 5/5 and navigation/authorization regression on staging. UX-IA-02..06 remain proposals subject to separate reviews.
+
+**Release holds unchanged:** No new features, no PR merging, no production deployment, no unrestricted media, no feature gate activation. Independent security acceptance pending.
+
+---
+
 ## E2E Round 2 update: 2026-11-27
 
 **Owner-reported acceptance:** E2E Round 2 **12/12 PASS**. Roster integration is accepted for **staging UX** only. This supersedes Round 1's 8 PASS / 3 FAIL / 1 PENDING for the scenarios covered by Round 2. The exact assertion list, source revision, identity ledger and direct backend security coverage were not provided in the handoff.
