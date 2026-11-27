@@ -271,13 +271,13 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
       if(!op.current())return;
       const notice=decision==='approved'?'Video approved privately. Not published.':'Video rejected. Playback blocked.';
       if(inboxReviewMode.value){resetMedia();mediaNotice.value=notice;mediaReviewEvent.value={type:'changed'};}
-      else {mediaNotice.value=notice;await refreshMedia();if(op.current())mediaReviewEvent.value={type:'changed'};}
+      else {mediaNotice.value=notice;mediaReviewEvent.value={type:'changed'};await refreshMedia();}
     }catch(error){
       if(op.ownsState()){
         const isInbox=inboxReviewMode.value;
         if(error.status===409){
           if(isInbox){resetMedia();mediaError.value='This review changed. Refresh the queue before retrying.';mediaReviewEvent.value={type:'conflict'};}
-          else {await refreshMedia();if(op.current()){mediaError.value='This review changed. Refresh before retrying.';mediaReviewEvent.value={type:'conflict'};}}
+          else {mediaReviewEvent.value={type:'conflict'};await refreshMedia();if(op.current())mediaError.value='This review changed. Refresh before retrying.';}
         }else op.failed(error);
         if(error.status===401||error.status===403)mediaReviewEvent.value={type:'denied'};
       }
