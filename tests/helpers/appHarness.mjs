@@ -120,7 +120,7 @@ export async function harness(t, initialUser = null, options = {}) {
   URL: BrowserURL,
   console: { error() {}, warn() {}, log() {} },
   setTimeout, clearTimeout, setInterval, clearInterval, performance, requestAnimationFrame: fn => h.frames.push(fn), cancelAnimationFrame: id => { h.cancelledFrame = id; },
-  alert() {}, fetch(...args) {
+  alert() {}, ...(options.confirm?{confirm:options.confirm}:{}), fetch(...args) {
     if (h.fetchImpl) return h.fetchImpl(...args);
     assert.fail('Network access forbidden in lifecycle tests');
   } });
