@@ -128,7 +128,7 @@ export const PerformanceWorkspace = {
         </fieldset>
       </form>
       <div v-if="ready && (!organized || section==='overview')" class="space-y-3">
-        <h3 class="font-semibold">Measurement history</h3>
+        <h3 class="font-semibold">Measurement history &amp; revisions</h3>
         <p v-if="!rows.length" class="text-sm text-slate-300">No measurements have been entered.</p>
         <article v-for="row in rows" :key="row.id" class="space-y-2 rounded-xl border border-slate-700 bg-slate-950 p-3">
           <div class="flex flex-wrap items-center justify-between gap-2">
