@@ -146,3 +146,87 @@ test('exact lookup requires complete current contract receipt',async()=>{
 test('transient review cannot upload archive analyze or expand library',async()=>{
  const a=adapter();await a.c.openInboxReview(row);a.c.mediaUploadAllowed.value=true;a.c.mediaFile.value={};a.c.uploadCategory.value='pitching';a.c.mediaItems.value[0].can_archive=true;await a.c.uploadPrivateMedia();await a.c.archivePrivateMedia(a.c.mediaItems.value[0]);a.c.analysisCategory.value='pitching';a.c.analysisFps.value='120';a.c.analyzePrivateMedia();await a.c.refreshMedia();assert.equal(a.calls.length,2);a.c.resetMedia();
 });
+
+test('independent summary and inbox responses retain their own exact server totals in either arrival order',async()=>{
+ for(const first of ['summary','inbox']){
+  const count=later(),inbox=later();
+  const a=queue({mediaActionSummary:()=>count.promise,reviewInbox:()=>inbox.promise},scoped);
+  const summaryRead=a.q.refreshSummary(),inboxRead=a.q.refreshInbox();
+  if(first==='summary'){
+   count.resolve(summary(8));await summaryRead;
+   assert.equal(a.q.summaryItems.value[0].count,8);assert.equal(a.q.total.value,null);
+   inbox.resolve(response([row],7,5));await inboxRead;
+  }else{
+   inbox.resolve(response([row],7,5));await inboxRead;
+   assert.equal(a.q.total.value,7);assert.deepEqual(a.q.summaryItems.value,[]);
+   count.resolve(summary(8));await summaryRead;
+  }
+  assert.equal(a.q.summaryItems.value[0].count,8);assert.equal(a.q.total.value,7);
+  assert.equal(a.q.filteredTotal.value,5);assert.equal(a.q.rows.value.length,1);
+ }
+});
+
+test('role, club, team and logout changes abort both reads, and late data cannot repopulate scope',async()=>{
+ for(const change of ['role','club','team','logout']){
+  const count=later(),inbox=later(),signals=[];
+  const a=queue({
+   mediaActionSummary:(_scope,o)=>{signals.push(o.signal);return count.promise;},
+   reviewInbox:(_scope,_filters,o)=>{signals.push(o.signal);return inbox.promise;}
+  },scoped);
+  const reads=[a.q.refreshSummary(),a.q.refreshInbox()];
+  if(change==='logout')a.invalidate();
+  else a.scopeChanged(change==='role'?admin:change==='club'?{...scoped,organizationId:'other-club'}:{...scoped,scopeTeamId:'team-a'});
+  assert.equal(signals.length,2);assert.ok(signals.every(signal=>signal.aborted));
+  count.resolve(summary(9));inbox.resolve(response([row],9));await Promise.all(reads);
+  assert.deepEqual(a.q.summaryItems.value,[]);assert.equal(a.q.total.value,null);assert.deepEqual(a.q.rows.value,[]);
+ }
+});
+
+test('latest overlapping refresh wins for both channels even when old data returns last',async()=>{
+ const counts=[later(),later()],inboxes=[later(),later()],signals=[];
+ let n=0,m=0;
+ const a=queue({
+  mediaActionSummary:(_scope,o)=>{signals.push(o.signal);return counts[n++].promise;},
+  reviewInbox:(_scope,_filters,o)=>{signals.push(o.signal);return inboxes[m++].promise;}
+ });
+ const stale=[a.q.refreshSummary(),a.q.refreshInbox()];
+ const current=[a.q.refreshSummary(),a.q.refreshInbox()];
+ assert.ok(signals.slice(0,2).every(signal=>signal.aborted));
+ counts[1].resolve(summary(2));inboxes[1].resolve(response([row],3));await Promise.all(current);
+ counts[0].resolve(summary(6));inboxes[0].resolve(response([row],7));await Promise.all(stale);
+ assert.equal(a.q.summaryItems.value[0].count,2);assert.equal(a.q.total.value,3);
+});
+
+test('review success or conflict cancels pre-review reads and rechecks both totals without arithmetic',async()=>{
+ for(const outcome of ['changed','conflict']){
+  const staleSummary=later(),staleInbox=later(),signals=[];
+  let summaries=0,inboxes=0;
+  const a=queue({
+   mediaActionSummary:(_scope,o)=>{signals.push(o.signal);return ++summaries===1?staleSummary.promise:Promise.resolve(summary(4));},
+   reviewInbox:(_scope,_filters,o)=>{signals.push(o.signal);return ++inboxes===1?staleInbox.promise:Promise.resolve(response([row],5));}
+  });
+  const stale=[a.q.refreshSummary(),a.q.refreshInbox()];
+  a.receipt(outcome);await Promise.resolve();
+  assert.ok(signals.slice(0,2).every(signal=>signal.aborted));
+  staleSummary.resolve(summary(12));staleInbox.resolve(response([row],12));await Promise.all(stale);
+  assert.equal(summaries,2);assert.equal(inboxes,2);
+  assert.equal(a.q.summaryItems.value[0].count,4);assert.equal(a.q.total.value,5);
+ }
+});
+
+test('an earlier successful count is cleared on denial or unavailability without inventing zero',async()=>{
+ for(const error of [401,403,503]){
+  let failing=false;
+  const a=queue({
+   mediaActionSummary:async()=>{if(failing)throw err(error);return summary(2);},
+   reviewInbox:async()=>{if(failing)throw err(error);return response([row],2);}
+  });
+  await Promise.all([a.q.refreshSummary(),a.q.refreshInbox()]);
+  assert.equal(a.q.summaryItems.value[0].count,2);assert.equal(a.q.total.value,2);
+  failing=true;
+  await Promise.all([a.q.refreshSummary(),a.q.refreshInbox()]);
+  assert.deepEqual(a.q.summaryItems.value,[]);assert.equal(a.q.total.value,null);
+  assert.equal(a.q.summaryStatus.value,'unavailable');assert.equal(a.q.status.value,'unavailable');
+  assert.deepEqual(a.q.rows.value,[]);
+ }
+});

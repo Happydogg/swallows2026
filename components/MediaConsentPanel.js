@@ -8,27 +8,82 @@ export const MediaConsentPanel={
   const service=createPrivateMediaService({auth:props.auth});
   const selected=ref(''),status=ref(null),checked=ref(false),busy=ref(false),error=ref(''),notice=ref('');
   let sequence=0,abort=null;
-  function reset(){sequence++;abort?.abort();abort=null;status.value=null;checked.value=false;busy.value=false;error.value='';notice.value='';}
+  const verifiedLink=player=>props.auth.guardianLinks.value.find(link=>
+   link.athlete_id===player.athlete_id && link.status==='verified');
+  const eligible=id=>props.players.find(player=>id===player.id && verifiedLink(player));
+  function authorized(id){
+   const {auth}=props,context=auth.accountContext.value;
+   return auth.authReady.value && !auth.authError.value && !!auth.authUser.value?.id &&
+    context?.user_id===auth.authUser.value.id && context.roles.includes('guardian') && !!eligible(id);
+  }
+  function reset(){
+   sequence++;abort?.abort();abort=null;
+   status.value=null;checked.value=false;busy.value=false;error.value='';notice.value='';
+  }
+  function validate(result,id){
+   if(result?.player_id!==id||result.policy_version!=='sdl004-clubhouse-view-download-v2'||
+      typeof result.organization_name!=='string'||typeof result.active!=='boolean'||
+      typeof result.can_accept!=='boolean'||typeof result.generation!=='string'||!Array.isArray(result.history)){
+    throw Error('Invalid consent response.');
+   }
+   return result;
+  }
   async function run(action=null){
-   if(busy.value||!props.players.some(p=>p.id===selected.value))return;
-   if(action===true&&(!checked.value||!status.value?.can_accept||status.value.active))return;
-   if(action===false&&!status.value?.active)return;
-   const id=selected.value,generation=status.value?.generation,identity=props.auth.captureIdentity(),epoch=++sequence;
-   abort?.abort();const controller=new AbortController();abort=controller;
-   const current=()=>epoch===sequence&&!controller.signal.aborted&&props.auth.isCurrentIdentity(identity)&&selected.value===id;
-   busy.value=true;error.value='';notice.value='';
+   const id=selected.value,previous=status.value;
+   if(busy.value||!authorized(id))return;
+   if(action===true&&(!checked.value||!previous?.can_accept||previous.active))return;
+   if(action===false&&!previous?.active)return;
+   const identity=props.auth.captureIdentity(),epoch=++sequence;
+   if(!props.auth.isCurrentIdentity(identity))return;
+   const controller=new AbortController();abort=controller;
+   const ownsState=()=>epoch===sequence&&props.auth.isCurrentIdentity(identity)&&selected.value===id&&authorized(id);
+   const current=()=>ownsState()&&!controller.signal.aborted;
+   status.value=null;checked.value=false;busy.value=true;error.value='';notice.value='';
    const timer=setTimeout(()=>controller.abort(),20000);
    try{
-    const result=action===null?await service.mediaConsent(id,{signal:controller.signal}):await service.setMediaConsent(id,generation,action,{signal:controller.signal});
+    let result=validate(await service.mediaConsent(id,{signal:controller.signal}),id);
     if(!current())return;
-    if(result?.player_id!==id||result.policy_version!=='sdl004-clubhouse-view-download-v2'||typeof result.organization_name!=='string'||typeof result.active!=='boolean'||typeof result.can_accept!=='boolean'||typeof result.generation!=='string'||!Array.isArray(result.history))throw Error('Invalid consent response.');
-    status.value=result;checked.value=false;
-    if(action!==null)notice.value=result.active?'Sharing consent recorded. Videos remain private until explicitly published.':'Sharing consent withdrawn. Future shared access is blocked.';
-   }catch(e){if(epoch===sequence&&props.auth.isCurrentIdentity(identity)&&selected.value===id){status.value=null;checked.value=false;error.value=controller.signal.aborted?'Consent request timed out. Refresh to verify the current state.':e.message||'Consent service unavailable.';}}
-   finally{clearTimeout(timer);if(epoch===sequence){busy.value=false;abort=null;}}
+    if(action!==null){
+     // The roster does not project enrollment generation. Recheck it with
+     // the existing consent read before sending an explicit decision.
+     const {generation}=result;
+     if(generation!==previous.generation||result.organization_name!==previous.organization_name||
+        result.active!==previous.active||(action===true&&!result.can_accept)){
+      status.value=result;
+      error.value='Consent changed. Review the current information before making a new decision.';
+      return;
+     }
+     result=validate(await service.setMediaConsent(id,generation,action,{signal:controller.signal}),id);
+     if(!current())return;
+     notice.value=result.active?'Sharing consent recorded. Videos remain private until explicitly published.':
+      'Sharing consent withdrawn. Future shared access is blocked.';
+    }
+    status.value=result;
+   }catch(e){
+    if(ownsState())error.value=controller.signal.aborted?'Consent request timed out. Refresh to verify the current state.':e.message||'Consent service unavailable.';
+   }finally{
+    clearTimeout(timer);
+    if(epoch===sequence){busy.value=false;abort=null;}
+   }
   }
-  function select(id){reset();selected.value=id;if(id)void run();}
-  watch(()=>props.players.map(p=>p.id).join(','),()=>{if(!props.players.some(p=>p.id===selected.value))select(props.players[0]?.id||'');},{immediate:true});
+  function select(id){
+   reset();selected.value=id;
+   if(authorized(id))void run();
+  }
+  watch([
+   ()=>props.auth.authUser.value?.id,()=>props.auth.accountContext.value,
+   ()=>props.auth.authReady.value,()=>props.auth.authError.value,
+   ()=>JSON.stringify(props.players.filter(verifiedLink).map(player=>[
+    player.id,player.athlete_id,verifiedLink(player).relationship
+   ]).sort((a,b)=>a[0].localeCompare(b[0])))
+  ],()=>{
+   reset();
+   if(!eligible(selected.value))selected.value=props.players.find(verifiedLink)?.id||'';
+   // Account verification may replace several projections in one turn.
+   // Clear immediately and issue just the final authoritative read.
+   const epoch=sequence;
+   void Promise.resolve().then(()=>{if(sequence===epoch&&authorized(selected.value))void run();});
+  },{immediate:true,flush:'sync'});
   onUnmounted(reset);
   return {selected,status,checked,busy,error,notice,select,refresh:()=>run(),accept:()=>run(true),withdraw:()=>{if(globalThis.confirm('Withdraw team video sharing consent? This blocks future shared access. Previously delivered copies cannot be recalled. Re-acceptance may require resolution of a guardian objection.'))void run(false);}};
  },

@@ -153,3 +153,41 @@ test('verified nonreview workspaces never call review APIs',async t=>{
  }
  assert.equal(requests.length,0);
 });
+
+test('Library → Review → Library requires deliberate, freshly authorized player selection',async t=>{
+ const h=await harness(t,user('navigation-qa'),{origin:'https://sdl-ux-live.pages.dev'});
+ const TEAM='22222222-2222-4222-8222-222222222222',PLAYER='33333333-3333-4333-8333-333333333333',MEDIA='44444444-4444-4444-8444-444444444444';
+ const reads=[];
+ let allowList=true;
+ h.fetchImpl=async(url)=>{
+  const path=new URL(url);
+  if(path.pathname.endsWith('/action-summary'))return Response.json({revision:'review-inbox-v1',status:'ready',complete:true,items:[{kind:'video_review',available:true,count:0,required:false}]});
+  if(path.pathname.endsWith('/review-inbox'))return Response.json({revision:'review-inbox-v1',status:'ready',complete:true,pendingTotal:0,filteredTotal:0,items:[],teams:[],players:[],nextCursor:null});
+  if(path.pathname.endsWith('/upload-eligibility'))return Response.json({allowed:false});
+  if(path.pathname==='/v2/submissions'){
+   reads.push(path.searchParams.get('player_id'));
+   if(!allowList)return Response.json({},{status:403});
+   return Response.json({items:[{id:MEDIA,player_id:PLAYER,category:'pitching',status:'approved'}]});
+  }
+  assert.fail('Unexpected media request '+path.pathname);
+ };
+ coachContext(h);
+ h.app.coachRoster.value=[{id:PLAYER,team_id:TEAM,preferred_name:'Synthetic player'}];
+ h.app.navigateTab('videos');
+ const media=h.app.privateMediaController;
+ await media.selectMediaPlayer(PLAYER);
+ assert.equal(media.mediaItems.value.length,1);assert.equal(media.mediaReadAllowed.value,true);
+ media.mediaFile.value={name:'synthetic.mov'};media.mediaPlaybackUrl.value='blob:library-private';
+ assert.equal(h.app.changeVideoSection('review'),true);
+ assert.equal(media.mediaPlayerId.value,'');assert.equal(media.mediaFile.value,null);
+ assert.equal(media.mediaPlaybackUrl.value,'');assert.equal(media.mediaItems.value.length,0);
+ assert.ok(h.revoked.includes('blob:library-private'));
+ assert.equal(h.app.changeVideoSection('library'),true);
+ await Promise.resolve();
+ assert.deepEqual(reads,[PLAYER]);assert.equal(media.mediaReadAllowed.value,false);
+ assert.equal(media.mediaPlayerId.value,'');assert.equal(media.inboxReviewMode.value,false);
+ allowList=false;
+ await media.selectMediaPlayer(PLAYER);
+ assert.deepEqual(reads,[PLAYER,PLAYER]);assert.equal(media.mediaReadAllowed.value,false);
+ assert.equal(media.mediaItems.value.length,0);assert.equal(media.mediaPlaybackUrl.value,'');
+});
