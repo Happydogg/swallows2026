@@ -15,6 +15,16 @@
 | SDL-D-20261121-09 | Present the **same private, permission-enforced video room inside Player Profile** and retain Videos tab; never present the disabled legacy empty gallery in place of actual R2 clips. | Implemented, automated-tested, deployed to UX Live | `PlayerProfile.js` named slot and `index.html`; real coach/parent UAT pending |
 | SDL-D-20261121-10 | Select player history through the active role’s approved scope and invalidate pending profile results on navigation or identity changes. | Implemented and locally tested | Full suite 405/405. Signed-in staging acceptance pending. |
 
+## SDL-000 P0/P1 UX fix checkpoint (2026-11-28)
+
+**Documentation of reviewed source and reported local tests, not approval to deploy or change authorization.**
+
+| ID | Decision / rationale | Classification | Evidence / outstanding gate |
+|---|---|---|---|
+| SDL-D-20261128-01 | Receive [draft PR #21](https://github.com/Happydogg/swallows2026/pull/21) as a **source remediation candidate** for UX-QA-02/03 and focused dispositions of UX-QA-04/05; keep approved UX-002 staging baseline `4590f86c` unchanged. Code commit `8f8c9813`; handoff-only remote tip `f4b45210`. | **Implemented/source reviewed; UAT pending** | [Handoff](https://github.com/Happydogg/swallows2026/blob/f4b452105fd23c5e37a09bf41b32742da83e370f/docs/design/SDL-UX-003/P0P1-QA-HANDOFF.md); only `MediaConsentPanel.js`, `MediaSharingPanels.js` runtime changes; three focused test files and one handoff; no Worker, DB, grant, media-service/gate edits. |
+| SDL-D-20261128-02 | Accept UX-QA-01 isolated `127.0.0.1:5500` proposal as **preparation**, not target activation or physical mobile acceptance. Hosted origin/redirect/Worker/bindings and synthetic data must be checked before explicit owner approval; a phone's loopback is its own device. | **Prepared / approval pending (P0)** | [P0 readiness plan](https://github.com/Happydogg/swallows2026/blob/f4b452105fd23c5e37a09bf41b32742da83e370f/docs/design/SDL-UX-003/P0P1-QA-HANDOFF.md); no authenticated approved candidate deployment, merge, production release or real-family scope. |
+| SDL-D-20261128-03 | Record Codex **local-reported** 530/530 full and 73/73 focused UX-003 checks, Vue 8/8 and UX build 178/178 for `8f8c9813`. Do not re-label older independently verified CI 516/516 at `0120c6b` as proof for the new candidate. | **Local tested (reported), independent CI not confirmed** | [PR #21](https://github.com/Happydogg/swallows2026/pull/21); no PR-tip CI statuses/workflows observed; Worker local package warning remains a separate release-preservation hold. |
+
 ## SDL-000 current UX integration QA decisions (2026-11-27)
 
 These record this owner-supplied independent QA handoff and verified CI findings. **Recording QA is not a new owner approval to merge, deploy, alter permissions or accept production risk.** Earlier decision entries below remain historical.
