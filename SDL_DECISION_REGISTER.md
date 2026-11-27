@@ -39,4 +39,6 @@ The following add to, and do not replace, the historical entries above. **Report
 
 | SDL-D-20261127-13 | SDL-UX-002 submitted issue #12 proposing five-tab usability reorganization and six reversible UX-IA batches; no new features. | **PROPOSED, owner UX design approval pending; no implementation authorization.** | Source review at `c9ad810459db6e5ad4c5834f7e4882970842f987`; missing authenticated current screenshots and device evidence; preserve existing working flows and SDL-004 security gates. |
 
+| SDL-D-20261127-14 | Owner approved first UX restructuring batch UX-IA-01. Draft PR #13 implements Home/Team/Videos/header/Me presentation rearrangement; later UX-IA-02..06 remain unapproved. | **Approved batch / implemented candidate, full tests and owner staging browser UAT PENDING; not merged or released.** | Issue #12 owner approval comment; PR #13 head `239e29c5`, 7 presentation and 3 test files. 17 focused checks reported; preserve Round 2 12/12, ADMIN-01 5/5 and all backend gates. No production authorization. |
+
 **Non-decisions:** No permission to merge `main`, deploy production, auto-delete seeded enrollments, weaken player RLS or publish private media. A successful unit test is not a final owner acceptance test.
