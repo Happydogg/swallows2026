@@ -26,7 +26,7 @@ export function useMediaReviewInbox({auth,scope,activeTab,section,privateMedia,s
   const request=op('summary');if(!request)return;
   summaryStatus.value='loading';summaryItems.value=[];
   try{const response=await service.mediaActionSummary(request.scope,{signal:request.signal});
-   if(request.current()){summaryItems.value=response.items;summaryStatus.value='ready';}else if(request.failed())summaryStatus.value='unavailable';
+   if(request.current()){summaryItems.value=[{kind:'video_review',available:true,count:response.items[0].count,required:false}];summaryStatus.value='ready';}else if(request.failed())summaryStatus.value='unavailable';
   }catch(e){if(request.failed()){if(e.status===401||e.status===403)denied();else summaryStatus.value='unavailable';}}
   finally{request.finish();}
  }
@@ -65,7 +65,7 @@ export function useMediaReviewInbox({auth,scope,activeTab,section,privateMedia,s
   if(result?.status===401||result?.status===403){denied();return;}
   if(!result?.opened){notice.value='This video could not be opened. The queue has been refreshed.';await Promise.all([refreshInbox(),refreshSummary()]);}
  }
- function retry(){blocked=false;void refreshSummary();if(inReview())void refreshInbox();}
+ function retry(){if(opening.value||privateMedia.mediaReviewing.value)return;blocked=false;if(inReview())privateMedia.resetMedia();void refreshSummary();if(inReview())void refreshInbox();}
  // Synchronous invalidation, deferred fetch. A change of account context invalidates even an identical scope key.
  watch([()=>auth.accountContext.value,()=>scopeKey(scope.value)],()=>{reset();if(inReview()||privateMedia.inboxReviewMode.value)privateMedia.resetMedia();},{flush:'sync'});
  watch([activeTab,section],()=>{epoch++;clearSummary();clearInbox();filters.value=emptyFilters();if(blocked){summaryStatus.value='unavailable';status.value='unavailable';notice.value='Review access is unavailable. Refresh account permissions or sign in again.';}if(!inReview()&&privateMedia.inboxReviewMode.value)privateMedia.resetMedia();},{flush:'sync'});
@@ -75,6 +75,6 @@ export function useMediaReviewInbox({auth,scope,activeTab,section,privateMedia,s
   if(event.type==='denied'){denied();return;}
   opening.value=false;
   void refreshSummary();if(inReview())void refreshInbox();
- },{flush:'post'});
+ },{flush:'sync'});
  return {available,summaryStatus,summaryItems,status,rows,teams,players,filters,total,filteredTotal,next,opening,notice,reset,refreshSummary,refreshInbox,filter,open,retry};
 }
