@@ -221,14 +221,14 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
   }
   async function archivePrivateMedia(item) {
     if(mediaArchiving.value||mediaUploading.value||!mediaReadAllowed.value||!mediaItems.value.some(row=>row.id===item.id&&row.can_archive===true))return;
-    if(!globalThis.confirm('Delete this private video from the active library? The private stored file is retained for recovery.'))return;
+    if(!globalThis.confirm('Permanently delete this video? This action cannot be undone.'))return;
     const op=operation();mediaArchiving.value=true;mediaError.value='';mediaNotice.value='';
     try {
-      await service.archive(item.id,{signal:op.signal});
+      const receipt=await service.archive(item.id,{signal:op.signal});
       if(!op.current())return;
       releasePlayback();discardThumbnails();
       mediaItems.value=mediaItems.value.filter(row=>row.id!==item.id);
-      mediaNotice.value='Video removed from the active library.';
+      mediaNotice.value=receipt.deleted?'Video permanently deleted.':'Video removed from the library. Storage deletion is pending automatic retry.';
       await refreshMedia();
     }catch(error){op.failed(error);}
     finally{if(op.ownsState())mediaArchiving.value=false;op.finish();}

@@ -161,8 +161,8 @@ export function createPrivateMediaService({ auth, client = supabaseClient, baseU
     },
     async archive(mediaId,options) {
       const result=await request(`/v2/submissions/${id(mediaId)}/archive`,{...options,method:'POST'});
-      if(result?.archived!==true)throw new MediaError('Invalid removal receipt. Refresh before retrying.');
-      return true;
+      if(result?.archived!==true||typeof result.deleted!=='boolean')throw new MediaError('Removal status unknown. Refresh before retrying.');
+      return {deleted:result.deleted};
     },
     playback(mediaId, options) { return request(`/v2/submissions/${id(mediaId)}/playback`, { ...options, blob: true }); },
     upload(playerId,file,options) { return submit(playerId,file,options?.submission,options); },

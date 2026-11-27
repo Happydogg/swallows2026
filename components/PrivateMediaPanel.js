@@ -100,7 +100,7 @@ export const PrivateMediaPanel = {
             </button>
             <button v-if="item.can_archive === true" type="button" @click="archivePrivateMedia(item)" :disabled="mediaArchiving || mediaUploading || mediaPlaybackLoading"
               class="min-h-10 w-full rounded-xl border border-rose-700 px-3 py-2 text-sm font-semibold text-rose-200 disabled:opacity-50">
-              {{ mediaArchiving ? 'Removing…' : 'Delete video' }}
+              {{ mediaArchiving ? 'Deleting…' : 'Delete video' }}
             </button>
           </div>
         </li>

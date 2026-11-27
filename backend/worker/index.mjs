@@ -2,8 +2,13 @@
 import { verifyIdentity,adminQuery,limitedBytes,configOk,validId,json,ORIGINS } from './pilot.mjs';
 import { createSubmissionRoutes } from './submissionRoutes.mjs';
 import {mediaAction, mediaGates} from './mediaGates.mjs';
+import {purgeArchivedMedia,PURGE_CRON} from './mediaPurge.mjs';
 const submissions=createSubmissionRoutes({verifyIdentity,adminQuery,limitedBytes,configOk,validId,json,ORIGINS});
 export default {
+  async scheduled(controller,env) {
+    if(controller.cron!==PURGE_CRON||env.MEDIA_ARCHIVE_ENABLED!=='true')return;
+    if(!await purgeArchivedMedia(env))throw Error('Staging media purge retry pending');
+  },
   async fetch(request,env) {
     const path=new URL(request.url).pathname.replace(/\/+$/, '') || '/';
     const origin=request.headers.get('Origin');

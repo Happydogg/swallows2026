@@ -411,3 +411,13 @@ test('MOV from Photos and a 40 MiB staging maximum retain the private media cont
  const blob=await read.service.playback(VIDEO);
  assert.equal(blob.type,'video/quicktime');assert.equal(blob.size,12);
 });
+
+test('video delete receipts distinguish confirmed physical deletion from queued cleanup',async t=>{
+ let payload={archived:true,deleted:true};let status=200;
+ const {service}=await serviceHarness(t,{fetchImpl:async()=>Response.json(payload,{status})});
+ assert.deepEqual(await service.archive(VIDEO),{deleted:true});
+ payload={archived:true,deleted:false};status=202;
+ assert.deepEqual(await service.archive(VIDEO),{deleted:false});
+ payload={archived:true};status=200;
+ await assert.rejects(service.archive(VIDEO),/Removal status unknown/);
+});

@@ -109,3 +109,30 @@ test('MOV upload preserves native MIME through private storage and service-only 
  assert.equal(playback.status,200);assert.equal(playback.headers.get('Content-Type'),'video/quicktime');
  assert.deepEqual(new Uint8Array(await playback.arrayBuffer()),bytes);
 });
+
+test('permanent deletion requires authorization, verified storage absence and durable retry',async t=>{
+ const prior=globalThis.fetch;t.after(()=>{globalThis.fetch=prior;});
+ const player='abcdef12-3456-d789-0123-abcdef123456',video='33333333-3333-4333-8333-333333333333',key='pilot/'+player+'/'+video+'.mp4';
+ let queued=false,confirmed=false,stored=true,fail=false,wrongKey=false,attempts=0,records=0,allowed=true,due=true;
+ globalThis.fetch=async(url,init)=>{
+   const path=new URL(url).pathname,body=init.body?JSON.parse(init.body):{},headers=new Headers(init.headers);
+   if(path==='/auth/v1/user')return Response.json({id:'11111111-1111-4111-8111-111111111111'});
+   if(path.endsWith('/sdl_004_session_active'))return Response.json(true);
+   if(path.endsWith('/sdl_004_submission_contract'))return Response.json({rbacVersion:5,revision:'sdl004-club-enrollment-v2',mediaRevision:'v5.1-clean-start'});
+   if(path.endsWith('/sdl_v5_archive_media')){if(!allowed)return new Response(null,{status:403});queued=true;return Response.json(true);}
+   assert.equal(headers.get('apikey'),'sb_secret_synthetic');assert.equal(headers.get('Authorization'),null);
+   if(path.endsWith('/sdl_v5_media_purge_jobs'))return Response.json(queued?[{id:video,player_id:player,object_key:wrongKey?'unrelated':key,confirmed,due}]:[]);
+   if(path.endsWith('/sdl_v5_record_media_purge')){assert.equal(body.p_id,video);records++;confirmed=body.p_absent;if(confirmed)due=false;return Response.json(confirmed);}
+   throw Error(path);
+ };
+ const env={SUPABASE_URL:'https://wvurolqbjhuckkkjiiiv.supabase.co',SUPABASE_PUBLISHABLE_KEY:'sb_publishable_synthetic',SUPABASE_SECRET_KEY:'sb_secret_synthetic',MEDIA_ARCHIVE_ENABLED:'true',MEDIA_BUCKET:{
+   async delete(k){assert.equal(k,key);attempts++;if(fail)throw Error('R2 unavailable');stored=false;},
+   async head(k){assert.equal(k,key);return stored?{size:12}:null;}
+ }};
+ const remove=()=>entry.fetch(new Request(WORKER+'/v2/submissions/'+video+'/archive',{method:'POST',headers:{Origin:LIVE,Authorization:'Bearer synthetic'}}),env);
+ allowed=false;assert.equal((await remove()).status,403);assert.equal(attempts,0);
+ allowed=true;wrongKey=true;let r=await remove();assert.equal(r.status,202);assert.equal((await r.json()).deleted,false);assert.equal(attempts,0);
+ wrongKey=false;fail=true;r=await remove();assert.equal(r.status,202);assert.equal((await r.json()).deleted,false);assert.equal(stored,true);assert.equal(records,1);
+ fail=false;await entry.scheduled({cron:'*/5 * * * *'},env);assert.equal(stored,false);assert.equal(confirmed,true);assert.equal(records,2);
+ r=await remove();assert.equal(r.status,200);assert.deepEqual(await r.json(),{archived:true,deleted:true});assert.equal(attempts,2);
+});

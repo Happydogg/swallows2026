@@ -1,5 +1,6 @@
 import {mediaAction} from './mediaGates.mjs';
 import {pilotWorkflowRoute} from './pilotWorkflowRoutes.mjs';
+import {purgeArchivedMedia} from './mediaPurge.mjs';
 const PLAYER_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const validPlayerId = value => typeof value === 'string' && PLAYER_UUID.test(value);
 export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedBytes, configOk, validId, json, ORIGINS }) {
@@ -210,7 +211,11 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
         const result=await call('sdl_v5_archive_media',{p_id:id});
         if(result.error)return error(result);
         if(result.value!==true)return json({error:'Media removal denied'},403,origin);
-        return json({archived:true},200,origin);
+        // Archive and queue commit atomically before any physical R2 operation.
+        // If interrupted, the scheduled retry processes the durable job.
+        let deleted=false;
+        try { deleted=await purgeArchivedMedia(env,id); } catch { /* queue remains retryable */ }
+        return json({archived:true,deleted},deleted?200:202,origin);
       }
       if (['review','publish'].includes(action) && request.method === 'POST') {
         let body;
