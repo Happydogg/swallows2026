@@ -26,13 +26,14 @@ export const CoachTeamRoster = {
     roster: { type: Array, required: true },
     loading: { type: Boolean, required: true },
     error: { type: String, default: '' },
-    showTeamFilter: { type: Boolean, default: true }
+    showTeamFilter: { type: Boolean, default: true },
+    showReview: { type: Boolean, default: true }
   },
   template: `
     <section class="space-y-4" aria-label="Coach team roster">
       <header class="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 class="text-xl font-bold text-white">Team Dashboard</h2>
+          <h2 class="text-xl font-bold text-white">Team roster</h2>
           <p class="text-xs text-slate-400">Full authorized roster · Select a player for profile, growth charts and videos</p>
         </div>
         <span class="text-sm text-slate-300">{{ displayedRoster.length }} players</span>
@@ -65,7 +66,7 @@ export const CoachTeamRoster = {
           <p class="text-xs text-slate-400 mt-1">Throws {{ player.throws || '--' }} · Bats {{ player.bats || '--' }}</p>
           <div class="mt-3 flex flex-wrap gap-2">
             <button type="button" @click="$emit('open-profile',player)" class="rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-bold text-white hover:bg-blue-500">View player profile →</button>
-            <button type="button" @click="$emit('open-review',player.team_id)" class="rounded-lg border border-slate-600 bg-slate-700 px-3 py-2.5 text-sm">Team review</button>
+            <button v-if="showReview" type="button" @click="$emit('open-review',player.team_id)" class="rounded-lg border border-slate-600 bg-slate-700 px-3 py-2.5 text-sm">Team review</button>
           </div>
         </article>
       </div>
