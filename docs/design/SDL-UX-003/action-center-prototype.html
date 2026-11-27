@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SDL UX-003 | Offline synthetic prototype</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#0b1220;color:#f8fafc;--panel:#152237;--muted:#a9bad0;--line:#35445b;--accent:#89d8fa}
+*{box-sizing:border-box}body{margin:0}button,select{font:inherit;min-height:44px;max-width:100%;border:1px solid var(--line);border-radius:10px;background:#1d3049;color:#fff;padding:10px 13px}button{cursor:pointer}button:focus-visible,select:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}button[aria-current=page],button[aria-pressed=true]{background:#12496b;border-color:#7dd3fc;color:#fff}button:disabled{opacity:.55;cursor:not-allowed}a{color:var(--accent)}.wrap{max-width:900px;margin:auto;padding:16px 16px 105px}header{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}.brand{font-size:18px;font-weight:800;color:var(--accent)}.demo{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#fbbf24}.account{margin:16px 0;display:grid;gap:6px}.account select{width:100%}h1{font-size:28px;margin:16px 0 4px}h2{font-size:18px;margin:0 0 12px}h3{font-size:16px;margin:0}p{margin:8px 0;line-height:1.5}.muted,small{color:var(--muted)}.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin:14px 0}.stack{display:grid;gap:10px}.card{display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;background:#192a41;border:1px solid var(--line);border-radius:12px;padding:14px;width:100%}.card>span:first-child{min-width:0;overflow-wrap:anywhere}.count{font-size:22px;font-weight:800;color:var(--accent)}.label{font-size:12px;color:var(--muted)}.subnav{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.filters{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}.filters label{display:grid;gap:5px;min-width:0;font-size:13px;color:var(--muted)}.thumb{flex:0 0 74px;height:58px;display:grid;place-items:center;background:#243955;border:1px solid #3d5574;border-radius:8px;color:#b9dcf0;font-size:24px}.video-row{display:flex;align-items:center;gap:12px}.video-row .info{flex:1;min-width:0;overflow-wrap:anywhere}.pending{color:#fcd34d;font-size:12px}.primary{background:#16628c;border-color:#76c9ec;font-weight:700}.nav{position:fixed;bottom:0;left:0;right:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));background:#101d30;border-top:1px solid var(--line);padding:8px 5px calc(8px + env(safe-area-inset-bottom));z-index:2}.nav button{border:0;background:transparent;border-radius:10px;padding:6px 0;font-size:12px;display:grid;gap:3px;justify-items:center}.nav button[aria-current=page]{background:#12496b}.nav .sym{font-size:21px}.note{font-size:13px;color:var(--muted)}.warning{border-color:#a87528}.test{font-size:12px;color:var(--muted);margin-top:20px}#notice{min-height:1.5em}.focus-heading:focus{outline:none}
+@media(min-width:700px){.wrap{padding:24px 28px 110px}.nav{max-width:900px;margin:auto}.card{min-height:72px}}
+</style></head><body>
+<div class="wrap"><header><div class="brand">Swallows DataLab</div><div class="demo">Synthetic preview · no backend</div></header>
+<label class="account" for="account">Demo account / workspace<select id="account"></select></label>
+<main id="screen"></main><p id="notice" role="status" class="note"></p><p id="checks" class="test"></p></div><nav id="nav" class="nav" aria-label="Main navigation"></nav>
+<script id="ux003-model">
+function fixtures(){
+  const accounts=[
+    {id:"coach-a",label:"Coach · Team A",role:"coach",teams:["A"],reviewAccess:true},
+    {id:"admin-a",label:"Club Admin · Teams A + B",role:"club_admin",teams:["A","B"],reviewAccess:true},
+    {id:"manager-a",label:"Team Manager · Team A",role:"team_manager",teams:["A"],reviewAccess:false},
+    {id:"guardian-a",label:"Guardian · linked children",role:"guardian",teams:["A"],reviewAccess:false},
+    {id:"dual",label:"Dual-role · Coach workspace",role:"coach",teams:["A"],reviewAccess:true},
+    {id:"dual",label:"Dual-role · Guardian workspace",role:"guardian",teams:["A"],reviewAccess:false},
+    {id:"platform",label:"Platform Admin · no review grant",role:"platform_admin",teams:[],reviewAccess:false},
+    {id:"coach-unassigned",label:"Coach · no assigned team",role:"coach",teams:[],reviewAccess:false}
+  ];
+  const rows=[
+    {id:"v1",team:"A",player:"Demo 12",category:"pitching",status:"pending",can_review:true,submitter:"guardian-a"},
+    {id:"v2",team:"A",player:"Demo 24",category:"batting",status:"pending",can_review:true,submitter:"guardian-b"},
+    {id:"v3",team:"B",player:"Demo 36",category:"throwing",status:"pending",can_review:true,submitter:"guardian-c"},
+    {id:"v4",team:"A",player:"Demo 48",category:"throwing",status:"pending",can_review:true,submitter:"dual"},
+    {id:"v5",team:"A",player:"Demo 50",category:"pitching",status:"pending",can_review:false,submitter:"guardian-d"},
+    {id:"v6",team:"A",player:"Demo 12",category:"batting",status:"approved",can_review:false,submitter:"guardian-a"},
+    {id:"v7",team:"C",player:"Demo 62",category:"pitching",status:"pending",can_review:true,submitter:"guardian-e"},
+    {id:"v8",team:"A",player:"Demo 24",category:"throwing",status:"pending",can_review:true,submitter:"coach-a"}
+  ];
+  return {accounts,rows};
+}
+
+function canReview(account){
+  return !!account && ["coach","club_admin"].includes(account.role) && account.reviewAccess===true && account.teams.length>0;
+}
+
+function eligible(account,rows){
+  if(!canReview(account)) return [];
+  return rows.filter(row=>row.status==="pending" && row.can_review===true && account.teams.includes(row.team) && row.submitter!==account.id);
+}
+
+function createState(){
+  const {accounts,rows}=fixtures();
+  let source=rows.map(r=>({...r})), generation=0, request=0;
+  const s={account:accounts[0],tab:"home",section:"library",filters:{team:"",player:"",category:""},items:[],status:"idle",opened:null,notice:"",accounts};
+  function reset(){
+    generation++;request++;s.tab="home";s.section="library";s.filters={team:"",player:"",category:""};s.items=[];s.opened=null;s.status="idle";s.notice="";
+  }
+  function switchAccount(index){if(!accounts[index]) return false;reset();s.account=accounts[index];return true;}
+  function begin(){
+    s.items=[];s.opened=null;s.status=canReview(s.account)?"loading":"not_applicable";
+    return {generation,request:++request};
+  }
+  function receive(ticket,rows,status="ready"){
+    if(ticket.generation!==generation||ticket.request!==request||!canReview(s.account))return false;
+    s.items=status==="ready"?eligible(s.account,rows):[];
+    s.status=status==="ready"?"ready":"unavailable";
+    return true;
+  }
+  function refresh(available=true){const ticket=begin();return receive(ticket,source,available?"ready":"unavailable");}
+  function navigate(tab,section="library"){
+    if(!["home","team","stats","videos","me"].includes(tab))return false;
+    if(tab==="videos"&&section==="review"&&!canReview(s.account))return false;
+    s.opened=null;s.tab=tab;s.section=section;return true;
+  }
+  function setFilter(key,value){
+    if(!Object.hasOwn(s.filters,key))return;
+    s.opened=null;s.filters[key]=value;
+    if(key==="team")s.filters.player="";
+  }
+  function visible(){return s.items.filter(r=>Object.entries(s.filters).every(([k,v])=>!v||r[k]===v));}
+  function open(id){if(s.tab!=="videos"||s.section!=="review"||s.status!=="ready"||!visible().some(r=>r.id===id))return false;s.opened=id;return true;}
+  function simulatedExternalCompletion(){
+    if(!s.opened||!s.items.some(r=>r.id===s.opened)||!canReview(s.account))return false;
+    // A fixture-only acknowledgement of a workflow completed elsewhere.
+    source=source.filter(r=>r.id!==s.opened);s.opened=null;
+    refresh();s.notice="Demo: inbox refreshed after a simulated completion outside this screen.";return true;
+  }
+  function count(){return s.status==="ready"?s.items.length:null;}
+  return {s,switchAccount,begin,receive,refresh,navigate,setFilter,visible,open,simulatedExternalCompletion,count};
+}
+
+function runChecks(){
+  const cases=[];
+  const test=(name,f)=>{try{if(f()!==true)throw Error("assertion failed");cases.push({name,pass:true});}catch(e){cases.push({name,pass:false,error:String(e)});}};
+  test("Coach count is assigned-scope and excludes own, denied and approved rows",()=>{const m=createState();m.refresh();return m.count()===3&&!m.s.items.some(r=>["v5","v6","v7","v8"].includes(r.id));});
+  test("Club Admin fixture receives only its two authorized teams",()=>{const m=createState();m.switchAccount(1);m.refresh();return m.count()===5&&m.s.items.every(r=>["A","B"].includes(r.team));});
+  for(const i of [2,3,5,6,7])test("No review route or count for fixture "+i,()=>{const m=createState();m.switchAccount(i);m.refresh();return m.count()===null&&m.s.items.length===0&&!m.navigate("videos","review");});
+  test("Dual-role coach excludes own submission",()=>{const m=createState();m.switchAccount(4);m.refresh();return !m.s.items.some(r=>r.id==="v4")&&m.count()===3;});
+  test("Home review deep-link and filters work",()=>{const m=createState();m.refresh();m.navigate("videos","review");m.setFilter("team","A");m.setFilter("category","batting");return m.s.section==="review"&&m.visible().length===1&&m.visible()[0].id==="v2"&&m.count()===3;});
+  test("Player filter and team-change clearing",()=>{const m=createState();m.switchAccount(1);m.refresh();m.setFilter("player","Demo 12");if(m.visible().length!==1)return false;m.setFilter("team","B");return m.s.filters.player===""&&m.visible().length===1;});
+  test("Direct open of unauthorized or filtered-out IDs fails",()=>{const m=createState();m.refresh();m.navigate("videos","review");m.setFilter("category","pitching");return !m.open("v2")&&!m.open("v5")&&!m.open("v8")&&m.open("v1");});
+  test("Simulated external completion refreshes count and closes detail",()=>{const m=createState();m.refresh();m.navigate("videos","review");m.open("v1");return m.simulatedExternalCompletion()&&m.count()===2&&m.s.opened===null;});
+  test("Unavailable is not an empty inbox",()=>{const m=createState();m.refresh(false);return m.count()===null&&m.s.status==="unavailable"&&m.visible().length===0;});
+  test("Account/workspace change clears details, filters and pending data; stale response ignored",()=>{const m=createState();m.switchAccount(4);m.refresh();m.navigate("videos","review");m.setFilter("category","batting");m.open("v2");const old=m.begin();m.switchAccount(5);return !m.receive(old,fixtures().rows)&&m.s.items.length===0&&m.s.opened===null&&m.s.filters.category===""&&m.s.tab==="home"&&m.count()===null;});
+  test("Older same-account refresh cannot overwrite newer response",()=>{const m=createState();const old=m.begin();const latest=m.begin();m.receive(latest,[]);return !m.receive(old,fixtures().rows)&&m.count()===0;});
+  test("Successful empty inbox is zero",()=>{const m=createState();const t=m.begin();m.receive(t,[]);return m.count()===0&&m.s.status==="ready";});
+  test("Five destinations retained; no sixth tab",()=>{const m=createState();return ["home","team","stats","videos","me"].every(t=>m.navigate(t))&&!m.navigate("approvals");});
+  return cases;
+}
+</script>
+<script id="ux003-ui">
+const m=createState(), s=m.s, screen=document.getElementById("screen"), nav=document.getElementById("nav"), account=document.getElementById("account");
+const e=(tag,txt,cls)=>{const n=document.createElement(tag);if(txt!==undefined)n.textContent=txt;if(cls)n.className=cls;return n;};
+const btn=(txt,fn,cls)=>{const n=e("button",txt,cls);n.type="button";n.addEventListener("click",fn);return n;};
+const panel=(title)=>{const n=e("section",undefined,"panel");n.append(e("h2",title));return n;};
+function go(tab,section){if(m.navigate(tab,section)){render();screen.querySelector("h1")?.focus();}}
+function card(title,description,count,fn){
+  const n=btn("",fn,"card"), label=e("span");label.append(e("strong",title),e("p",description,"note"));n.append(label,e("span",count===null?"›":String(count),"count"));return n;
+}
+function header(title,sub){const h=e("h1",title,"focus-heading");h.tabIndex=-1;screen.append(h,e("p",sub,"muted"));}
+function home(){
+  header("Home","Dashboard · your current workspace");
+  const actions=panel("Action Center"), list=e("div",undefined,"stack");
+  if(canReview(s.account)){
+    const label=s.status==="ready"?(m.count()===0?"No videos awaiting your review":"Awaiting independent review"):"Count unavailable — try again in Videos";
+    list.append(card("Video review",label,m.count(),()=>go("videos","review")));
+  }
+  if(s.account.role==="coach")list.append(card("Performance review","Open the existing Stats review workflow",null,()=>go("stats","review")));
+  if(s.account.role==="club_admin"||s.account.role==="team_manager")list.append(card("Team management","Open the existing authorized roster",null,()=>go("team")));
+  if(s.account.role==="guardian")list.append(e("p","No required action in this demo.","muted"));
+  if(!list.children.length)list.append(e("p","No assigned actions in this demo.","muted"));
+  actions.append(list);screen.append(actions);
+  if(s.account.role==="guardian"){
+    const optional=panel("Optional choices");optional.append(card("Media sharing preferences","Optional · private by default; declining does not block ordinary access",null,()=>go("me","consent")));screen.append(optional);
+    const updates=panel("Submission updates");updates.append(card("Your videos","Check your own submission status",null,()=>go("videos","library")));screen.append(updates);
+  }
+  const dash=panel("Dashboard");dash.append(e("p","Existing role-specific roster and family dashboards remain unchanged in the app.","muted"));screen.append(dash);
+}
+function filter(key,label,values){
+ const wrap=e("label",label), sel=e("select");sel.setAttribute("aria-label",label);
+ for(const [value,text] of [["","All"],...values.map(v=>[v,key==="team"?"Team "+v:v])]){const o=e("option",text);o.value=value;sel.append(o);}sel.value=s.filters[key];
+ sel.addEventListener("change",()=>{const val=sel.value;m.setFilter(key,val);render();screen.querySelector('[aria-label="'+label+'"]')?.focus();});wrap.append(sel);return wrap;
+}
+function videos(){
+  header("Videos","Library · Review · Clubhouse");
+  const bar=e("nav",undefined,"subnav");bar.setAttribute("aria-label","Video sections");
+  for(const [id,label] of [["library","Library"],["review","Review"],["clubhouse","Clubhouse"]]){
+    if(id==="review"&&!canReview(s.account))continue;const b=btn(label,()=>go("videos",id));b.setAttribute("aria-pressed",String(s.section===id));bar.append(b);
+  }
+  screen.append(bar);
+  if(s.section!=="review"){
+    const p=panel(s.section==="clubhouse"?"Clubhouse":"Private video library");p.append(e("p",s.section==="clubhouse"?"Future authorized gallery. Publication and download are not connected in this prototype.":"Existing MP4/MOV upload, playback, AR analysis and permanent deletion stay in the current app. This preview makes no media requests.","muted"));screen.append(p);return;
+  }
+  if(!canReview(s.account))return;
+  const p=panel("Video Review inbox");
+  p.append(e("p",m.count()===null?"Pending count unavailable":m.count()+" authorized pending video"+(m.count()===1?"":"s"),"muted"));
+  p.append(btn("Refresh",()=>{m.refresh();render();}),btn("Simulate unavailable",()=>{m.refresh(false);render();}));
+  if(s.status!=="ready"){p.append(e("p","Inbox unavailable. No count or private rows are retained.","note"));screen.append(p);return;}
+  const filters=e("div",undefined,"filters");
+  filters.append(filter("team","Team",s.account.teams),filter("player","Player",[...new Set(s.items.filter(r=>!s.filters.team||r.team===s.filters.team).map(r=>r.player))]),filter("category","Category",["pitching","batting","throwing"]));
+  p.append(filters);const results=e("p",m.visible().length+" matching videos","note");results.setAttribute("role","status");p.append(results);
+  const list=e("div",undefined,"stack");for(const r of m.visible()){
+    const row=e("article",undefined,"card video-row"), thumb=e("div","▶","thumb");thumb.setAttribute("aria-hidden","true");const info=e("div",undefined,"info");info.append(e("h3",r.player),e("p","Team "+r.team+" · "+r.category,"note"),e("span","Pending · synthetic thumbnail","pending"));
+    row.append(thumb,info,btn("Open",()=>{if(m.open(r.id)){render();document.getElementById("review-handoff")?.focus();}},"primary"));list.append(row);
+  }
+  if(!list.children.length)list.append(e("p",s.items.length?"No matches. Change filters.":"No pending videos in your authorized scope.","muted"));
+  p.append(list);screen.append(p);
+  if(s.opened){const r=s.items.find(x=>x.id===s.opened);if(r){
+    const hand=panel("Existing independent review · handoff preview");hand.id="review-handoff";hand.tabIndex=-1;hand.append(e("p",r.player+" · "+r.category),e("p","Live integration will reselect the player, revalidate can_review, then open the existing authorized playback/review panel. No approval or rejection is implemented here.","note"),btn("Simulate completion in existing workflow",()=>{m.simulatedExternalCompletion();render();screen.querySelector("h1")?.focus();},"primary"),btn("Close",()=>{s.opened=null;render();screen.querySelector("h1")?.focus();}));screen.append(hand);
+  }}
+}
+function render(){
+ screen.replaceChildren();nav.replaceChildren();document.getElementById("notice").textContent=s.notice;
+ if(s.tab==="home")home();else if(s.tab==="videos")videos();else {
+  const name={team:"Team",stats:"Stats",me:"Me"}[s.tab];header(name,"Destination preview · existing workflow retained");
+  const p=panel(s.section==="review"?"Performance Review":s.section==="consent"?"Consent preferences":name+" workspace");
+  p.append(e("p",s.section==="consent"?"Optional future sharing choices. No consent is collected or saved here.": "This synthetic P0 prototype preserves the destination without duplicating its live functionality.","muted"));screen.append(p);
+ }
+ for(const [tab,label,symbol] of [["home","Home","⌂"],["team","Team","♙"],["stats","Stats","▥"],["videos","Videos","▣"],["me","Me","◉"]]){
+   const b=btn("",()=>go(tab));const icon=e("span",symbol,"sym");icon.setAttribute("aria-hidden","true");b.append(icon,e("span",label));if(s.tab===tab)b.setAttribute("aria-current","page");nav.append(b);
+ }
+}
+s.accounts.forEach((a,i)=>{const o=e("option",a.label);o.value=String(i);account.append(o);});
+account.addEventListener("change",()=>{m.switchAccount(Number(account.value));m.refresh();render();});
+const checks=runChecks();document.getElementById("checks").textContent="Synthetic state checks: "+checks.filter(x=>x.pass).length+"/"+checks.length+" passed. Not browser, API or staging acceptance.";
+m.refresh();render();
+</script></body></html>
