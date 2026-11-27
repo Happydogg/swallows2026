@@ -329,6 +329,21 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   assert.match(String(enrollmentTools().props.class),/hidden/);
   await h.app.signOutAndClear();await Vue.nextTick();
   assert.doesNotMatch(flatten(host),/Manager Scoped Player|Synthetic Roster Player/);
+  h.loginUser=user('coach-fixture');
+  h.rows.sdl_v5_account_context={version:1,user_id:'coach-fixture',roles:['coach'],
+    direct_memberships:{organizations:[],teams:[],guardian_links:0},
+    organizations:[{id:'club-a',name:'Synthetic Club A',roles:['coach']}],
+    teams:[{id:'team-a1',organization_id:'club-a',name:'Synthetic Team A1',roles:['coach']}],
+    platform:{view:false,export:false,sensitive_write:false}};
+  h.rows.roster=[{id:'11111111-1111-4111-8111-111111111111',team_id:'team-a1',preferred_name:'Coach Scoped Player',jersey:'12'}];
+  await h.app.signInAndLoad();await Vue.nextTick();
+  assert.match(flatten(host),/Team overview/);
+  navButton(primaryNav,'Stats').props.onClick();await Vue.nextTick();
+  assert.ok(sectionButton('Review'));
+  navButton(mobileNav,'Me').props.onClick();await Vue.nextTick();
+  assert.match(flatten(meArea()),/Coach · Active/);
+  await h.app.signOutAndClear();await Vue.nextTick();
+  assert.doesNotMatch(flatten(host),/Coach Scoped Player|Manager Scoped Player/);
   assert.equal(errors.length, 0, errors.map(String).join('\n'));
   assert.equal(warnings.length, 0, warnings.join('\n'));
 });
