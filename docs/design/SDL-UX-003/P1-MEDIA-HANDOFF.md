@@ -1,0 +1,20 @@
+# SDL-UX-003 P1 | Media experience prototype checkpoint
+Date: 2026-11-27
+Owner approval in UX-003 conversation: continue isolated P1 development. No production, live integration, backend authorization or deployment approval inferred.
+Task branch: task/sdl-ux-003-action-center. P0 checkpoint: c2f2dc2bece66a05d72840006add06f2db033c7f.
+Source re-inspected: PrivateMediaPanel.js and usePrivateMedia.js on P0 branch. Existing authorized playback, MP4/MOV file selection (40 MiB maximum), progress, thumbnails, original FPS and motion selection, AR, independent private review and permanent deletion remain untouched.
+
+## Delivered
+- Offline media-experience-prototype.html: Library, Review destination placeholder, Clubhouse, optional Me consent, five main tabs; player/category/status filters; mock playback and AR handoff; MP4/MOV synthetic descriptor upload including 99% until success, interruption and refresh; confirmation for delete/publication/unpublication/download; consent withdrawal, revoked and unavailable states.
+- No real upload, file selection, video decoding, analysis, download, persistence, API requests or review mutation. All media, users and permissions are fictional fixtures, NOT an implementation of backend authorization.
+- tests/ux003MediaPrototype.test.mjs runs synthetic model checks and static offline/UI parse checks via Node. Exact committed model readback: 19/19 model checks pass; offline static check pass; UI JavaScript parsed. Node runner, real browser layout, device testing and full existing regression suite not run here.
+- Revocation regression added: refresh and returning to the same revoked demo account do not restore access.
+
+## Integration decisions and dependencies
+P1A: preserve current controller ownership; improve presentation only after shared-file agreement. Keep existing authorized per-player media listing, scope and playback lifecycle, demand-driven thumbnails, existing uploader and permanent delete confirmation, and analyzer workflow. Do not derive upload/deletion rights from role label or assume review implies sharing. Avoid extra video downloads to render thumbnails. Use existing upload receipt as source of successful status; timeout/interruption requires refresh before retry. No real children in staging.
+P1B: mock permission snapshots illustrate proposed separate can_view, can_download, can_publish, can_unpublish and consent controls. These are not deployed contracts. The demo's specific view/download dependency, publication eligibility, and withdrawal fixture are design assumptions requiring RBAC-05 confirmation. Final granularity (player, team, media, consent policy version), guardian combination rules, audit, status transitions, expiry, revocation propagation, publication and download authorization are RBAC-05 owned. No publication based solely on private approval; restoring consent must not implicitly republish. Revocation clears client selection, pending actions, previews and stale response acceptance; previously downloaded files cannot be recalled. Require current server authorization for each new action; never use client fixture logic as authorization.
+Shared files (index.html, js/app.js, PrivateMediaPanel.js, usePrivateMedia.js, privateMediaService.js) remain unchanged until ownership and backend contracts are agreed. Do not merge or deploy automatically.
+P2: actual mobile and cross-role QA remains outstanding. Retain Round 2, ADMIN-01, UX-IA and RBAC-10A acceptance gates from P0 handoff. Test 320/375/390/430px layouts, iOS Safari/Android Chrome with synthetic H.264 and MOV/HEVC compatibility, upload progress/interruption, thumbnail retry, AR, deletion, consent withdrawal during playback, 401/403, 409 and stale responses, direct API negative tests owned by RBAC-05. Real browser acceptance NOT claimed.
+
+## Next action
+SDL-000 to register P1 prototype checkpoint, confirm shared-file integration allocation and RBAC-05 contracts, and schedule P0C/P1A implementation and P2 acceptance in order. No production or staging deployment performed by this task.
