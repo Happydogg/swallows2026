@@ -98,6 +98,10 @@ export const PrivateMediaPanel = {
               class="min-h-10 w-full rounded-xl bg-blue-600 px-3 py-2 text-sm font-bold text-white hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:opacity-50">
               ▶ Play privately
             </button>
+            <button v-if="item.can_archive === true" type="button" @click="archivePrivateMedia(item)" :disabled="mediaArchiving || mediaUploading || mediaPlaybackLoading"
+              class="min-h-10 w-full rounded-xl border border-rose-700 px-3 py-2 text-sm font-semibold text-rose-200 disabled:opacity-50">
+              {{ mediaArchiving ? 'Removing…' : 'Delete video' }}
+            </button>
           </div>
         </li>
       </ul>

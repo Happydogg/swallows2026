@@ -4,7 +4,8 @@ export const mediaGates = {
   upload: 'MEDIA_UPLOAD_ENABLED',
   review: 'MEDIA_REVIEW_ENABLED',
   publish: 'MEDIA_PUBLICATION_ENABLED',
-  download: 'MEDIA_DOWNLOAD_ENABLED'
+  download: 'MEDIA_DOWNLOAD_ENABLED',
+  archive: 'MEDIA_ARCHIVE_ENABLED'
 };
 
 export function mediaAction(path, method) {
@@ -15,7 +16,7 @@ export function mediaAction(path, method) {
   if (path === '/v2/submissions/upload-eligibility' && method === 'GET') return 'upload';
   if (path === '/v2/clubhouse' && method === 'GET') return 'playback';
   if (path === '/v2/review' && method === 'GET') return 'review';
-  const action = /^\/v2\/submissions\/[^/]+\/(playback|download|publish|review)$/.exec(path)?.[1];
+  const action = /^\/v2\/submissions\/[^/]+\/(playback|download|publish|review|archive)$/.exec(path)?.[1];
   if (action && method === (action === 'playback' || action === 'download' ? 'GET' : 'POST')) return action;
   return null;
 }

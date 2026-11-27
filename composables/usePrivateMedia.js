@@ -11,6 +11,7 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
   const mediaUploadAllowed = ref(false);
   const mediaLoading = ref(false);
   const mediaUploading = ref(false);
+  const mediaArchiving = ref(false);
   const mediaProgress = ref(0);
   const mediaError = ref('');
   const mediaUploadError = ref('');
@@ -122,6 +123,7 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
     mediaUploadAllowed.value = false;
     mediaLoading.value = false;
     mediaUploading.value = false;
+    mediaArchiving.value = false;
     mediaPlaybackLoading.value = false;
     mediaProgress.value = 0;
     mediaFile.value = null;
@@ -217,6 +219,20 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
     } catch (error) { op.failed(error); }
     finally { if (op.ownsState()) mediaUploading.value = false; op.finish(); }
   }
+  async function archivePrivateMedia(item) {
+    if(mediaArchiving.value||mediaUploading.value||!mediaReadAllowed.value||!mediaItems.value.some(row=>row.id===item.id&&row.can_archive===true))return;
+    if(!globalThis.confirm('Delete this private video from the active library? The private stored file is retained for recovery.'))return;
+    const op=operation();mediaArchiving.value=true;mediaError.value='';mediaNotice.value='';
+    try {
+      await service.archive(item.id,{signal:op.signal});
+      if(!op.current())return;
+      releasePlayback();discardThumbnails();
+      mediaItems.value=mediaItems.value.filter(row=>row.id!==item.id);
+      mediaNotice.value='Video removed from the active library.';
+      await refreshMedia();
+    }catch(error){op.failed(error);}
+    finally{if(op.ownsState())mediaArchiving.value=false;op.finish();}
+  }
   async function playPrivateMedia(item) {
     if (!mediaReadAllowed.value || !mediaItems.value.some(row => row.id === item.id)) return;
     releasePlayback();
@@ -259,9 +275,9 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
     mediaError.value = 'The browser could not decode this MP4 video. Try an H.264 MP4 file.';
   }
   return { mediaPlayers, mediaPlayerId, mediaItems, mediaReadAllowed, mediaUploadAllowed, mediaLoading,
-    mediaUploading, mediaProgress, mediaError, mediaUploadError, mediaNotice, mediaFile, uploadCategory, mediaPlaybackUrl, mediaPlaybackId,
+    mediaUploading, mediaArchiving, mediaProgress, mediaError, mediaUploadError, mediaNotice, mediaFile, uploadCategory, mediaPlaybackUrl, mediaPlaybackId,
     mediaPlaybackLoading, analysisCategory, analysisFps, mediaThumbnails, mediaThumbnailBusy, mediaThumbnailFailed,
     submissionsEnabled, ensureMediaThumbnail, retryMediaThumbnail,
-    selectMediaPlayer, refreshMedia, selectMediaFile, uploadPrivateMedia, playPrivateMedia,
+    selectMediaPlayer, refreshMedia, selectMediaFile, uploadPrivateMedia, archivePrivateMedia, playPrivateMedia,
     analyzePrivateMedia, reportPlaybackError, resetMedia };
 }

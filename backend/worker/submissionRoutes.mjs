@@ -187,7 +187,14 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
         const playerId = url.searchParams.get('player_id');
         if (!validId(playerId)) return json({ error: 'Invalid player_id' }, 400, origin);
         const result = await call('sdl_004_list_submissions', { p_player_id: playerId });
-        return result.error ? error(result) : json({ items: result.value }, 200, origin);
+        if(result.error) return error(result);
+        // An unavailable archive capability never blocks the library or grants removal.
+        if(env.MEDIA_ARCHIVE_ENABLED==='true' && Array.isArray(result.value)){
+          const eligible=await call('sdl_v5_media_archive_ids',{p_player:playerId});
+          const ids=new Set(!eligible.error&&Array.isArray(eligible.value)?eligible.value.filter(validId):[]);
+          return json({items:result.value.map(row=>({...row,can_archive:ids.has(row.id)}))},200,origin);
+        }
+        return json({items:result.value},200,origin);
       }
       if (path === '/v2/clubhouse' && request.method === 'GET') {
         const teamId = url.searchParams.get('team_id');
@@ -195,9 +202,15 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
         const result = await call('sdl_004_clubhouse_videos', { p_team_id: teamId });
         return result.error ? error(result) : json({ items: result.value }, 200, origin);
       }
-      const match = path.match(/^\/v2\/submissions\/([^/]+)\/(review|publish|playback|download)$/);
+      const match = path.match(/^\/v2\/submissions\/([^/]+)\/(review|publish|playback|download|archive)$/);
       if (!match || !validId(match[1])) return json({ error: 'Not found' }, 404, origin);
       const [, id, action] = match;
+      if(action==='archive' && request.method==='POST'){
+        const result=await call('sdl_v5_archive_media',{p_id:id});
+        if(result.error)return error(result);
+        if(result.value!==true)return json({error:'Media removal denied'},403,origin);
+        return json({archived:true},200,origin);
+      }
       if (['review','publish'].includes(action) && request.method === 'POST') {
         let body;
         try { body = await request.json(); } catch { return json({ error: 'Invalid JSON' }, 400, origin); }

@@ -149,8 +149,13 @@ export function createPrivateMediaService({ auth, client = supabaseClient, baseU
         if (!UUID.test(item?.id) || item.player_id !== playerId ||
           !['pitching','batting','throwing'].includes(item.category) ||
           !['pending','approved','rejected'].includes(item.status)) throw new MediaError('Invalid media listing.');
-        return { id:item.id, player_id:item.player_id, category:item.category, status:item.status, created_at:item.created_at ?? null };
+        return { id:item.id, player_id:item.player_id, category:item.category, status:item.status, created_at:item.created_at ?? null, ...(item.can_archive===true?{can_archive:true}:{}) };
       });
+    },
+    async archive(mediaId,options) {
+      const result=await request(`/v2/submissions/${id(mediaId)}/archive`,{...options,method:'POST'});
+      if(result?.archived!==true)throw new MediaError('Invalid removal receipt. Refresh before retrying.');
+      return true;
     },
     playback(mediaId, options) { return request(`/v2/submissions/${id(mediaId)}/playback`, { ...options, blob: true }); },
     upload(playerId,file,options) { return submit(playerId,file,options?.submission,options); },

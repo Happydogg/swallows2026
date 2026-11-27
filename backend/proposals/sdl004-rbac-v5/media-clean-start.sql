@@ -2,7 +2,9 @@
 -- bundle before assigning a migration version. CREATE OR REPLACE preserves ACLs.
 BEGIN;
 -- Two statements intentionally leave all pre-existing rows outside clean start.
-ALTER TABLE public.sdl_video_submissions ADD COLUMN clean_start boolean;
+ALTER TABLE public.sdl_video_submissions ADD COLUMN clean_start boolean,
+ ADD COLUMN archived_at timestamptz,
+ ADD COLUMN archived_by uuid REFERENCES public.profiles(id);
 ALTER TABLE public.sdl_submission_uploads ADD COLUMN clean_start boolean;
 ALTER TABLE public.sdl_submission_uploads ALTER COLUMN clean_start SET DEFAULT true;
 -- The service finalizer uses the reservation ID for the submission. A lease
@@ -31,7 +33,7 @@ RETURNS boolean LANGUAGE sql STABLE SET search_path='' AS $$
  LEFT JOIN public.sdl_club_enrollments e ON e.id=s.enrollment_id AND e.generation=s.enrollment_generation
  AND e.athlete_id=p.athlete_id AND e.organization_id=p.organization_id
  JOIN public.sdl_media_objects m ON m.id=s.id AND m.player_id=p.id
- WHERE s.id=p_id AND s.clean_start IS TRUE
+ WHERE s.id=p_id AND s.clean_start IS TRUE AND s.archived_at IS NULL
  AND (s.status IN ('approved','pending') OR (s.status='rejected' AND s.rejected_access_until>now()))
  AND s.subject_scope<>'multiple' AND (
  (e.status='active' AND e.ended_at IS NULL AND e.started_at<=now()
@@ -92,7 +94,7 @@ CREATE OR REPLACE FUNCTION public.sdl_004_submission_can_publish(p_id uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
  SELECT public.sdl_004_session_active() AND EXISTS(SELECT 1 FROM public.sdl_video_submissions s
  JOIN public.players p ON p.id=s.player_id AND p.athlete_id=s.athlete_id AND p.organization_id=s.organization_id
- WHERE EXISTS(SELECT 1 FROM public.sdl_club_enrollments recording WHERE recording.id=s.enrollment_id AND recording.generation=s.enrollment_generation AND recording.status='active' AND recording.ended_at IS NULL AND recording.recording_storage_authorized AND nullif(btrim(recording.recording_permission_ref),'') IS NOT NULL) AND s.id=p_id AND s.clean_start IS TRUE AND s.status='approved'
+ WHERE EXISTS(SELECT 1 FROM public.sdl_club_enrollments recording WHERE recording.id=s.enrollment_id AND recording.generation=s.enrollment_generation AND recording.status='active' AND recording.ended_at IS NULL AND recording.recording_storage_authorized AND nullif(btrim(recording.recording_permission_ref),'') IS NOT NULL) AND s.id=p_id AND s.clean_start IS TRUE AND s.archived_at IS NULL AND s.status='approved'
  AND s.subject_scope='single_athlete' AND s.subject_confirmed_by IS NOT NULL AND s.subject_confirmed_by<>s.submitted_by AND sdl_rbac_v5.player_role_gate(s.player_id,'review_video')
  AND public.sdl_004_active_club_consent(s.enrollment_id,s.enrollment_generation) IS NOT NULL);
 $$;
@@ -101,7 +103,7 @@ RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE s public.sdl_video_submissions%ROWTYPE; consent uuid;
 BEGIN
  SELECT * INTO s FROM public.sdl_video_submissions WHERE id=p_id FOR UPDATE;
- IF NOT FOUND OR s.clean_start IS DISTINCT FROM true OR NOT EXISTS(SELECT 1 FROM public.players WHERE id=s.player_id AND athlete_id=s.athlete_id AND organization_id=s.organization_id) OR NOT public.sdl_004_submission_can_review(s.player_id) THEN RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501'; END IF;
+ IF NOT FOUND OR s.clean_start IS DISTINCT FROM true OR s.archived_at IS NOT NULL OR NOT EXISTS(SELECT 1 FROM public.players WHERE id=s.player_id AND athlete_id=s.athlete_id AND organization_id=s.organization_id) OR NOT public.sdl_004_submission_can_review(s.player_id) THEN RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501'; END IF;
  IF p_team_ids IS NULL OR cardinality(p_team_ids)>20 THEN RAISE EXCEPTION 'Invalid team scope' USING ERRCODE='22023'; END IF;
  IF cardinality(p_team_ids)>0 THEN
   IF s.subject_scope IS DISTINCT FROM 'single_athlete' OR s.subject_confirmed_by IS NULL
@@ -128,4 +130,55 @@ CREATE OR REPLACE FUNCTION public.sdl_004_submission_contract()
 RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
  SELECT CASE WHEN public.sdl_004_session_active() THEN jsonb_build_object('rbacVersion',5,'mediaRevision','v5.1-clean-start','revision','sdl004-club-enrollment-v2','enrollmentAdmin',true,'clubhouseRoster',true,'clubhouseLeaderboard',true,'parentStatistics',true,'statisticsConsent',true,'pilotWorkflow','sdl004-final-pilot-v1') ELSE NULL END;
 $$;
+
+-- Staging library removal: no physical deletion, no permanent-delete grant.
+-- Only current, private, clean-start records may be archived here.
+CREATE FUNCTION sdl_rbac_v5.can_archive_media(p_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SET search_path='' AS $
+ SELECT sdl_rbac_v5.active_actor() AND EXISTS(
+ SELECT 1 FROM public.sdl_video_submissions s
+ JOIN public.players p ON p.id=s.player_id AND p.athlete_id=s.athlete_id AND p.organization_id=s.organization_id
+ JOIN public.sdl_club_enrollments e ON e.id=s.enrollment_id AND e.generation=s.enrollment_generation
+   AND e.athlete_id=s.athlete_id AND e.organization_id=s.organization_id
+ WHERE s.id=p_id AND s.clean_start IS TRUE AND s.archived_at IS NULL
+ AND cardinality(s.publication_team_ids)=0 AND s.status IN ('approved','pending','rejected')
+ AND e.status='active' AND e.ended_at IS NULL AND e.started_at<=now()
+ AND (sdl_rbac_v5.has_player_role(s.player_id,'club_admin')
+   OR sdl_rbac_v5.has_player_role(s.player_id,'coach')
+   OR (s.status='pending' AND s.submitted_by=auth.uid()
+       AND sdl_rbac_v5.has_player_role(s.player_id,'guardian')
+       AND sdl_rbac_v5.guardian_participates(auth.uid(),s.player_id)))
+ );
+$;
+REVOKE ALL ON FUNCTION sdl_rbac_v5.can_archive_media(uuid) FROM PUBLIC,anon,authenticated,service_role;
+
+CREATE FUNCTION public.sdl_v5_media_archive_ids(p_player uuid)
+RETURNS uuid[] LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $
+ SELECT coalesce(array_agg(eligible.id),ARRAY[]::uuid[]) FROM (
+ SELECT s.id FROM public.sdl_video_submissions s
+ WHERE s.player_id=p_player AND sdl_rbac_v5.can_archive_media(s.id)
+ ORDER BY s.created_at DESC,s.id LIMIT 30) eligible;
+$;
+
+CREATE FUNCTION public.sdl_v5_archive_media(p_id uuid)
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $
+DECLARE s public.sdl_video_submissions%ROWTYPE;
+BEGIN
+ SELECT * INTO s FROM public.sdl_video_submissions WHERE id=p_id FOR UPDATE;
+ IF NOT FOUND OR NOT sdl_rbac_v5.can_archive_media(p_id) THEN
+   RAISE EXCEPTION 'Media removal not authorized' USING ERRCODE='42501';
+ END IF;
+ UPDATE public.sdl_video_submissions SET archived_at=now(),archived_by=auth.uid(),
+  publication_team_ids=ARRAY[]::uuid[],publication_consent_id=NULL,
+  history=history||jsonb_build_array(jsonb_build_object('action','archived','actor',auth.uid(),'at',now()))
+ WHERE id=p_id;
+ INSERT INTO sdl_rbac_v5.events(actor,action,organization_id,player_id,target_id,reason)
+ VALUES(auth.uid(),'media_archived',s.organization_id,s.player_id,s.id,'Private video removed from active library');
+ RETURN true;
+END;
+$;
+-- Hold until a separate reviewed staging activation. Do not grant here.
+REVOKE ALL ON FUNCTION public.sdl_v5_media_archive_ids(uuid),public.sdl_v5_archive_media(uuid)
+ FROM PUBLIC,anon,authenticated,service_role;
+
 COMMIT;
