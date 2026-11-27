@@ -165,6 +165,19 @@ export function createPrivateMediaService({ auth, client = supabaseClient, baseU
       if(result?.updated!==true)throw new MediaError('Review status unknown. Refresh before retrying.');
       return true;
     },
+    // Narrow staging-only contracts for SDL-UX-003 integration.
+    mediaConsent(playerId,options) { return request(`/v2/media/consent?player_id=${playerIdValue(playerId)}`,options); },
+    setMediaConsent(playerId,generation,accept,options) {
+      if(typeof accept!=='boolean')throw new MediaError('Explicit consent decision required.');
+      return request(`/v2/media/consent?player_id=${playerIdValue(playerId)}`,{...options,method:'POST',body:{generation:playerIdValue(generation),accept,policy_version:accept?'sdl004-clubhouse-view-download-v2':null}});
+    },
+    publicationEligibility(mediaId,options) { return request(`/v2/media/publication-eligibility?media_id=${id(mediaId)}`,options); },
+    setMediaPublication(mediaId,teamId,publish,options) {
+      if(typeof publish!=='boolean')throw new MediaError('Explicit publication decision required.');
+      return request(`/v2/media/${id(mediaId)}/${publish?'publish':'unpublish'}`,{...options,method:'POST',body:{team_id:playerIdValue(teamId)}});
+    },
+    sharedMedia(teamId,cursor,options) {return request(`/v2/media/clubhouse?team_id=${playerIdValue(teamId)}${cursor?'&cursor='+encodeURIComponent(cursor):''}`,options);},
+    sharedPlayback(mediaId,teamId,options) {return request(`/v2/media/${id(mediaId)}/shared-playback?team_id=${playerIdValue(teamId)}`,{...options,blob:true});},
     async archive(mediaId,options) {
       const result=await request(`/v2/submissions/${id(mediaId)}/archive`,{...options,method:'POST'});
       if(result?.archived!==true||typeof result.deleted!=='boolean')throw new MediaError('Removal status unknown. Refresh before retrying.');

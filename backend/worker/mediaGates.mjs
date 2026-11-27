@@ -1,5 +1,6 @@
 // Exact opt-in for each action. These gates do not grant database privileges.
 export const mediaGates = {
+  consent: 'MEDIA_CONSENT_ENABLED',
   playback: 'MEDIA_PLAYBACK_ENABLED',
   upload: 'MEDIA_UPLOAD_ENABLED',
   review: 'MEDIA_REVIEW_ENABLED',
@@ -14,6 +15,10 @@ export function mediaAction(path, method) {
     if (method === 'POST') return 'upload';
   }
   if (path === '/v2/submissions/upload-eligibility' && method === 'GET') return 'upload';
+  if (path === '/v2/media/consent' && ['GET','POST'].includes(method)) return 'consent';
+  if (['/v2/media/publication-eligibility','/v2/media/clubhouse'].includes(path) && method==='GET') return 'publish';
+  if (/^\/v2\/media\/[^/]+\/shared-playback$/.test(path) && method==='GET') return 'publish';
+  if (/^\/v2\/media\/[^/]+\/(publish|unpublish)$/.test(path) && method==='POST') return 'publish';
   if (path === '/v2/clubhouse' && method === 'GET') return 'playback';
   if (path === '/v2/review' && method === 'GET') return 'review';
   if (/^\/v2\/submissions\/[^/]+\/review-private$/.test(path) && method==='POST') return 'review';

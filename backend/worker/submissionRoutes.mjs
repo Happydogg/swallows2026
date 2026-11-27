@@ -224,7 +224,58 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
         if(result.error)return error(result);
         return result.value===true?json({updated:true},200,origin):json({error:'Review denied'},403,origin);
       }
-      const match = path.match(/^\/v2\/submissions\/([^/]+)\/(review|publish|playback|download|archive)$/);
+      // New v5.1 contracts never route through the held legacy publication RPCs.
+      const consentRoute=path==='/v2/media/consent';
+      const shareRoute=path.startsWith('/v2/media/')&&!consentRoute;
+      const sharePlayback=path.match(/^\/v2\/media\/([^/]+)\/shared-playback$/);
+      const parseSmallJson=async()=>{
+        const reader=request.body?.getReader();if(!reader)throw Error('Invalid JSON');
+        let size=0;const parts=[];
+        while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>4096){await reader.cancel();throw Error('Oversize JSON');}parts.push(value);}
+        const bytes=new Uint8Array(size);let off=0;for(const part of parts){bytes.set(part,off);off+=part.byteLength;}
+        return JSON.parse(new TextDecoder().decode(bytes));
+      };
+      if(consentRoute){
+        if(env.MEDIA_CONSENT_ENABLED!=='true'||contract.value.mediaConsentRevision!=='sdl004-clubhouse-view-download-v2')return json({error:'Consent disabled',code:'media_disabled'},503,origin);
+        const player=url.searchParams.get('player_id');
+        if(!validPlayerId(player))return json({error:'Invalid player'},400,origin);
+        let result;
+        if(request.method==='GET')result=await call('sdl_v5_media_consent_status',{p_player:player});
+        else if(request.method==='POST'){
+          let body;try{body=await parseSmallJson();}catch{return json({error:'Invalid consent JSON'},400,origin);}
+          if(!validPlayerId(body?.generation)||typeof body.accept!=='boolean'||(body.accept&&body.policy_version!=='sdl004-clubhouse-view-download-v2'))return json({error:'Explicit current consent required'},400,origin);
+          result=await call('sdl_v5_set_media_consent',{p_player:player,p_generation:body.generation,p_accept:body.accept,p_policy:body.accept?body.policy_version:null});
+        }else return json({error:'Method not allowed'},405,origin);
+        return result.error?error(result):json(result.value,200,origin);
+      }
+      if(shareRoute){
+        if(env.MEDIA_PUBLICATION_ENABLED!=='true'||env.MEDIA_CONSENT_ENABLED!=='true'||contract.value.mediaPublicationRevision!=='team-publication-v1'||contract.value.mediaConsentRevision!=='sdl004-clubhouse-view-download-v2')return json({error:'Publication disabled',code:'media_disabled'},503,origin);
+        if(path==='/v2/media/publication-eligibility'&&request.method==='GET'){
+          const id=url.searchParams.get('media_id');if(!validId(id))return json({error:'Invalid media ID'},400,origin);
+          const result=await call('sdl_v5_media_publication_eligibility',{p_id:id});
+          return result.error?error(result):json(result.value,200,origin);
+        }
+        const mutation=path.match(/^\/v2\/media\/([^/]+)\/(publish|unpublish)$/);
+        if(mutation&&request.method==='POST'){
+          if(!validId(mutation[1]))return json({error:'Invalid media ID'},400,origin);
+          let body;try{body=await parseSmallJson();}catch{return json({error:'Invalid publication JSON'},400,origin);}
+          if(!validPlayerId(body?.team_id))return json({error:'Invalid team ID'},400,origin);
+          const publish=mutation[2]==='publish';
+          const result=await call('sdl_v5_set_media_publication',{p_id:mutation[1],p_team:body.team_id,p_publish:publish});
+          return result.error?error(result):result.value===true?json({updated:true,published:publish},200,origin):json({error:'Publication denied'},403,origin);
+        }
+        if(path==='/v2/media/clubhouse'&&request.method==='GET'){
+          const team=url.searchParams.get('team_id'),cursor=url.searchParams.get('cursor');
+          if(!validPlayerId(team))return json({error:'Invalid team ID'},400,origin);
+          let before=null,beforeId=null;
+          if(cursor!==null){const parts=cursor.split('|');if(parts.length!==2||parts[0].length>48||!/^\d{4}-\d{2}-\d{2}T/.test(parts[0])||!Number.isFinite(Date.parse(parts[0]))||!validId(parts[1]))return json({error:'Invalid cursor'},400,origin);[before,beforeId]=parts;}
+          const result=await call('sdl_v5_shared_media_list',{p_team:team,p_before:before,p_before_id:beforeId});
+          return result.error?error(result):json(result.value,200,origin);
+        }
+        if(!sharePlayback||request.method!=='GET')return json({error:'Not found'},404,origin);
+        if(env.MEDIA_PLAYBACK_ENABLED!=='true')return json({error:'Playback disabled',code:'media_disabled'},503,origin);
+      }
+      const match = sharePlayback ? [null,sharePlayback[1],'shared-playback'] : path.match(/^\/v2\/submissions\/([^/]+)\/(review|publish|playback|download|archive)$/);
       if (!match || !validId(match[1])) return json({ error: 'Not found' }, 404, origin);
       const [, id, action] = match;
       if(action==='archive' && request.method==='POST'){
@@ -237,6 +288,7 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
         try { deleted=await purgeArchivedMedia(env,id); } catch { /* queue remains retryable */ }
         return json({archived:true,deleted},deleted?200:202,origin);
       }
+      if(action==='publish')return json({error:'Legacy publication route disabled',code:'media_disabled'},503,origin);
       if (['review','publish'].includes(action) && request.method === 'POST') {
         let body;
         try { body = await request.json(); } catch { return json({ error: 'Invalid JSON' }, 400, origin); }
@@ -250,8 +302,10 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
           :await call('sdl_004_publish_submission',{p_id:id,p_team_ids:body.team_ids,p_subject_athletes:body.subject_athletes??[]});
         return result.error ? error(result) : json({ updated: true }, 200, origin);
       }
-      if (['playback','download'].includes(action) && request.method === 'GET') {
-        const allowed = action === 'download'
+      if (['playback','download','shared-playback'].includes(action) && request.method === 'GET') {
+        const team=action==='shared-playback'?url.searchParams.get('team_id'):null;
+        if(action==='shared-playback'&&!validPlayerId(team))return json({error:'Invalid team ID'},400,origin);
+        const allowed = action==='shared-playback' ? await call('sdl_v5_authorize_shared_playback',{p_id:id,p_team:team}) : action === 'download'
           ? await call('sdl_v5_authorize_download', { p_id: id })
           : await call('sdl_v5_authorize_playback', {p_id:id});
         if (allowed.error) return error(allowed);
