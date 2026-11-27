@@ -2,6 +2,18 @@
 
 **As of:** 2026-11-27. **Scope:** Current GitHub branch and independently checked staging services; not a production readiness certificate.
 
+## UX IA-01 through IA-05 checkpoint (2026-11-27)
+
+**Latest status (supersedes earlier candidate-only notes below):** Source PRs #13–17 merged; owner accepted IA-01, IA-02 and IA-04; IA-03 non-video functions accepted with private-media blocker open; IA-05 staging deployed, awaiting owner visual review. IA-06 mobile/cross-role QA is the next UX step. These are UX review staging deployments and do not authorize SDL production.
+
+**IA-05 evidence:** [PR #17](https://github.com/Happydogg/swallows2026/pull/17) merged at `9437a44faf3d8bfaca7f9f65ddeabae7cf52cb4c`. [Issue #12 handoff](https://github.com/Happydogg/swallows2026/issues/12#issuecomment-7215859630) reports 8/8 focused Vue/performance smoke checks visible and full regression gate success with remaining logs truncated. Cloudflare directly shows successful `sdl-ux-live` deployment `2c151c7b-68c6-4260-840c-f18f0cae23dc` and `sdl-ux-preview` deployment `ad310875-8399-423f-aca2-36c41f0c0d86`, both at the PR #17 merge commit.
+
+**Next actions:** (P0 SDL-UX) Owner visually checks IA-05 Me/preferences, existing role switch, gated tools, photo directory and sign-out; IA-06 tests mobile phone layouts, Club Admin/Team Manager/Coach/Guardian/multi-role navigation, focus/accessibility and screenshot evidence, preserving Round 2 12/12, ADMIN-01 5/5 and RBAC-10A. (P0 SDL-004 media) Independently diagnose and repair legacy-vs-v5 media authorization transport under approved scoped rights, with positive/negative tests and no loosening of gates. (P0 SDL-GOV) Complete consent/provenance, direct API, recovery and security gates.
+
+**Prohibitions:** No new features, production pilot deployment, real-family onboarding, RBAC/consent expansion, unrestricted media or destructive migration. UX acceptance != backend security acceptance.
+
+---
+
 ## UX-IA-01 approved candidate update (2026-11-27)
 
 **Owner approval:** The proposed first UX-IA-01 batch is approved and has a source implementation candidate on [draft PR #13](https://github.com/Happydogg/swallows2026/pull/13). GitHub confirms head `239e29c5655ca692908d182b6b05158463c31ea9`, target UX feature branch, and 10 changed files (seven presentation, three tests). The source and issue comment report 17/17 focused assertions passed. **Full regression/Vue renderer and authenticated staging owner acceptance not run. No merge or manual deployment.**
