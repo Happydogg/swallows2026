@@ -1,6 +1,60 @@
 # Swallows DataLab | Roadmap Status (Evidence-based)
 
-**As of:** 2026-11-21. **Scope:** Current GitHub branch and independently checked staging services; not a production readiness certificate.
+**As of:** 2026-11-27. **Scope:** Current GitHub branch and independently checked staging services; not a production readiness certificate.
+
+## Current roadmap overlay: 2026-11-27 (supersedes older status snapshot below)
+
+**Project strategy:** No feature expansion. Complete the approved frontend and test actual workflows against the currently restricted staging backend. Do not use frontend button visibility as authorization evidence.
+
+### Current verified and reported state
+
+| Workstream | Current stage | Next acceptance threshold |
+|---|---|---|
+| SDL-004 RBAC v5.1 | **Staging-deployed, restricted.** Supabase 22 v5 RPCs, 11 named session/account policies and bundled migration ledger observed read-only; Worker active version observed. | Credentials/scoped-role UAT, independent negative direct API tests, unresolved security/privacy QA findings, recovery evidence |
+| SDL-UX-002 | Approved role-adaptive UX and implemented feature-branch components; existing UX reviews and tests recorded separately | Inspect latest source; integrate against the exact installed v5.1 contract, preserve old behavior, owner Live Server plus hosted staging acceptance |
+| SDL-004 synthetic testing | Twelve synthetic identities and relationships planned; provisioning script prepared | Controlled provisioning, role grant verification, known cleanup ledger; no global Platform Admin activation |
+| SDL-GOV | Independent QA FAIL for unrestricted staging; restricted-mode owner authorization | Track restricted RPC list, migration ledger reconciliation, backup/isolated restore, privacy approvals, formal sign-offs |
+| SDL-005 | Existing video workflow and browser analyzer work may continue | Preserve private media controls and scientific uncertainty; no unrestricted media activation |
+| SDL-006 | Independent scientific QA continues | No unverified biomechanics claims or new AI Coach features promoted into MVP |
+
+### Task ownership and execution queue
+
+| Priority / task | Responsible workstream | Required artifact / outcome | Execution status |
+|---|---|---|---|
+| P0 SDL-004-RBAC-CONTRACT | Backend RBAC + SDL-UX-002 | Reconciled API/role-to-screen matrix, deployed RPC and Worker gate inventory, feature flags and branch baseline | Planning, read-only |
+| P0 SDL-004-SYN-12 | Backend RBAC workstream | Create exactly 12 approved synthetic identities, verified team/club/guardian links, scripted cleanup ledger and no global PA privilege | Prepared; NOT executed |
+| P0 SDL-UX-002-INTEGRATE | SDL-UX-002 and Codex | Five-tab role-aware MVP with PA/CA/TM/CO/GU UI paths; preserve current permissions; disabled routes clearly unavailable | Pending integration and source review |
+| P0 SDL-UX-UAT-01 | Project owner + SDL-UX-002 | Stepwise Live Server checklist with PASS/FAIL/BLOCKED plus screenshot/network evidence; repeat critical flows on hosted staging | Pending |
+| P0 SDL-004-SEC-REMEDIATE | Backend RBAC + independent SDL-GOV security QA | Fix observed defects, verify direct RPC/table/R2 deny paths, session revocation, multi-role isolation, subject and consent boundaries | Outstanding; unrestricted QA FAIL |
+| P0 SDL-004-MIG-LEDGER | Backend RBAC + release owner | Map all 14 source migration files/checksums to single hosted version, block unsafe future CLI push | Pending reconciliation |
+| P0 SDL-004-RECOVERY | Backend + SDL-GOV | Verified hosted backup and isolated restore, containment/rollback rehearsal, provider MFA recovery and exact Worker/source/bindings | Outstanding |
+| P1 SDL-004-GATES | Backend + SDL-GOV + owner | Individual evidence-backed release decisions for each restricted media/shared-session capability and submission gate | Blocked; leave off |
+| P1 SDL-000-PILOT-DECISION | SDL-000 + owner | Review all accepted UAT, security, consent, recovery and rollback evidence; explicit pilot scope and authorization | NOT authorized |
+| Parallel SDL-005 / SDL-006 | Their dedicated workstreams | Video/scientific verification consistent with restricted MVP; no scope expansion | Independent |
+
+### Critical path to first production pilot
+
+1. **Inventory and baseline:** Confirm UX and backend source branches, v5.1 API contracts, current Worker flags/restrictions, 14-to-1 migration ledger, and deployment identities. Document conflicts.
+2. **Synthetic identities:** Backend provisions the 12 approved synthetic accounts and exact assignments in staging with no global PA activation. Verify each login and server-recognized scope.
+3. **Frontend MVP integration:** SDL-UX-002 implements only approved role-specific navigation and workflows. Keep backend permission checks server-side and disabled features unavailable.
+4. **Owner functional acceptance:** Test Coach, Guardian, Club Admin and Team Manager with synthetic accounts in Live Server; record PASS/FAIL/BLOCKED; repeat critical login, playback, CORS and authorization on hosted staging. Platform Admin restricted paths require separately approved synthetic access.
+5. **Defect correction and negative tests:** Codex fixes narrowly scoped frontend/backend bugs; backend/independent QA exercises direct RLS, RPC, account/session revocation, multi-role and cross-team/cross-club denial, media subject and consent checks. UI success does not override security FAIL.
+6. **Security/privacy/recovery gates:** Reconcile historical assignment and consent, media rights and retention, private avatar storage, MFA recovery, exact migration ledger and protected backup/restore. Keep remaining RPCs disabled until each restricted path is approved.
+7. **Pilot release decision:** Independently re-review the resolved blockers and perform full hosted staging rehearsal. Only a separate explicit owner decision may authorize production deployment or real-family onboarding.
+
+**Stop condition:** Any unresolved P0 unauthorized access, privilege escalation, consent violation, unreviewed media exposure, or unverified recovery path blocks production. Features not cleared may be excluded from a restricted pilot only when technically inaccessible and explicitly approved as out of pilot scope.
+
+### Environment and evidence checkpoint
+
+- Supabase staging ID: wvurolqbjhuckkkjiiiv; observed hosted bundled migration 20261126235408; 22 public sdl_v5_* functions and 11 matching account/session policy names.
+- Cloudflare Worker sdl-r2-staging-gate: observed active version 2cd3f378-5636-466a-beac-aa4c6a48097c at 100% traffic.
+- GitHub source: feature/SDL-004-rbac-v5, PR #7 draft/unmerged, head 6331aa965f8afaac50862a75a71993da0d7ae4c9. Separate UX branch feature/SDL-UX-002-login-redesign.
+- Owner handoff reports 14 source migrations installed in one bundle, 18 temporarily restricted media/shared-session RPCs, preserved 19 players / 120 sessions / 2 media rows, and no global PA grant. These specifics were not all independently verified by this coordination review.
+- Live Server uses a different origin from Cloudflare Pages. Final auth, OAuth redirects, CORS and video behavior must be checked on hosted staging.
+
+**Approvals NOT granted:** PR merge, production, real-family onboarding, unrestricted media/RPC access, destructive migrations or deletions, synthetic global PA privilege, automatic consent broadening. This document updates a working GitHub mirror, not the independent project directory or final release record.
+
+---
 
 | Workstream | Planned | Verified implementation stage | Remaining release requirements |
 |---|---|---|---|
