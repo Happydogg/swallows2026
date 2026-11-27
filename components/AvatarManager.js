@@ -10,16 +10,16 @@ export const AvatarManager = {
   setup(props) { return { ...props.controller }; },
   template: `
   <div class="no-print">
-    <section v-if="showList" class="my-5 space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-4 sm:p-6"
+    <section v-if="showList" class="sdl-panel my-4 space-y-4 p-4 sm:p-5"
       aria-label="Authorized player directory">
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p class="text-xs font-bold uppercase tracking-wider text-sky-300">Player identity</p>
-          <h2 class="mt-1 text-xl font-black text-white">Manage players</h2>
+          <h2 class="sdl-section-title mt-1 text-white">Manage player photos</h2>
           <p class="mt-2 text-sm leading-relaxed text-slate-400">Open a permitted player profile to edit its picture. The official statistics remain protected.</p>
         </div>
         <button type="button" :disabled="loading || busy" @click="load"
-          class="self-start rounded-lg border border-blue-500/40 bg-blue-900/30 px-4 py-3 text-sm font-bold text-cyan-200 disabled:opacity-50">
+          class="sdl-secondary self-start px-4 py-2 text-sm font-semibold disabled:opacity-50">
           Refresh players
         </button>
       </div>
