@@ -2,6 +2,16 @@
 
 **Updated:** 2026-11-27. **Status:** Working GitHub coordination mirror. Reconcile against the independent SDL Master Directory before calling this authoritative.
 
+## SDL-UX-002 usability audit handoff — issue #12 (2026-11-27)
+
+**Proposed, not yet owner-approved for implementation.** The [read-only audit](https://github.com/Happydogg/swallows2026/issues/12) reviewed UX source baseline `c9ad810459db6e5ad4c5834f7e4882970842f987`. Its top issues: overlapping headers and workspace sections, full roster duplication on Home/Team, fragmented performance contexts, long mixed-content Player Profile and confusing legacy/disabled controls. SDL-000 independently spot-checked `index.html`, `CoachHome.js`, `AppShell.js`, `PlayerProfile.js` and `AppHeader.js` at the cited commit; source supports duplication/placement concerns, not final device usability conclusions.
+
+**Suggested IA:** Retain the approved five tabs (Home, Team, Stats, Videos, Me). Home is a role-specific summary, Team is canonical roster, Stats is shared player-scoped performance, Videos is authorized private media, Me is account and permitted administrative settings. Player Profile uses contextual Overview/Growth/Stats/Videos/History groupings, retaining existing controllers, exports and permission gates. No new capabilities.
+
+**Pending:** Owner approves or revises the IA before any UX-IA-01 coding. Obtain current authenticated synthetic-role mobile, tablet and desktop captures, including empty/denied states. UX-IA-01 through UX-IA-06 are proposed batches only. Preserve owner-reported Round 2 12/12 and ADMIN-01 5/5, and keep all SDL-004 security/release holds.
+
+---
+
 ## 2026-11-27 E2E Round 2 functional acceptance handoff
 
 **Latest owner-reported result:** 12 of 12 E2E Round 2 scenarios PASS. The owner accepts **roster integration for staging UX**. This supersedes the earlier reported Round 1 functional roster result of 8 PASS, 3 FAIL and 1 PENDING **for the scenarios actually rerun**. Raw assertion logs, identities, test date/time, exact frontend build and direct API coverage were not supplied to SDL-000; do not infer additional coverage.
