@@ -176,8 +176,11 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   assert.equal(h.app.statsBoardController.selectedId.value,linkedChild.id);
   sectionButton('Overview').props.onClick();await Vue.nextTick();
   assert.match(flatten(statsArea()),/Radar throwing.*Pending review/s);
-  h.app.openFamilyPlayerProfile(linkedChild);
-  await until(()=>/Radar throwing.*Pending review/s.test(flatten(host)));
+  h.rows.sdl_004_player_statistics=[{id:'profile-current',player_id:linkedChild.id,session_date:'2026-01-01',exit_velo:54}];
+  await h.app.openFamilyPlayerProfile(linkedChild);
+  await until(()=>!h.app.profileHistoryLoading.value && /Radar throwing.*Pending review/s.test(flatten(host)));
+  assert.equal(h.app.profileHistoryError.value,'');
+  await Vue.nextTick();
   assert.match(flatten(host),/Linked Child.*Performance measurements/s);
   const profileArea=()=>elements(host).find(n=>n.props['aria-label']==='Player profile');
   const profileNav=()=>elements(profileArea()).find(n=>n.props['aria-label']==='Player profile sections');
@@ -185,6 +188,7 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   const profilePart=name=>elements(profileArea()).find(n=>n.props['aria-label']===name);
   assert.equal(profileButton('Overview').props['aria-pressed'],true);
   assert.ok(profilePart('Latest recorded results'));
+  assert.match(flatten(profilePart('Latest recorded results')),/54 km\/h/);
   assert.match(String(profilePart('Profile performance actions').props.class),/hidden/);
   assert.equal(profilePart('Profile videos'),undefined);
   assert.match(String(profilePart('Profile session history').props.class),/hidden/);
