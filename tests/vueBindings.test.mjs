@@ -161,13 +161,16 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   h.rows.sdl_004_pilot_performance=[{id:'22222222-2222-4222-8222-222222222222',player_id:linkedChild.id,
     status:'pending',revision:1,protocol_id:'throw-radar-v1',protocol_label:'Radar throwing',unit:'km/h',value:79,
     measurement_date:'2026-01-01',history:[]}];
+  h.rows.sdl_004_player_statistics=[{id:'profile-current',player_id:linkedChild.id,session_date:'2026-01-01',exit_velo:54}];
   h.app.navigateTab('stats');
-  await until(()=>/Radar throwing.*Pending review/s.test(flatten(host)));
+  await until(()=>/Radar throwing.*Pending review/s.test(flatten(host)) && /One recorded result · no comparison yet/.test(flatten(host)));
   const statsSections=()=>elements(host).find(n=>n.type==='nav' && n.props['aria-label']==='Statistics sections');
   const statsArea=()=>elements(host).find(n=>n.type==='section' && n.props['aria-label']==='Performance measurements');
   const sectionButton=name=>elements(statsSections()).find(n=>n.type==='button' && flatten(n).trim()===name);
   assert.ok(sectionButton('Overview'));assert.ok(sectionButton('Record'));assert.equal(sectionButton('Review'),undefined);
   assert.match(flatten(statsArea()),/Measurement history/);
+  assert.match(flatten(statsArea()),/54\.0 km\/h/);
+  assert.equal(elements(statsArea()).filter(n=>n.type==='svg' && String(n.props['aria-label']||'').includes('trend for')).length,0);
   assert.doesNotMatch(flatten(statsArea()),/Measurement evidence|Save official result/);
   assert.equal(elements(statsArea()).filter(n=>n.type==='label' && flatten(n).trim().startsWith('Choose player')).length,1);
   sectionButton('Record').props.onClick();await Vue.nextTick();
