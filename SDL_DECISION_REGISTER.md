@@ -35,4 +35,6 @@ The following add to, and do not replace, the historical entries above. **Report
 
 **Implementation note:** These entries are a working coordination mirror. Reconcile with the independent Master Directory and operational release ledger before treating them as a final governance register.
 
+| SDL-D-20261127-12 | Owner reports E2E Round 2 passed 12/12 and accepts roster integration for staging UX; proceed with approved MVP completion without feature expansion. | Owner-reported staging UX functional acceptance, NOT independent security sign-off | SDL-UX-002 handoff of November 27; Round 1 8/3/1 superseded only for rerun scenarios; raw matrix, identities and build evidence not supplied to SDL-000. Production, unrestricted media, PR merge and real-family onboarding remain withheld. |
+
 **Non-decisions:** No permission to merge `main`, deploy production, auto-delete seeded enrollments, weaken player RLS or publish private media. A successful unit test is not a final owner acceptance test.
