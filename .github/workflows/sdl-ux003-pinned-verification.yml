@@ -15,7 +15,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: '22.16.0'
+          node-version: '22.23.0'
       - name: Exact candidate
         run: |
           test "$(git rev-parse HEAD)" = "7b0e8912c7394e377c2f81704483e1ea3151631a"
