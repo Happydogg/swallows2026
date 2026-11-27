@@ -1,6 +1,6 @@
 # Swallows DataLab | Decision Register (Working Mirror)
 
-**Updated:** 2026-11-21. Reconcile with original decisions and external SDL Master Directory; this is not a replacement for historical evidence.
+**Updated:** 2026-11-27. Reconcile with original decisions and external SDL Master Directory; this is not a replacement for historical evidence.
 
 | ID | Decision and rationale | State | Evidence / consequence |
 |---|---|---|---|
@@ -14,5 +14,25 @@
 | SDL-D-20261121-08 | Keep scientific QA independent: no unsupported injury predictions, simulated velocities, or fixed thresholds promoted into AI Coach. | Approved architecture requirement, not implementation | SDL-006 research/integration workstreams |
 | SDL-D-20261121-09 | Present the **same private, permission-enforced video room inside Player Profile** and retain Videos tab; never present the disabled legacy empty gallery in place of actual R2 clips. | Implemented, automated-tested, deployed to UX Live | `PlayerProfile.js` named slot and `index.html`; real coach/parent UAT pending |
 | SDL-D-20261121-10 | Select player history through the active role’s approved scope and invalidate pending profile results on navigation or identity changes. | Implemented and locally tested | Full suite 405/405. Signed-in staging acceptance pending. |
+
+## Decisions and holds recorded 2026-11-27
+
+The following add to, and do not replace, the historical entries above. **Reported execution status is not independently verified security acceptance.**
+
+| ID | Decision / owner direction | Classification | Evidence / remaining gate |
+|---|---|---|---|
+| SDL-D-20261127-01 | Adopt SDL-004 RBAC permission specification v5.1 for five roles PA, CA, TM, CO and GU; allow independent multi-role accounts. | Approved policy, restricted staging implementation reported | v5.1 amendment; PR #7 and 22 public v5 RPCs observed |
+| SDL-D-20261127-02 | Permit controlled staging deployment despite independent QA FAIL for unrestricted installation; retain restrictive mode. | Owner-approved restricted staging deployment, NOT unrestricted acceptance | Hosted migration 20261126235408; Worker version 2cd3f378-5636-466a-beac-aa4c6a48097c; both observed |
+| SDL-D-20261127-03 | Freeze new feature scope; finish approved frontend UX before pilot. | Owner-approved development direction | SDL-UX-002 owns complete role-aware UI based on existing design |
+| SDL-D-20261127-04 | Owner performs smoke and functional testing using VS Code Live Server; repeat critical flows on hosted staging. | Approved testing process, NOT waiver of security gates | Synthetic role accounts required; direct RLS/PostgREST/Worker denial tests remain mandatory for release |
+| SDL-D-20261127-05 | Keep SUBMISSIONS_ENABLED=false and the 18 temporary media/shared-session RPC restrictions until applicable findings are resolved. | Operational hold | Media authorization, subject confirmation, consent/provenance and negative tests remain; restrictions owner-reported |
+| SDL-D-20261127-06 | Resolve historical-consent broadening only on approved evidence, not by inventing fresh consent; retain objections and audit. | Approved safeguards / privacy release hold | v5.1 amendment section 3; privacy review and reconciliation needed |
+| SDL-D-20261127-07 | Preserve Platform Admin provider MFA recovery gate; no synthetic global PA grant activated as part of installation. | Security hold | Verify provider MFA and AAL1 viewing versus AAL2 download/export, sensitive writes and recovery |
+| SDL-D-20261127-08 | Reconcile fourteen source migration files to the single hosted bundled ledger version before future CLI push. | Mandatory migration governance hold | Hosted migration 20261126235408 independently observed; detailed per-file reconciliation pending |
+| SDL-D-20261127-09 | Do not merge PR #7, deploy production, onboard real families or open unrestricted media as part of this planning handoff. | Release hold | PR #7 confirmed draft/unmerged; independent security QA previously FAIL |
+| SDL-D-20261127-10 | Backend workstream owns twelve synthetic identities, scoped club/team/guardian assignment and server-side authorization defect triage; SDL-UX owns UI integration and owner UAT; SDL-000 manages cross-workstream gates. | Coordination assignment, execution pending | Synthetic provisioning script prepared, not executed; separate owner approval for privilege-granting/provisioning actions |
+| SDL-D-20261127-11 | Earlier Goal 2C manual workflow pass and owner-deferred remaining tests remain distinct from the new RBAC security release criteria. | Evidence preservation | Prior Goal 2C report, automated fixture cleanup reconciliation outstanding; no implicit security pass |
+
+**Implementation note:** These entries are a working coordination mirror. Reconcile with the independent Master Directory and operational release ledger before treating them as a final governance register.
 
 **Non-decisions:** No permission to merge `main`, deploy production, auto-delete seeded enrollments, weaken player RLS or publish private media. A successful unit test is not a final owner acceptance test.
