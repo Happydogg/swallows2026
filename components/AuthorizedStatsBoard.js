@@ -37,17 +37,17 @@ export const AuthorizedStatsBoard = {
     return {...props.controller,recordedMetrics,first,last,value,delta,points};
   },
   template:`
-    <section :class="contextOnly ? 'space-y-3' : 'space-y-4 rounded-2xl border border-slate-700 bg-slate-900/90 p-4'"
+    <section :class="contextOnly ? 'space-y-3' : 'space-y-4 border-t border-slate-700 pt-4'"
       aria-label="Live authorized player growth statistics">
       <div v-if="!contextOnly" class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p class="text-xs font-black uppercase tracking-wider text-cyan-300">Live staging measurements · authorized access</p>
-          <h2 class="mt-2 text-xl font-black text-white sm:text-2xl">Player development</h2>
+          <p class="sr-only">Live staging measurements</p>
+          <h2 class="sdl-section-title text-white">Player development</h2>
           <p class="mt-2 max-w-2xl text-sm text-slate-400">Recorded results over time. Compare measurements only within the same testing protocol.</p>
         </div>
         <button type="button" @click="selectedId && select(selectedId)" :disabled="busy || !selectedId"
-          class="min-h-11 rounded-xl border border-blue-500/50 bg-blue-900/40 px-4 py-2 text-sm font-semibold text-cyan-200 disabled:opacity-50">
-          Refresh history
+          class="sdl-secondary px-3 py-2 text-sm font-semibold disabled:opacity-50">
+          Refresh trends
         </button>
       </div>
       <label v-if="!resultsOnly" class="block max-w-lg text-sm font-bold text-slate-300">
@@ -58,14 +58,14 @@ export const AuthorizedStatsBoard = {
           <option v-for="p in players" :key="p.id" :value="p.id">#{{ p.jersey || '–' }} · {{ p.preferred_name || 'Player' }}</option>
         </select>
       </label>
-      <div v-if="selected && !resultsOnly" class="flex flex-wrap items-center gap-3 rounded-xl bg-slate-950/75 p-3">
+      <div v-if="selected && !resultsOnly" class="flex flex-wrap items-center gap-3 py-1">
         <img v-if="selected.photo_url && !selected.photo_url.startsWith('sdl-private-avatar:')"
           :src="selected.photo_url" alt="" class="h-14 w-14 rounded-xl object-cover">
         <div>
           <p class="font-bold text-white">{{ selected.preferred_name }}</p>
           <p class="text-xs text-slate-400">#{{ selected.jersey || '–' }} · {{ sessions.length }} recorded session{{ sessions.length===1?'':'s' }}</p>
         </div>
-        <button type="button" @click="$emit('open-profile',selected)" class="ml-auto rounded-lg bg-blue-700 px-3 py-2 text-sm text-white">View profile</button>
+        <button type="button" @click="$emit('open-profile',selected)" class="sdl-secondary ml-auto px-3 py-2 text-sm font-semibold">View profile</button>
       </div>
       <template v-if="!contextOnly">
       <p v-if="busy" class="rounded-xl bg-slate-950 p-4 text-sm text-slate-300" role="status">
@@ -76,25 +76,26 @@ export const AuthorizedStatsBoard = {
         No permitted measurements are recorded for this player.
       </p>
       <template v-if="!busy && !error && sessions.length">
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <article v-for="m in recordedMetrics" :key="m.key" class="rounded-2xl border border-slate-700 bg-slate-950/85 p-4">
+        <div class="grid grid-cols-1 gap-3" :class="recordedMetrics.length > 1 ? 'sm:grid-cols-2 xl:grid-cols-3' : ''">
+          <article v-for="m in recordedMetrics" :key="m.key" class="sdl-inset p-4">
             <p class="text-xs font-bold uppercase tracking-wide text-slate-300">{{ m.name }}</p>
-            <p class="mt-2 text-xl font-black text-white">{{ value(last(sessions,m),m) }}</p>
-            <div v-if="last(sessions,m)" class="mt-1 flex justify-between gap-2 text-xs text-slate-400">
+            <p class="mt-2 text-2xl font-bold tabular-nums text-white">{{ value(last(sessions,m),m) }}</p>
+            <div v-if="points(sessions,m)" class="mt-1 flex flex-wrap justify-between gap-2 text-sm text-slate-400">
               <span>{{ value(first(sessions,m),m) }} initially</span>
               <span class="font-bold text-slate-200">{{ delta(sessions,m) }}</span>
             </div>
-            <svg viewBox="0 0 240 75" role="img" :aria-label="m.name+' trend for '+selected.preferred_name"
+            <p v-else class="mt-1 text-sm sdl-muted">One recorded result · no comparison yet</p>
+            <svg v-if="points(sessions,m)" viewBox="0 0 240 75" role="img" :aria-label="m.name+' trend for '+selected.preferred_name"
               class="mt-3 h-20 w-full" preserveAspectRatio="none">
               <line x1="8" x2="232" y1="65" y2="65" stroke="#475569" stroke-width="1"></line>
               <polyline v-if="points(sessions,m)" :points="points(sessions,m)" fill="none" :stroke="m.color" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"></polyline>
             </svg>
           </article>
         </div>
-        <details class="rounded-2xl border border-slate-700 bg-slate-950/80 p-4">
+        <details class="border-t border-slate-700 pt-3">
           <summary class="cursor-pointer py-2 text-sm font-bold text-white">Official performance history ({{ sessions.length }})</summary>
           <div class="mt-3 overflow-x-auto">
-            <table class="w-full min-w-[610px] text-left text-xs">
+            <table class="w-full text-left text-sm" :class="recordedMetrics.length > 3 ? 'min-w-[610px]' : ''">
               <thead><tr class="border-b border-slate-600 text-slate-400">
                 <th scope="col" class="p-2">Date</th><th v-for="m in recordedMetrics" :key="m.key" scope="col" class="p-2">{{ m.name }} ({{ m.unit }})</th>
               </tr></thead>
