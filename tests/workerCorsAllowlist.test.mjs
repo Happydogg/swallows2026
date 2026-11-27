@@ -136,3 +136,24 @@ test('permanent deletion requires authorization, verified storage absence and du
  fail=false;await entry.scheduled({cron:'*/5 * * * *'},env);assert.equal(stored,false);assert.equal(confirmed,true);assert.equal(records,2);
  r=await remove();assert.equal(r.status,200);assert.deepEqual(await r.json(),{archived:true,deleted:true});assert.equal(attempts,2);
 });
+
+test('independent private review has its own gate and contract, and only calls the narrow RPC',async t=>{
+ const prior=globalThis.fetch;t.after(()=>{globalThis.fetch=prior;});
+ let revision=true,allowed=true,calls=0;
+ const video='33333333-3333-4333-8333-333333333333';
+ globalThis.fetch=async(url,init)=>{
+  const n=new URL(url).pathname.split('/').pop();
+  if(n==='user')return Response.json({id:'11111111-1111-4111-8111-111111111111'});
+  if(n==='sdl_004_session_active')return Response.json(true);
+  if(n==='sdl_004_submission_contract')return Response.json({rbacVersion:5,revision:'sdl004-club-enrollment-v2',mediaRevision:'v5.1-clean-start',mediaReviewRevision:revision?'independent-review-v1':null});
+  if(n==='sdl_v5_review_private_media'){calls++;assert.equal(new Headers(init.headers).get('Authorization'),'Bearer synthetic');assert.equal(JSON.parse(init.body).p_id,video);return allowed?Response.json(true):new Response(null,{status:403});}
+  throw Error('Unexpected RPC '+n);
+ };
+ const env={SUPABASE_URL:'https://wvurolqbjhuckkkjiiiv.supabase.co',SUPABASE_PUBLISHABLE_KEY:'sb_publishable_synthetic',SUPABASE_SECRET_KEY:'sb_secret_synthetic',MEDIA_BUCKET:{},SUBMISSIONS_ENABLED:'false',MEDIA_REVIEW_ENABLED:'false'};
+ const run=(body={decision:'approved',note:'',single_subject:true})=>entry.fetch(new Request(WORKER+'/v2/submissions/'+video+'/review-private',{method:'POST',headers:{Origin:LIVE,Authorization:'Bearer synthetic','Content-Type':'application/json'},body:JSON.stringify(body)}),env);
+ assert.equal((await run()).status,503);assert.equal(calls,0);
+ env.MEDIA_REVIEW_ENABLED='true';revision=false;assert.equal((await run()).status,503);assert.equal(calls,0);
+ revision=true;assert.equal((await run({decision:'rejected',note:'',single_subject:false})).status,400);assert.equal(calls,0);
+ allowed=false;assert.equal((await run()).status,403);assert.equal(calls,1);
+ allowed=true;assert.equal((await run()).status,200);assert.equal(calls,2);
+});

@@ -156,8 +156,14 @@ export function createPrivateMediaService({ auth, client = supabaseClient, baseU
         if (!UUID.test(item?.id) || item.player_id !== playerId ||
           !['pitching','batting','throwing'].includes(item.category) ||
           !['pending','approved','rejected'].includes(item.status)) throw new MediaError('Invalid media listing.');
-        return { id:item.id, player_id:item.player_id, category:item.category, status:item.status, created_at:item.created_at ?? null, ...(item.can_archive===true?{can_archive:true}:{}) };
+        return { id:item.id, player_id:item.player_id, category:item.category, status:item.status, created_at:item.created_at ?? null, ...(item.can_archive===true?{can_archive:true}:{}), ...(item.can_review===true?{can_review:true}:{}) };
       });
+    },
+    async review(mediaId,decision,note,singleSubject,options) {
+      if(!['approved','rejected'].includes(decision)||typeof note!=='string'||note.length>1000||typeof singleSubject!=='boolean'||(decision==='rejected'&&(singleSubject||!note.trim())))throw new MediaError('Invalid independent review.');
+      const result=await request(`/v2/submissions/${id(mediaId)}/review-private`,{...options,method:'POST',body:{decision,note,single_subject:singleSubject}});
+      if(result?.updated!==true)throw new MediaError('Review status unknown. Refresh before retrying.');
+      return true;
     },
     async archive(mediaId,options) {
       const result=await request(`/v2/submissions/${id(mediaId)}/archive`,{...options,method:'POST'});

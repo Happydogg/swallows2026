@@ -16,6 +16,7 @@ export function mediaAction(path, method) {
   if (path === '/v2/submissions/upload-eligibility' && method === 'GET') return 'upload';
   if (path === '/v2/clubhouse' && method === 'GET') return 'playback';
   if (path === '/v2/review' && method === 'GET') return 'review';
+  if (/^\/v2\/submissions\/[^/]+\/review-private$/.test(path) && method==='POST') return 'review';
   const action = /^\/v2\/submissions\/[^/]+\/(playback|download|publish|review|archive)$/.exec(path)?.[1];
   if (action && method === (action === 'playback' || action === 'download' ? 'GET' : 'POST')) return action;
   return null;

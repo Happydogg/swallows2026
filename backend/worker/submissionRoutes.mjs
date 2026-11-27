@@ -190,19 +190,39 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
         if (!validPlayerId(playerId)) return json({ error: 'Invalid player_id' }, 400, origin);
         const result = await call('sdl_004_list_submissions', { p_player_id: playerId });
         if(result.error) return error(result);
+        if(!Array.isArray(result.value))return json({error:'Invalid media listing'},503,origin);
+        const rows=result.value.map(row=>({...row,can_review:env.MEDIA_REVIEW_ENABLED==='true'&&contract.value.mediaReviewRevision==='independent-review-v1'&&row.can_review===true,can_publish:false}));
         // An unavailable archive capability never blocks the library or grants removal.
         if(env.MEDIA_ARCHIVE_ENABLED==='true' && Array.isArray(result.value)){
           const eligible=await call('sdl_v5_media_archive_ids',{p_player:playerId});
           const ids=new Set(!eligible.error&&Array.isArray(eligible.value)?eligible.value.filter(validId):[]);
-          return json({items:result.value.map(row=>({...row,can_archive:ids.has(row.id)}))},200,origin);
+          return json({items:rows.map(row=>({...row,can_archive:ids.has(row.id)}))},200,origin);
         }
-        return json({items:result.value},200,origin);
+        return json({items:rows},200,origin);
       }
       if (path === '/v2/clubhouse' && request.method === 'GET') {
         const teamId = url.searchParams.get('team_id');
         if (!validId(teamId)) return json({ error: 'Invalid team_id' }, 400, origin);
         const result = await call('sdl_004_clubhouse_videos', { p_team_id: teamId });
         return result.error ? error(result) : json({ items: result.value }, 200, origin);
+      }
+      const independentReview=path.match(/^\/v2\/submissions\/([^/]+)\/review-private$/);
+      if(independentReview&&request.method==='POST'){
+        if(contract.value.mediaReviewRevision!=='independent-review-v1')return json({error:'Review contract unavailable'},503,origin);
+        if(!validId(independentReview[1]))return json({error:'Invalid video ID'},400,origin);
+        let body;
+        try {
+          const reader=request.body?.getReader();if(!reader)throw Error();
+          const parts=[];let size=0;
+          while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>8192){await reader.cancel();return json({error:'Review request too large'},413,origin);}parts.push(value);}
+          const bytes=new Uint8Array(size);let off=0;for(const part of parts){bytes.set(part,off);off+=part.byteLength;}
+          body=JSON.parse(new TextDecoder().decode(bytes));
+        } catch { return json({error:'Invalid review JSON'},400,origin); }
+        if(!['approved','rejected'].includes(body?.decision)||typeof body.note!=='string'||body.note.length>1000||
+          typeof body.single_subject!=='boolean'||(body.decision==='rejected'&&(body.single_subject||!body.note.trim())))return json({error:'Invalid independent review'},400,origin);
+        const result=await call('sdl_v5_review_private_media',{p_id:independentReview[1],p_decision:body.decision,p_note:body.note,p_single_subject:body.single_subject});
+        if(result.error)return error(result);
+        return result.value===true?json({updated:true},200,origin):json({error:'Review denied'},403,origin);
       }
       const match = path.match(/^\/v2\/submissions\/([^/]+)\/(review|publish|playback|download|archive)$/);
       if (!match || !validId(match[1])) return json({ error: 'Not found' }, 404, origin);

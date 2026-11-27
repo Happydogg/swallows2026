@@ -57,7 +57,7 @@ export const PrivateMediaPanel = {
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 class="text-lg font-bold text-white">Private clips</h3>
-          <p class="mt-1 text-xs text-slate-400">Up to 30 recent private clips · Not automatically shared or coach-approved</p>
+          <p class="mt-1 text-xs text-slate-400">Up to 30 recent private clips · Approval never publishes a video</p>
         </div>
         <button type="button" @click="refreshMedia" :disabled="mediaUploading || mediaPlaybackLoading"
           class="rounded-xl border border-blue-500/50 bg-blue-900/40 px-4 py-3 text-sm font-bold text-sky-200 hover:bg-blue-800/60 disabled:cursor-not-allowed disabled:opacity-50">Refresh videos</button>
@@ -70,7 +70,7 @@ export const PrivateMediaPanel = {
       <ul v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2" aria-label="Authorized private video library">
         <li v-for="(item, index) in mediaItems" :key="item.id" v-media-visible="item"
           class="flex min-w-0 overflow-hidden rounded-2xl border border-slate-700 bg-slate-950/80 sm:block">
-          <button type="button" @click="playPrivateMedia(item)" :disabled="mediaPlaybackLoading"
+          <button type="button" @click="playPrivateMedia(item)" :disabled="mediaPlaybackLoading || mediaReviewing || item.status==='rejected'"
             :aria-label="'Play private practice clip '+(index+1)"
             class="relative flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden bg-slate-900 sm:aspect-video sm:h-auto sm:w-full disabled:opacity-60">
             <img v-if="mediaThumbnails[item.id]" :src="mediaThumbnails[item.id]"
@@ -88,17 +88,19 @@ export const PrivateMediaPanel = {
           <div class="flex min-w-0 flex-1 flex-col justify-between gap-2 p-3 sm:p-4">
             <div>
               <p class="text-sm font-bold text-white">Practice clip {{ index + 1 }}</p>
+              <p class="mt-1 text-xs font-semibold text-slate-300">{{ {pending:'Awaiting independent review',approved:'Approved privately',rejected:'Rejected · playback blocked'}[item.status] }}</p>
               <p class="mt-1 text-xs leading-relaxed text-slate-400">
                 {{ item.created_at ? new Date(item.created_at).toLocaleDateString() : 'New private clip' }}
                 <span v-if="item.category">· {{ item.category }}</span>
               </p>
             </div>
             <button v-if="mediaThumbnailFailed[item.id]" type="button" @click="retryMediaThumbnail(item)" class="rounded-lg border border-slate-600 px-3 py-2 text-sm text-white">Retry preview</button>
-            <button type="button" @click="playPrivateMedia(item)" :disabled="mediaPlaybackLoading"
+            <button type="button" @click="playPrivateMedia(item)" :disabled="mediaPlaybackLoading || mediaReviewing || item.status==='rejected'"
               class="min-h-10 w-full rounded-xl bg-blue-600 px-3 py-2 text-sm font-bold text-white hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:opacity-50">
               ▶ Play privately
             </button>
-            <button v-if="item.can_archive === true" type="button" @click="archivePrivateMedia(item)" :disabled="mediaArchiving || mediaUploading || mediaPlaybackLoading"
+            <p v-if="item.can_review===true" class="text-xs text-cyan-200">Play the clip to review it.</p>
+            <button v-if="item.can_archive === true" type="button" @click="archivePrivateMedia(item)" :disabled="mediaArchiving || mediaReviewing || mediaUploading || mediaPlaybackLoading"
               class="min-h-10 w-full rounded-xl border border-rose-700 px-3 py-2 text-sm font-semibold text-rose-200 disabled:opacity-50">
               {{ mediaArchiving ? 'Deleting…' : 'Delete video' }}
             </button>
@@ -113,6 +115,16 @@ export const PrivateMediaPanel = {
         </div>
         <video :key="mediaPlaybackUrl" :src="mediaPlaybackUrl" controls playsinline preload="metadata"
           @error="reportPlaybackError" class="aspect-video w-full rounded-xl bg-black object-contain"></video>
+        <section v-if="reviewItem" class="space-y-3 rounded-xl border border-cyan-700 p-3" aria-label="Independent video review">
+          <h4 class="text-sm font-bold text-white">Independent video review</h4>
+          <p class="text-xs text-slate-300">Watch the entire clip before deciding. Approval stays private. Subject confirmation is optional for private approval, but required for future team sharing.</p>
+          <label class="flex items-start gap-2 text-sm text-slate-200"><input type="checkbox" v-model="reviewSingleSubject" :disabled="mediaReviewing">I confirm only this selected athlete is identifiable in the entire clip.</label>
+          <label class="block text-sm text-slate-300">Review note (required for rejection)<textarea v-model="reviewVideoNote" maxlength="1000" :disabled="mediaReviewing" class="mt-1 w-full rounded-lg bg-slate-900 border border-slate-600 p-2"></textarea></label>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" @click="reviewPrivateMedia('approved')" :disabled="mediaReviewing || mediaArchiving || mediaUploading" class="flex-1 rounded-xl bg-emerald-700 p-3 text-sm font-bold text-white disabled:opacity-50">Approve privately</button>
+            <button type="button" @click="reviewPrivateMedia('rejected')" :disabled="mediaReviewing || mediaArchiving || mediaUploading || !reviewVideoNote.trim()" class="flex-1 rounded-xl border border-rose-700 p-3 text-sm font-bold text-rose-200 disabled:opacity-50">Reject</button>
+          </div>
+        </section>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2" aria-label="Video recording metadata for analysis">
           <label class="block text-sm font-semibold text-slate-300">
             Movement in this clip

@@ -421,3 +421,11 @@ test('video delete receipts distinguish confirmed physical deletion from queued 
  payload={archived:true};status=200;
  await assert.rejects(service.archive(VIDEO),/Removal status unknown/);
 });
+
+test('private media review only sends decision, note and explicit subject attestation',async t=>{
+ let body;
+ const {service}=await serviceHarness(t,{fetchImpl:async(url,init)=>{assert.match(url,/\/review-private$/);body=JSON.parse(init.body);return Response.json({updated:true});}});
+ assert.equal(await service.review(VIDEO,'approved','',true),true);
+ assert.deepEqual(body,{decision:'approved',note:'',single_subject:true});
+ await assert.rejects(service.review(VIDEO,'rejected','',false),/Invalid independent review/);
+});
