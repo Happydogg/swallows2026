@@ -1,0 +1,15 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {projectActionCenter,ActionCenter} from '../components/ActionCenter.js';
+import {visibleReviewRows,localThumbnail,VideoReviewInbox} from '../components/VideoReviewInbox.js';
+const items=[{kind:'video_review',available:true,count:3},{kind:'media_consent',available:true,required:true,count:12},{kind:'performance_review',available:false,count:9},{kind:'unknown',available:true,count:7}];
+const row={id:'demo-1',playerId:'p1',teamId:'t1',status:'pending',can_review:true,category:'pitching'};
+test('action routes are fixed and unauthorized/unknown entries omitted',()=>{const a=projectActionCenter(items,'ready');assert.equal(a.length,2);assert.equal(a[0].tab,'videos');assert.equal(a[0].section,'review');assert.equal(a[0].count,3);});
+test('optional consent cannot be required or counted',()=>{const a=projectActionCenter(items,'ready')[1];assert.equal(a.group,'optional');assert.equal(a.required,false);assert.equal(a.count,null);});
+test('unknown/stale count never masquerades as zero',()=>{assert.equal(projectActionCenter(items,'loading')[0].count,null);assert.equal(projectActionCenter(items,'unavailable')[0].count,null);assert.deepEqual(projectActionCenter(items,'idle'),[]);});
+test('invalid counts hidden, real zero visible',()=>{assert.equal(projectActionCenter([{kind:'video_review',available:true,count:-1}],'ready')[0].count,null);assert.equal(projectActionCenter([{kind:'video_review',available:true,count:0}],'ready')[0].count,0);});
+test('inbox ignores nonpending, denied, invalid and duplicate rows',()=>{assert.deepEqual(visibleReviewRows([row,row,{...row,id:'2',status:'approved'},{...row,id:'3',can_review:false},{...row,id:'4',category:'invalid'}],{},true,'ready'),[row]);});
+test('inbox unavailable or loading never exposes rows',()=>{assert.deepEqual(visibleReviewRows([row],{},false,'ready'),[]);assert.deepEqual(visibleReviewRows([row],{},true,'loading'),[]);assert.deepEqual(visibleReviewRows([row],{},true,'unavailable'),[]);});
+test('inbox filters team player category',()=>{for(const f of [{teamId:'t2'},{playerId:'p2'},{category:'batting'}])assert.deepEqual(visibleReviewRows([row],f,true,'ready'),[]);assert.deepEqual(visibleReviewRows([row],{teamId:'t1',playerId:'p1',category:'pitching'},true,'ready'),[row]);});
+test('thumbnail only accepts existing local JPEG format',()=>{assert.equal(localThumbnail('https://example.invalid/image.jpg'),'');assert.equal(localThumbnail('data:image/svg+xml;base64,AAAA'),'');assert.equal(localThumbnail('data:image/jpeg;base64,AAAA'),'data:image/jpeg;base64,AAAA');});
+test('review component only emits open/navigation events and no review mutation',()=>{assert.deepEqual(VideoReviewInbox.emits,['filter','refresh','more','open']);assert.deepEqual(ActionCenter.emits,['navigate','refresh']);});
