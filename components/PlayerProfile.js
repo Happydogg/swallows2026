@@ -166,6 +166,8 @@ export const PlayerProfile = {
     </div>
   </div>
 
+  <slot name="performance"></slot>
+
   <!-- SDL-005: A server-authorized private video room replaces legacy card URLs
        in staging. Keep the original video gallery as a fallback when no slot is supplied. -->
   <slot name="private-media">

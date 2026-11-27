@@ -125,7 +125,11 @@
         @navigate="navigateTab" @open-player="submissionController.showProfile($event)"></stats-hub>
       <authorized-stats-board v-if="activeTab === 'stats' && currentView === 'overview' && (workspaceMode === 'coach' || workspaceMode === 'family')"
         :controller="statsBoardController" @open-profile="selectPlayer"></authorized-stats-board>
-      <p v-if="activeTab === 'stats' && isManagedWorkspace" role="status" class="rounded-xl border border-slate-700 bg-slate-800 p-5 text-slate-300">The scoped statistics reader for this role awaits integration. Roster access does not grant write or review permissions.</p>
+      <managed-roster v-if="activeTab === 'stats' && isManagedWorkspace" scope-only :controller="managedRosterController"
+        @organization="changeManagedOrganization" @team="changeManagedTeam" @retry="retryManagedRoster" @more="loadMoreManagedRoster"></managed-roster>
+      <performance-workspace v-if="activeTab === 'stats' && currentView === 'overview' && workspaceMode !== 'member'"
+        :auth="loginController" :mode="workspaceMode" :players="performancePlayers" :teams="performanceReviewTeams"
+        :fixed-player-id="isManagedWorkspace ? null : statsBoardController.selectedId.value" @updated="refreshPerformanceHistory"></performance-workspace>
       <managed-roster v-if="activeTab === 'team' && currentView === 'overview' && isManagedWorkspace" :key="workspaceMode + ':' + managedRosterController.organizationId.value + ':' + managedRosterController.teamId.value" :controller="managedRosterController"
         @organization="changeManagedOrganization" @team="changeManagedTeam" @retry="retryManagedRoster" @more="loadMoreManagedRoster" @open-profile="openManagedPlayerProfile" @navigate="navigateTab"></managed-roster>
 
@@ -222,6 +226,11 @@
       :get-attack-angle-color="getAttackAngleColor" :open-edit-session-modal="openEditSessionModal"
       :remove-session="removeSession" :delete-drill-video="deleteDrillVideo"
       @open-submissions="submissionController.changeTab('submissions'); submissionController.selectPlayer($event)" @back="leavePlayerProfile">
+      <template #performance>
+        <performance-workspace v-if="activeTab === 'team' && performancePlayers.some(row => row.id === selectedPlayer.id)"
+          :auth="loginController" :mode="workspaceMode" :players="performancePlayers"
+          :fixed-player-id="selectedPlayer.id" @updated="refreshPerformanceHistory"></performance-workspace>
+      </template>
       <template #private-media>
         <private-media-panel v-if="activeTab === 'team' && mediaOriginAllowed && visibleStagingPlayers.some(row => row.id === selectedPlayer.id)"
           :controller="privateMediaController" :profile-player-id="selectedPlayer.id"></private-media-panel>

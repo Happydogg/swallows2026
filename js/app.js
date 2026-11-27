@@ -1,3 +1,4 @@
+import { PerformanceWorkspace } from '../components/PerformanceWorkspace.js';
 import {createPilotWorkflowService} from './pilotWorkflowService.js';
 import {usePilotWorkspace} from '../composables/usePilotWorkspace.js';
 import {PilotWorkspace} from '../components/PilotWorkspace.js';
@@ -53,7 +54,7 @@ const { createApp, ref, onMounted, onUnmounted, markRaw, computed } = Vue;
 createApp({
   components: {
     PilotWorkspace, PerformanceInbox, LoginLanding, AppShell, CoachHome, ParentHome, StatsHub, AuthorizedStatsBoard, StagingDataBrowser, AvatarManager, InviteOnboarding, AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
-    SessionFormModal, UploadVideoModal, ArAnalyzerModal, ManagedRoster
+    SessionFormModal, UploadVideoModal, ArAnalyzerModal, ManagedRoster, PerformanceWorkspace
   },
   setup() {
     const savedLang = localStorage.getItem('swallows_lang');
@@ -136,6 +137,13 @@ createApp({
     const statsBoard = useAuthorizedStatsBoard({
       auth,coachRoster:coachRosterDisplay,familyPlayers,workspaceMode,activeTab
     });
+    const performancePlayers = computed(() => {
+      if (auth.authError.value || !auth.authUser.value) return [];
+      const rows = isManagedWorkspace.value ? managedRoster.rows.value : statsBoard.players.value;
+      return [...new Map(rows.map(row=>[row.id,row])).values()];
+    });
+    const performanceReviewTeams = computed(() => workspaceMode.value==='coach'
+      ? coachTeams.value.filter(team=>!coachTeamId.value || team.id===coachTeamId.value) : []);
     // Staging player projection: never promote viewer choice to authorization.
     const visibleStagingPlayers = computed(() => {
       if (auth.authError.value) return [];
@@ -370,6 +378,13 @@ createApp({
         if(version===historyRevision && auth.isCurrentIdentity(identity))profileHistoryLoading.value=false;
       }
     };
+    const refreshPerformanceHistory = id => {
+      if (currentView.value==='player' && selectedPlayer.value?.id===id) {
+        if (workspaceMode.value==='coach') void loadAuthorizedHistory(id,'coach');
+        if (workspaceMode.value==='family') void loadAuthorizedHistory(id,'guardian');
+      }
+      if (activeTab.value==='stats' && statsBoard.selectedId.value===id) void statsBoard.select(id);
+    };
     const openAuthorizedPlayerVideos = player => {
       if (!auth.authUser.value || auth.authError.value || !player?.id) return;
       const currentlyScoped = visibleStagingPlayers.value.some(row =>
@@ -414,7 +429,6 @@ createApp({
       clearProfileHistory();
       drillVideos.value=[];
       playerFeature.selectPlayer({...managed,photo_url:workspaceMode.value==='admin'?avatarForPlayer(managed):''});
-      profileHistoryError.value='Statistics history for this workspace is not connected to a verified reader yet.';
       activeTab.value='team';
     };
     const leavePlayerProfile = () => {
@@ -516,7 +530,7 @@ createApp({
       submissionController: markRaw(submissionWorkspace),
       enrollmentAdminController: markRaw(enrollmentAdmin),
       privateMediaController: markRaw(privateMedia),
-      statsBoardController: markRaw(statsBoard),
+      statsBoardController: markRaw(statsBoard), performancePlayers, performanceReviewTeams, refreshPerformanceHistory,
        avatarController: markRaw(avatarManager),
       managedRosterController: markRaw(managedRoster), workspaceOptions, isManagedWorkspace,
       changeManagedOrganization, changeManagedTeam, retryManagedRoster, loadMoreManagedRoster,

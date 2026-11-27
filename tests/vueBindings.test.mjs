@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
-import { harness, user } from './helpers/appHarness.mjs';
+import { harness, user, until } from './helpers/appHarness.mjs';
 const runtime = process.env.SDL004_VUE_RUNTIME;
 test('Vue 3 compiler and renderer preserve shell, private media, player and analyzer bindings', { skip: !runtime }, async t => {
   const Vue = await import(pathToFileURL(runtime).href);
@@ -155,6 +155,21 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   assert.match(flatten(host),/Linked Child/);
   assert.match(flatten(host),/Verified Guardian Access/);
   assert.doesNotMatch(flatten(host),/Active Roster|Arm Safety Flags|2015-06-15|HKLL-PRIVATE-007|\+85291234567|HiddenLast/);
+
+  const linkedChild=h.app.players.value[0];
+  h.rows.sdl_004_pilot_workspace={protocols:[{id:'throw-radar-v1',metric:'throwing_velo',label:'Radar throwing',unit:'km/h'}]};
+  h.rows.sdl_004_pilot_performance=[{id:'22222222-2222-4222-8222-222222222222',player_id:linkedChild.id,
+    status:'pending',revision:1,protocol_id:'throw-radar-v1',protocol_label:'Radar throwing',unit:'km/h',value:79,
+    measurement_date:'2026-01-01',history:[]}];
+  h.app.navigateTab('stats');
+  await until(()=>/Radar throwing.*Pending review/s.test(flatten(host)));
+  assert.match(flatten(host),/Performance measurements.*Measurement evidence/s);
+  h.app.openFamilyPlayerProfile(linkedChild);
+  await until(()=>/Radar throwing.*Pending review/s.test(flatten(host)));
+  assert.match(flatten(host),/Linked Child.*Performance measurements/s);
+  h.app.leavePlayerProfile();
+  h.app.navigateTab('home');
+  await Vue.nextTick();
 
   const admin=h.app.enrollmentAdminController;
   h.app.orgMemberships.value=[{role:'admin',status:'active'}];
