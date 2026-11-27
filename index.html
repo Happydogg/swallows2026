@@ -191,18 +191,43 @@
         <p class="mt-3 text-xs text-slate-400">Sign in there with your same staging account and select Private player videos. No data or media is copied between the two sites.</p>
       </section>
 
-      <section :class="activeTab === 'me' ? '' : 'hidden'" class="mb-4 flex flex-wrap items-center justify-between gap-3 bg-slate-800 border border-slate-700 p-3 rounded-lg no-print">
-        <div class="text-sm">
-          <div class="font-semibold">{{ authUser.email }}</div>
-          <div class="text-slate-400">{{ workspaceOptions.map(option=>option.label).join(' · ') || 'No enabled workspace' }}</div>
-          <div class="text-xs text-slate-500">Authorized clubs: {{ ordinaryOrganizations.length }} · Authorized teams: {{ ordinaryTeams.length }} · Verified guardian links: {{ guardianLinks.length }}</div>
+      <section :class="activeTab === 'me' ? '' : 'hidden'" class="mb-4 space-y-4 no-print" aria-label="Account and settings">
+        <header><h1 class="text-2xl font-bold tracking-tight text-white sm:text-3xl">Me</h1><p class="mt-1 text-sm sdl-muted">Your account, access and preferences.</p></header>
+        <div class="sdl-panel space-y-4 p-4 sm:p-5">
+          <div class="flex min-w-0 items-center gap-3">
+            <span aria-hidden="true" class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-950 text-xl font-bold text-cyan-200">{{ (authUser.email || '?').charAt(0).toUpperCase() }}</span>
+            <div class="min-w-0 flex-1">
+              <p class="text-xs sdl-muted">Signed in as</p>
+              <p class="break-all font-semibold text-white">{{ authUser.email || 'Signed-in account' }}</p>
+              <p class="mt-1 text-sm sdl-muted">{{ workspaceOptions.find(option=>option.id===workspaceMode)?.label || 'Limited access' }} workspace</p>
+            </div>
+          </div>
+          <div class="space-y-2 border-t border-slate-700 pt-3">
+            <h2 class="sdl-section-title">Workspace access</h2>
+            <div v-if="workspaceOptions.length" class="flex flex-wrap gap-2">
+              <span v-for="option in workspaceOptions" :key="option.id" class="rounded-lg border border-slate-600 bg-slate-950 px-3 py-1.5 text-sm" :class="option.id===workspaceMode ? 'text-cyan-200' : 'text-slate-300'">{{ option.label }}{{ option.id===workspaceMode ? ' · Active' : '' }}</span>
+            </div>
+            <p v-else class="text-sm sdl-muted">No enabled workspace</p>
+            <dl class="grid grid-cols-3 gap-2 pt-2">
+              <div class="min-w-0"><dt class="text-xs sdl-muted">Authorized clubs</dt><dd class="mt-1 text-xl font-semibold tabular-nums">{{ ordinaryOrganizations.length }}</dd></div>
+              <div class="min-w-0"><dt class="text-xs sdl-muted">Authorized teams</dt><dd class="mt-1 text-xl font-semibold tabular-nums">{{ ordinaryTeams.length }}</dd></div>
+              <div class="min-w-0"><dt class="text-xs sdl-muted">Verified guardian links</dt><dd class="mt-1 text-xl font-semibold tabular-nums">{{ guardianLinks.length }}</dd></div>
+            </dl>
+            <p class="text-xs sdl-muted">Access is determined by your verified membership and guardian links.</p>
+          </div>
         </div>
-        <label class="block text-sm font-semibold text-slate-200">Language
-          <select :value="currentLang" @change="currentLang = $event.target.value; saveLanguage()" class="mt-1 block min-h-11 rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm">
-            <option value="en">English (EN)</option><option value="zh">繁體中文 (ZH)</option><option value="ja">日本語 (JA)</option>
-          </select>
-        </label>
-        <button @click="signOutAndClear" :disabled="authBusy" class="bg-slate-700 px-4 py-2 rounded text-sm">Sign out</button>
+        <section class="sdl-panel space-y-3 p-4 sm:p-5" aria-label="Preferences">
+          <h2 class="sdl-section-title">Preferences</h2>
+          <label class="block max-w-sm text-sm font-semibold text-slate-200">Language
+            <select :value="currentLang" @change="currentLang = $event.target.value; saveLanguage()" class="mt-2 block min-h-11 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-base">
+              <option value="en">English (EN)</option><option value="zh">繁體中文 (ZH)</option><option value="ja">日本語 (JA)</option>
+            </select>
+          </label>
+        </section>
+        <section class="sdl-panel flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5" aria-label="Account session">
+          <div><h2 class="sdl-section-title">Account session</h2><p class="text-sm sdl-muted">Sign out when you finish using this device.</p></div>
+          <button type="button" @click="signOutAndClear" :disabled="authBusy" class="sdl-secondary px-4 py-2 text-sm font-semibold disabled:opacity-50">Sign out</button>
+        </section>
       </section>
       <div v-if="authError" role="alert" class="mb-3 text-rose-300 text-sm no-print">{{ authError }} <button type="button" class="ml-2 underline" @click="reloadMemberships">Refresh account permissions</button></div>
     <!-- Top Header Bar (Hidden during printing) -->
@@ -213,8 +238,16 @@
       @add-player="openAddPlayerModal" @lock-coach="lockCoachMode"
       @unlock-coach="unlockCoachMode"></app-header>
 
-    <pilot-workspace :class="activeTab === 'me' && !isManagedWorkspace ? '' : 'hidden'" :controller="pilotController"></pilot-workspace>
-    <club-enrollment-admin :class="activeTab === 'me' && !isManagedWorkspace ? '' : 'hidden'" :controller="enrollmentAdminController"></club-enrollment-admin>
+    <!-- Presentation grouping only. Preserve the original mounted controllers and role scope. -->
+     <details :class="activeTab === 'me' && !isManagedWorkspace ? 'sdl-panel mb-4 p-4 no-print' : 'hidden'" :open="pilotController.enabled ? true : undefined" aria-label="Additional family and staff tools">
+       <summary class="min-h-11 cursor-pointer py-2 font-semibold">Family and staff tools{{ pilotController.enabled ? '' : ' · currently unavailable' }}</summary>
+       <p class="mb-2 text-sm sdl-muted">Invitations, private family information and scoped staff workflows, where available to your account.</p>
+       <pilot-workspace :controller="pilotController"></pilot-workspace>
+     </details>
+     <details :class="activeTab === 'me' && !isManagedWorkspace && enrollmentAdminController.visible.value ? 'sdl-panel mb-4 p-4 no-print' : 'hidden'" :open="enrollmentAdminController.enabled ? true : undefined" aria-label="Enrollment tools">
+       <summary class="min-h-11 cursor-pointer py-2 font-semibold">Club enrollment tools{{ enrollmentAdminController.enabled ? '' : ' · currently unavailable' }}</summary>
+       <club-enrollment-admin :controller="enrollmentAdminController"></club-enrollment-admin>
+     </details>
     <!-- Private staging avatars: all available profiles are server-filtered. -->
     <avatar-manager :controller="avatarController" :show-list="activeTab === 'me' && workspaceMode === 'admin'" @open-profile="openManagedPlayerProfile"></avatar-manager>
 
