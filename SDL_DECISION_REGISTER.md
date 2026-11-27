@@ -37,4 +37,6 @@ The following add to, and do not replace, the historical entries above. **Report
 
 | SDL-D-20261127-12 | Owner reports E2E Round 2 passed 12/12 and accepts roster integration for staging UX; proceed with approved MVP completion without feature expansion. | Owner-reported staging UX functional acceptance, NOT independent security sign-off | SDL-UX-002 handoff of November 27; Round 1 8/3/1 superseded only for rerun scenarios; raw matrix, identities and build evidence not supplied to SDL-000. Production, unrestricted media, PR merge and real-family onboarding remain withheld. |
 
+| SDL-D-20261127-13 | SDL-UX-002 submitted issue #12 proposing five-tab usability reorganization and six reversible UX-IA batches; no new features. | **PROPOSED, owner UX design approval pending; no implementation authorization.** | Source review at `c9ad810459db6e5ad4c5834f7e4882970842f987`; missing authenticated current screenshots and device evidence; preserve existing working flows and SDL-004 security gates. |
+
 **Non-decisions:** No permission to merge `main`, deploy production, auto-delete seeded enrollments, weaken player RLS or publish private media. A successful unit test is not a final owner acceptance test.
