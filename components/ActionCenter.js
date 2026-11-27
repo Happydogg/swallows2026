@@ -39,7 +39,7 @@ export const ActionCenter={
       </header>
       <p v-if="status==='loading'" role="status" class="text-sm text-slate-300">Checking your actions…</p>
       <p v-else-if="status==='unavailable'" role="status" class="text-sm text-amber-200">Some action counts are unavailable. Try again.</p>
-      <p v-else-if="status==='ready'&&!groups.length" role="status" class="text-sm text-slate-300">No assigned actions.</p>
+      <p v-else-if="status==='ready'&&!groups.length" role="status" class="text-sm text-slate-300">No other action categories are currently available in this workspace.</p>
       <div v-for="g in groups" :key="g.key" class="space-y-2">
         <h3 class="text-xs font-bold uppercase tracking-wide text-slate-300">{{g.label}}</h3>
         <button v-for="row in g.rows" :key="row.kind" type="button" @click="open(row)" class="flex min-h-14 w-full items-center justify-between gap-3 rounded-xl border border-slate-700 bg-slate-800 p-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">
@@ -49,7 +49,7 @@ export const ActionCenter={
             <span v-if="row.description" class="block text-xs leading-relaxed text-slate-300">{{row.description}}</span>
           </span>
           <span v-if="row.count!==null" class="shrink-0 text-lg font-black text-cyan-200" :aria-label="row.count+' pending'">{{row.count}}</span>
-          <span v-else aria-hidden="true" class="shrink-0 text-slate-300">›</span>
+          <span v-else-if="g.key==='attention'" class="shrink-0 text-xs text-slate-300">{{status==='loading'?'Checking…':'Unavailable'}}</span><span v-else aria-hidden="true" class="shrink-0 text-slate-300">›</span>
         </button>
       </div>
     </section>`
