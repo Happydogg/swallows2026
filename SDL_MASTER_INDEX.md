@@ -2,6 +2,19 @@
 
 **Updated:** 2026-11-27. **Status:** Working GitHub coordination mirror. Reconcile against the independent SDL Master Directory before calling this authoritative.
 
+## 2026-11-27 SDL-UX-002 final restructuring handoff
+
+**Current primary coordination checkpoint, superseding older UX-IA-05 and early IA-06 planning text below.** Keep historical evidence and earlier decisions intact.
+
+- **Workstream disposition:** SDL-UX-002's six-batch restructuring is **implemented**; owner accepts IA-01, IA-02, IA-04 and IA-05, plus IA-03's non-media presentation. IA-06 expanded synthetic cross-role Vue navigation coverage and passed the configured build (8/8 smoke checks reported). **Authenticated physical-phone/tablet/desktop and cross-role usability acceptance remain pending.** Freeze further redesign/feature expansion; retain SDL-UX-002 as defect-resolution, device-acceptance and integration-review owner.
+- **Exact source boundary:** [PR #18](https://github.com/Happydogg/swallows2026/pull/18) merged IA-06 at `bbe5582cc40f20e7b56417670d98162fb35a4dfb`. The current accepted UX branch `feature/SDL-UX-002-login-redesign` is `2d12a56eb773f22d1fa8e54b3b2d12c14557463d` (read-only GitHub branch comparison). GitHub compare confirms eight subsequent commits, including SDL-004 private-media changes. **UX-IA-06 acceptance must not be asserted for subsequent media changes.**
+- **Hosted Pages observation:** Cloudflare directly confirms successful latest `sdl-ux-live` deployment `6c0bba9b-dea0-4b5a-aaa3-455959212610` and `sdl-ux-preview` deployment `f4d12dac-ebd6-44fb-9fc9-6403ee0edbb7`, each built from `2d12a56eb773f22d1fa8e54b3b2d12c14557463d`. These are UX review environments, not production-pilot release approval.
+- **Evidence:** [Issue #12](https://github.com/Happydogg/swallows2026/issues/12) records owner Round 2 12/12, ADMIN-01 5/5, IA-01–05 acceptance, IA-06 synthetic checks and the newer media staging milestones. Correction display expected 54 km/h current / 60 km/h superseded. Full regression count in some capped Cloudflare logs is unavailable; do not substitute the 8/8 smoke count for a full suite result.
+- **Cross-workstream:** SDL-004B-RBAC-05 owns media/backend authorization and independent security acceptance. Private media and Coach independent review subsequently progressed in staging with synthetic tests, but media publication, sharing/download and remaining release gates must be verified independently. [Issue #19](https://github.com/Happydogg/swallows2026/issues/19) registers SDL-UX-003 Action Center/Video Review Inbox as a separate unmounted synthetic prototype branch requiring API/ownership agreement; it is NOT included in accepted UX-002 baseline.
+- **Release hold:** No production, real-family onboarding, unrestricted shared media, consent expansion or unreviewed PR merge. Reconcile this working mirror with the independent SDL Master Directory before calling it canonical.
+
+---
+
 ## SDL-000 UX-IA-05 deployed checkpoint (2026-11-27)
 
 **This is the latest coordination status for Issue #12 and supersedes earlier UX-IA-01 candidate-only notes below. Preserve the old records as history.**
