@@ -2,6 +2,18 @@
 
 **As of:** 2026-11-27. **Scope:** Current GitHub branch and independently checked staging services; not a production readiness certificate.
 
+## E2E Round 2 update: 2026-11-27
+
+**Owner-reported acceptance:** E2E Round 2 **12/12 PASS**. Roster integration is accepted for **staging UX** only. This supersedes Round 1's 8 PASS / 3 FAIL / 1 PENDING for the scenarios covered by Round 2. The exact assertion list, source revision, identity ledger and direct backend security coverage were not provided in the handoff.
+
+**MVP next work:** SDL-UX-002 finishes other approved existing flows, tests role-aware navigation, responsive behavior and regressions for Coach, Guardian and dual-role users. SDL-004 owns any remaining direct roster RPC/security defects and restricted functions. SDL-000 tracks acceptance and release holds. No new features.
+
+**Next evidence request:** Obtain owner Round 2 test matrix, synthetic identities/scope verification, tested frontend commit and environment, negative-access results, and remaining screen-by-screen MVP gaps. Prior notes that 12 identities had not been provisioned are historical and should not be interpreted as current proof that they are absent or present.
+
+**Release gate unchanged:** SDL-004 remains staging-deployed in restricted mode. Independent security QA, direct authorization/consent and media tests, migration reconciliation, recoverable backup/restore and formal pilot approval remain outstanding. No production deployment, real-family onboarding, unrestricted media/RPC activation or PR merge is authorized.
+
+---
+
 ## Current roadmap overlay: 2026-11-27 (supersedes older status snapshot below)
 
 **Project strategy:** No feature expansion. Complete the approved frontend and test actual workflows against the currently restricted staging backend. Do not use frontend button visibility as authorization evidence.
