@@ -108,6 +108,9 @@ test('authenticated app harness connects Home -> scoped Review -> exact lookup -
  h.app.accountContext.value={...h.app.accountContext.value,user_id:h.user.id,roles:['coach','club_admin'],organizations:[{id:ORG,name:'Club',roles:['coach','club_admin']}],teams:[{id:TEAM,name:'Team',organization_id:ORG,roles:['coach','club_admin']}]};
  h.app.coachOrganizationId.value=ORG;h.app.coachTeamId.value=TEAM;
  h.app.navigateTab('home');const q=h.app.reviewQueue;
+ // Adapter must refuse even a previously authorized row outside effective Review.
+ assert.equal((await h.app.privateMediaController.openInboxReview(item)).opened,false);
+ assert.equal(requests.some(x=>x.url.searchParams.get('media_id')===MEDIA),false);
  if(!process.env.SDL004_VUE_RUNTIME)await q.refreshSummary();
  await until(()=>q.summaryStatus.value==='ready');
  assert.equal(h.app.actionCenterItems.value[0].count,1);
@@ -129,4 +132,24 @@ test('authenticated app harness connects Home -> scoped Review -> exact lookup -
  assert.equal(requests.filter(x=>x.url.pathname.endsWith('/review-private')).length,1);
  assert.equal(requests.some(x=>x.url.pathname==='/v2/submissions'),false);
  h.app.navigateTab('home');
+ assert.equal((await h.app.privateMediaController.openInboxReview(item)).opened,false);
+ assert.equal(h.app.privateMediaController.inboxReviewMode.value,false);
+});
+
+test('verified nonreview workspaces never call review APIs',async t=>{
+ const h=await harness(t,user('nonreviewer'),{origin:'https://sdl-ux-live.pages.dev'});
+ const ORG='11111111-1111-4111-8111-111111111111',TEAM='22222222-2222-4222-8222-222222222222';
+ const requests=[];h.fetchImpl=async(url)=>{requests.push(url);throw Error('Unexpected media API call');};
+ for(const role of ['manager','guardian','platform_admin']){
+  h.app.guardianLinks.value=role==='guardian'?[{athlete_id:'synthetic-athlete',status:'verified'}]:[];
+  h.app.accountContext.value={...h.app.accountContext.value,user_id:h.user.id,roles:[role],organizations:[{id:ORG,name:'Club',roles:[role]}],teams:[{id:TEAM,name:'Team',organization_id:ORG,roles:[role]}]};
+  h.app.navigateTab('home');
+  assert.equal(h.app.reviewScope.value,null);
+  assert.equal(h.app.actionCenterItems.value.some(x=>x.kind==='video_review'),false);
+  if(role==='guardian')assert.equal(h.app.actionCenterItems.value.find(x=>x.kind==='media_consent')?.count,undefined);
+  await h.app.reviewQueue.refreshSummary();
+  h.app.navigateTab('videos');assert.equal(h.app.changeVideoSection('review'),false);
+  await h.app.reviewQueue.refreshInbox();
+ }
+ assert.equal(requests.length,0);
 });
