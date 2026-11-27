@@ -2,6 +2,18 @@
 
 **As of:** 2026-11-27. **Scope:** Current GitHub branch and independently checked staging services; not a production readiness certificate.
 
+## UX-IA-01 approved candidate update (2026-11-27)
+
+**Owner approval:** The proposed first UX-IA-01 batch is approved and has a source implementation candidate on [draft PR #13](https://github.com/Happydogg/swallows2026/pull/13). GitHub confirms head `239e29c5655ca692908d182b6b05158463c31ea9`, target UX feature branch, and 10 changed files (seven presentation, three tests). The source and issue comment report 17/17 focused assertions passed. **Full regression/Vue renderer and authenticated staging owner acceptance not run. No merge or manual deployment.**
+
+**Candidate scope:** Home summary without duplicated full roster, Team canonical roster/registration, private Videos first, legacy toolbar hidden, language in Me; retain Guardian shortcuts and existing controllers, RBAC, media and feature gates. Existing issue proposal is superseded by owner approval only for UX-IA-01. **UX-IA-02..06 remain separate proposals, not yet authorized.**
+
+**Immediate critical path:** (1) independent source/diff and regression verification including full existing suite; (2) confirm testable isolated preview without accidental release; (3) synthetic-role mobile and desktop owner UAT, including Coach/Guardian/Club Admin/Team Manager and multi-role switch; (4) re-run previously accepted Round 2 12/12, ADMIN-01 5/5 and RBAC-10A chart/history as relevant; (5) separately review any merge/promotion request. Preserve backend restricted mode and security release hold.
+
+**Supplementary visual audit:** Nine current desktop-layout captures reported in Issue #12 comment. Coach Team and Videos showed gated submission content ahead of useful roster/media sections. Missing current phone and several role-specific captures; do not mark mobile visual acceptance.
+
+---
+
 ## UX restructuring proposal: issue #12 (2026-11-27)
 
 **Proposed, not authorized for implementation.** SDL-UX-002 read-only review at source baseline `c9ad810459db6e5ad4c5834f7e4882970842f987` reports overlapping headers/sections, duplicate Home roster, fragmented Stats context, long mixed-content Player Profile and misleading legacy/disabled controls. See https://github.com/Happydogg/swallows2026/issues/12. Source spot-check corroborates duplication, but device-level UX impact needs current authenticated screenshots.
