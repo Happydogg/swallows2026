@@ -2,6 +2,44 @@
 
 **As of:** 2026-11-27. **Scope:** Current GitHub branch and independently checked staging services; not a production readiness certificate.
 
+## P0 UX-002 independent QA / UX-003 integration readiness (2026-11-27)
+
+**Current checkpoint supersedes the earlier UX-IA-01–06 and media-planning status snapshots below; preserve those as dated history.** Working mirror only; not a production authorization.
+
+| Gate / workstream | Evidence state | Decision |
+|---|---|---|
+| SDL-UX-002 independent source review | **Completed/read-only**; [diff](https://github.com/Happydogg/swallows2026/compare/4590f86c458cacc461f45a8e62aeeda470e8646e...0120c6b74b048478e52e83c39bef011dcd2d02b3) accepted baseline `4590f86c...` vs candidate `0120c6b...` = 10 ahead, 0 behind, 22 changed paths | Source QA accepted for validation. Existing five-tab, stats authority (54 current / 60 superseded), role-scoped roster/profile and media paths substantially preserved. No frontend authorization bypass found in reviewed source, not proof of backend security. |
+| SDL-UX-003 automated verification | [GitHub Actions](https://github.com/Happydogg/swallows2026/actions/runs/46025411813/job/140595434819) pinned to `0120c6b...`: Worker local check PASS, `npm test` **516/516**, UX-003 **59/59 included**, Vue smoke **8/8**, UX build **178/178**, **91 static files** | **Tested: PASS**. Totals overlap; no full device/browser acceptance established. Worker release-preservation warning remains. |
+| Backend/media staging development | [RBAC-05 conditional approval](https://github.com/Happydogg/swallows2026/issues/19#issuecomment-7222808064), rollback-only SQL negative/revocation and owner reported **74/74 applicable** signed-browser checks | **Conditional synthetic development acceptance**, not final signed HTTP security release. Remaining outsider/revocation/network-concurrency/save cases deferred. |
+| Authenticated synthetic candidate browser/device UAT | UX-002 prepared **12-case** acceptance matrix; **no cases executed** on an approved candidate preview | **P0 HOLD** before final combined staging acceptance; verify iPhone Safari / Android Chrome, 320/375/390/430px, tablet, desktop, and Coach/CA/Manager/Guardian/dual-role. |
+| Frontend integration / environment | Existing active staging `feature/SDL-UX-002-login-redesign` at `4590f86c...`; isolated UX-003 at `0120c6b...`; candidate preview reported queued, no verified accepted candidate deployment | **No merge or deployment authorized.** Verify exact active SHA, preview origin, binding/observability preservation and rollback before requesting owner approval. |
+| Production pilot | Independent security, release preservation, mobile and recovery gates not complete | **HOLD**. No real family media or expanded child-data sharing. |
+
+### UX-002 independent QA issue register
+
+| ID | Severity | Finding / verification classification | Accountable owner / next acceptance |
+|---|---|---|---|
+| UX-QA-01 | **P0** | No approved authenticated candidate preview for integrated UAT. **Environment/acceptance blocker**, not a confirmed frontend defect | SDL-000: obtain separately approved isolated synthetic testing target; no automatic preview activation |
+| UX-QA-02 | **P1** | Guardian same-player account or enrollment-context changes may retain stale consent status. **Source-confirmed lifecycle risk**, live impact not tested | SDL-UX-003 + SDL-004B-RBAC-05: targeted invalidation/refetch and same-ID generation/role change tests |
+| UX-QA-03 | **P1** | Download-ready text may persist after 60-second save link expiry or close. **Source-confirmed messaging issue**, not evidence of URL retention | SDL-UX-003: clear/update notice on expiry and close; regression test |
+| UX-QA-04 | **P1** | Moving into Review resets previous private Library selection; navigation usability effect **unverified** | SDL-UX-003: focused workflow and state-reset tests without loosening access |
+| UX-QA-05 | **P1** | Home count and Review inbox fetched independently; concurrency/refresh consistency **unverified** | SDL-UX-003 + SDL-004B-RBAC-05: role/scope switch, conflict and same-snapshot semantics |
+| UX-QA-06 | **P2** | Legacy `Submissions and Clubhouse` disclosure still surfaces below Library and duplicates concepts. **Source-confirmed presentation clutter** | SDL-UX-003: preserve disabled gate; simplify placement only if approved |
+| UX-QA-07 | **P2** | Potential 320px compact-layout crowding. **Device hypothesis, not a confirmed defect** | SDL-UX-002: device/cross-role screenshot and accessibility review |
+
+### Ordered integration/acceptance plan
+
+1. **SDL-000:** Register this source QA handoff; keep original UX-002 and UX-003 evidence. No combined merge/staging deployment as part of documentation reconciliation.
+2. **SDL-UX-003:** Propose narrowly scoped remedies for `UX-QA-02` and `UX-QA-03`, dispositions for `04..07`; preserve single optional Option C consent, `can_download`, two-step save, and held private/legacy routes. Any code change requires repeat exact-source full regression.
+3. **SDL-004B-RBAC-05:** Confirm adapter/service and complete deferred signed HTTP role isolation, consent withdrawal/unpublication, revoked-session, late revocation/concurrency and download negative tests before production. Do not treat conditional development acceptance as unconditional.
+4. **SDL-000 + SDL-GOV:** Review staging Worker version/bindings/observability, actual frontend Pages origin and exact isolated preview/rollback plan. Request explicit owner approval for synthetic candidate staging environment and later merge/promotion.
+5. **SDL-UX-002 + owner:** Execute 12-case authenticated device matrix: Coach, Club Admin, Team Manager, Guardian, dual role, Team/Stats/Me and Videos; iPhone Safari / Android Chrome at 320/375/390/430 CSS pixels, tablet/desktop; 54 current vs 60 superseded; MP4/MOV playback, download save and consent/role lifecycle. Record observed PASS/FAIL separately from source inference.
+6. **SDL-000:** Accept or reject combined staging only with exact commit, CI evidence, UX-002 and RBAC-05 reviews, rollback and distinct approval. Production remains a later decision.
+
+Evidence: [Issue #19](https://github.com/Happydogg/swallows2026/issues/19); [CI job](https://github.com/Happydogg/swallows2026/actions/runs/46025411813/job/140595434819); [UX-003 handoff](https://github.com/Happydogg/swallows2026/blob/0120c6b74b048478e52e83c39bef011dcd2d02b3/docs/design/SDL-UX-003/FINAL-VIDEO-INTEGRATION-HANDOFF.md); [RBAC-05 conditional handoff](https://github.com/Happydogg/swallows2026/issues/19#issuecomment-7222808064).
+
+---
+
 ## SDL-UX-002 final restructuring status (2026-11-27)
 
 **Latest checkpoint; earlier UX-IA-01–05/candidate and media-blocker snapshots below are historical.**
