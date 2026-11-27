@@ -15,7 +15,7 @@ export const ParentHome = {
   <section class="space-y-5" aria-label="Parent home">
     <header class="flex flex-wrap items-center justify-between gap-3">
       <h1 class="text-2xl font-black tracking-tight text-white sm:text-3xl">My players</h1>
-      <button v-if="players.length" type="button" @click="$emit('navigate','team')" class="rounded-xl border border-sky-500/40 bg-blue-950 px-4 py-2.5 text-sm font-semibold text-sky-100 hover:bg-blue-900">Family team</button>
+
     </header>
     <p v-if="loading" class="rounded-2xl border border-slate-700 bg-slate-800 p-5 text-sm text-slate-400" role="status">Loading authorized family profiles…</p>
     <div v-else-if="!players.length" class="rounded-2xl border border-dashed border-slate-600 bg-slate-900 p-7">
@@ -38,10 +38,7 @@ export const ParentHome = {
         </div>
       </article>
     </div>
-    <div v-if="players.length" class="grid grid-cols-2 gap-3">
-      <button type="button" @click="$emit('navigate','stats')" class="rounded-2xl border border-slate-700 bg-slate-800/70 p-4 text-left text-sm font-semibold hover:border-blue-400/50">Growth and stats</button>
-      <button type="button" @click="$emit('navigate','videos')" class="rounded-2xl border border-slate-700 bg-slate-800/70 p-4 text-left text-sm font-semibold hover:border-blue-400/50">Practice videos</button>
-    </div>
+
   </section>
   `
 };
