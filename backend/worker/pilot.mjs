@@ -1,6 +1,6 @@
 const STAGING_URL = 'https://wvurolqbjhuckkkjiiiv.supabase.co';
 const ORIGINS = new Set(['http://127.0.0.1:5500', 'http://localhost:5500', 'https://sdl-staging.pages.dev', 'https://sdl-ux-live.pages.dev']);
-const LIMIT = 20 * 1024 * 1024;
+const LIMIT = 40 * 1024 * 1024;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function json(value, status, origin) {
@@ -42,26 +42,28 @@ async function limitedBytes(request) {
   const len = request.headers.get('Content-Length');
   if (!len || !/^\d+$/.test(len)) return {error:'Content-Length required', status:411};
   const n = Number(len);
-  if (!Number.isSafeInteger(n) || n <= 0 || n > LIMIT) return {error:'File must be 1 to 20 MiB',status:413};
+  if (!Number.isSafeInteger(n) || n <= 0 || n > LIMIT) return {error:'File must be 1 to 40 MiB',status:413};
   if (!request.body) return {error:'Empty upload',status:400};
   const reader = request.body.getReader();
-  const parts=[]; let total=0;
+  const bytes = new Uint8Array(n); let total=0;
   try {
     while (true) {
       const {done,value}=await reader.read();
       if(done) break;
-      total+=value.byteLength;
-      if(total>LIMIT){await reader.cancel();return {error:'Upload exceeds 20 MiB',status:413};}
-      if(total>n){await reader.cancel();return {error:'Upload length mismatch',status:400};}
-      parts.push(value);
+      if(total+value.byteLength>LIMIT){await reader.cancel();return {error:'Upload exceeds 40 MiB',status:413};}
+      if(total+value.byteLength>n){await reader.cancel();return {error:'Upload length mismatch',status:400};}
+      bytes.set(value,total); total+=value.byteLength;
     }
   } catch {return {error:'Upload stream failed',status:400};}
   if (total!==n) return {error:'Upload length mismatch',status:400};
-  const bytes = new Uint8Array(total); let pos=0;
-  for (const p of parts) {bytes.set(p,pos); pos+=p.byteLength;}
-  // MP4/QuickTime ISO BMFF ftyp signature. Container signature is not a full decoder/AV scan.
+  // Identify modern ISO BMFF / QuickTime by major brand, not browser MIME.
+  // This is a container signature check, not a complete decoder or malware scan.
   if(total<12 || String.fromCharCode(...bytes.slice(4,8))!=='ftyp')
-    return {error:'Expected MP4 container (ftyp)',status:415};
-  return {bytes};
+    return {error:'Expected MP4 or MOV container (ftyp)',status:415};
+  const brand=String.fromCharCode(...bytes.slice(8,12));
+  const contentType=brand==='qt  ' ? 'video/quicktime' :
+    /^(isom|iso[2-9]|mp4[12]|avc1|hvc1|hev1|M4V |MSNV|dash)$/.test(brand) ? 'video/mp4' : null;
+  if(!contentType)return {error:'Unsupported video container brand',status:415};
+  return {bytes,contentType};
 }
 export {verifyIdentity,adminQuery,limitedBytes,configOk,validId,json,ORIGINS};

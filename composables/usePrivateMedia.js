@@ -4,7 +4,7 @@ const { ref, computed } = Vue;
 
 // Separate media permissions from isCoach: media access never unlocks official stats.
 export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {value:[]}, analyzer, service = createPrivateMediaService({ auth }),
-  urls = URL, timeoutMs = 65000, thumbnailExtractor = extractVideoThumbnail }) {
+  urls = URL, timeoutMs = 125000, thumbnailExtractor = extractVideoThumbnail }) {
   const mediaPlayerId = ref('');
   const mediaItems = ref([]);
   const mediaReadAllowed = ref(false);
@@ -272,7 +272,7 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
   }
   function reportPlaybackError() {
     releasePlayback();
-    mediaError.value = 'The browser could not decode this MP4 video. Try an H.264 MP4 file.';
+    mediaError.value = 'This browser could not decode the video. For wider compatibility, use H.264 (iPhone Camera > Formats > Most Compatible).';
   }
   return { mediaPlayers, mediaPlayerId, mediaItems, mediaReadAllowed, mediaUploadAllowed, mediaLoading,
     mediaUploading, mediaArchiving, mediaProgress, mediaError, mediaUploadError, mediaNotice, mediaFile, uploadCategory, mediaPlaybackUrl, mediaPlaybackId,

@@ -1,6 +1,6 @@
 // Clean-start v5.1 Worker contract. Every request is authorized again by the Worker.
 import { supabaseClient, SUPABASE_URL, PRIVATE_MEDIA_WORKER_URL } from './config.js';
-export const MEDIA_LIMIT = 20 * 1024 * 1024;
+export const MEDIA_LIMIT = 40 * 1024 * 1024;
 const STAGING = 'https://wvurolqbjhuckkkjiiiv.supabase.co';
 const WORKER = 'https://sdl-r2-staging-gate.sampson-ho.workers.dev';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -14,8 +14,8 @@ const messages = {
   409: 'Another upload or review is in progress or already completed. Refresh before retrying.',
   410: 'This invitation expired or was revoked. Request a new invitation from the club.',
   411: 'The browser did not send the file length. Please retry with a supported browser.',
-  413: 'Choose a non-empty MP4 file no larger than 20 MiB.',
-  415: 'This service accepts MP4 video files only.',
+  413: 'Choose a non-empty MP4 or MOV file no larger than 40 MiB.',
+  415: 'This service accepts MP4 and QuickTime MOV videos only.',
   503: 'The media service is unavailable. Please try again later.'
 };
 const disabled = () => Object.assign(new MediaError('This media feature is currently disabled.', 503), {code:'media_disabled'});
@@ -24,16 +24,13 @@ const PLAYER_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{1
 const playerIdValue = value => { if (typeof value !== 'string' || !PLAYER_UUID.test(value)) throw new MediaError('Invalid media or player ID.'); return value; };
 const id = value => { if (!UUID.test(value ?? '')) throw new MediaError('Invalid media or player ID.'); return value; };
 export function validateMediaFile(file) {
-  // iOS and Files providers may report a real .mp4 as generic or QuickTime.
-  // The Worker still checks the container bytes and enforces size and authorization.
+  // iOS Photos/Files may report generic MIME or a transcoded container.
   const mime = typeof file?.type === 'string' ? file.type.toLowerCase().trim() : '';
   const name = typeof file?.name === 'string' ? file.name : '';
-  if (!file || !/\.mp4$/i.test(name) || !['video/mp4','video/quicktime','application/octet-stream',''].includes(mime)) {
-    throw new MediaError(/\.mov$/i.test(name) || mime==='video/quicktime'
-      ? 'This clip is a MOV file or is not named .mp4. Choose an actual MP4 from Files; iPhone Camera recordings may be MOV.'
-      : 'Choose an MP4 video file from Files (not a photo or another video format).',415);
-  }
+  if (!file || !/\.(mp4|mov)$/i.test(name) || !['video/mp4','video/quicktime','application/octet-stream',''].includes(mime))
+    throw new MediaError('Choose an MP4 or MOV video from Photo Library or Files.',415);
   if (!Number.isSafeInteger(file.size) || file.size <= 0 || file.size > MEDIA_LIMIT) throw failure(413);
+  return /\.mov$/i.test(name) ? 'video/quicktime' : 'video/mp4';
 }
 
 export function createPrivateMediaService({ auth, client = supabaseClient, baseUrl = PRIVATE_MEDIA_WORKER_URL,
@@ -79,7 +76,7 @@ export function createPrivateMediaService({ auth, client = supabaseClient, baseU
         if (!auth.isCurrentIdentity(identity)) throw failure(401);
         return payload;
       }
-      if (response.headers.get('Content-Type')?.split(';')[0] !== 'video/mp4') throw new MediaError('Invalid video response.');
+      if (!['video/mp4','video/quicktime'].includes(response.headers.get('Content-Type')?.split(';')[0])) throw new MediaError('Invalid video response.');
       const length = Number(response.headers.get('Content-Length'));
       if (!Number.isFinite(length) || length <= 0 || length > MEDIA_LIMIT) throw new MediaError('Invalid video size.');
       const file = await response.blob();
@@ -92,7 +89,7 @@ export function createPrivateMediaService({ auth, client = supabaseClient, baseU
     }
   }
   async function uploadRoute(playerId, file, { signal, onProgress = () => {}, submission } = {}) {
-      playerIdValue(playerId); validateMediaFile(file);
+      playerIdValue(playerId); const declaredType = validateMediaFile(file);
       const { token, identity } = await bearer(signal);
       return new Promise((resolve, reject) => {
         if (signal?.aborted) { reject(new DOMException('Cancelled', 'AbortError')); return; }
@@ -100,10 +97,10 @@ export function createPrivateMediaService({ auth, client = supabaseClient, baseU
         const abort = () => xhr.abort();
         const finish = (fn, value) => { signal?.removeEventListener('abort', abort); fn(value); };
         xhr.open('POST', `${WORKER}/v2/submissions?player_id=${playerId}&category=${submission.category}`);
-        xhr.timeout = 60000;
+        xhr.timeout = 120000;
         xhr.withCredentials = false;
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-        xhr.setRequestHeader('Content-Type', 'video/mp4');
+        xhr.setRequestHeader('Content-Type', declaredType);
         xhr.setRequestHeader('Idempotency-Key', id(submission.key));
         // Blob/File bodies let the browser set Content-Length; JS cannot set it.
         xhr.upload.onprogress = event => {

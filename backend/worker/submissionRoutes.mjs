@@ -145,8 +145,8 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
         const allowed=await call('sdl_004_submission_can_submit',{p_player_id:playerId});
         if(allowed.error)return error(allowed);
         if(allowed.value!==true)return json({error:'Private upload authorization required'},403,origin);
-        if (request.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase() !== 'video/mp4') {
-          return json({ error: 'Only video/mp4 accepted' }, 415, origin);
+        if (!['video/mp4','video/quicktime'].includes(request.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase())) {
+          return json({ error: 'Only MP4 or QuickTime MOV accepted' }, 415, origin);
         }
         const upload = await limitedBytes(request);
         if (upload.error) return json({ error: upload.error }, upload.status, origin);
@@ -156,7 +156,7 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
         const claim=crypto.randomUUID();
         const digest=await crypto.subtle.digest('SHA-256',upload.bytes);
         const fileHash=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
-        const meta=new TextEncoder().encode(JSON.stringify([playerId,category,fileHash]));
+        const meta=new TextEncoder().encode(JSON.stringify(upload.contentType==='video/quicktime'?[playerId,category,fileHash,'video/quicktime']:[playerId,category,fileHash]));
         const fingerprint=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',meta)),b=>b.toString(16).padStart(2,'0')).join('');
         const reservation=await call('sdl_004_reserve_submission',{p_player_id:playerId,p_request_key:requestKey,
           p_claim:claim,p_fingerprint:fingerprint,p_size:upload.bytes.byteLength,p_category:category});
@@ -169,12 +169,12 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
           return json({id:r.id,player_id:r.player_id,category:r.category,status:r.status},201,origin);
         }
         if(r?.state!=='reserved'||!validId(r.id)||r.object_key!==`pilot/${playerId}/${r.id}.mp4`) return json({error:'Invalid upload reservation'},503,origin);
-        try { await env.MEDIA_BUCKET.put(r.object_key,upload.bytes,{httpMetadata:{contentType:'video/mp4',cacheControl:'private, no-store'}}); }
+        try { await env.MEDIA_BUCKET.put(r.object_key,upload.bytes,{httpMetadata:{contentType:upload.contentType,cacheControl:'private, no-store'}}); }
         catch { return json({error:'Object write failed; retry with the same request key'},503,origin); }
         // No object deletion. A retry reuses this reservation/key, and metadata
         // commits atomically. Uncommitted objects remain private for recovery.
         try {
-          const result=await adminQuery(env,'rpc/sdl_004_finish_submission',{method:'POST',
+          const result=await adminQuery(env,upload.contentType==='video/quicktime'?'rpc/sdl_v5_finish_quicktime':'rpc/sdl_004_finish_submission',{method:'POST',
             body:JSON.stringify({p_request_key:requestKey,p_claim:claim,p_user_id:identity.userId})});
           if(!result.ok) return json({error:'Upload not committed; retry with the same request key'},[401,403,409].includes(result.status)?result.status:503,origin);
           const receipt=await result.json();
@@ -239,8 +239,8 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
         } catch { return json({ error: 'Metadata unavailable' }, 503, origin); }
         if (!item) return json({ error: 'Not found' }, 404, origin);
         if (!validPlayerId(item.player_id) || item.object_key!==`pilot/${item.player_id}/${id}.mp4` ||
-          item.content_type!=='video/mp4' || !Number.isSafeInteger(item.byte_size) || item.byte_size<12 ||
-          item.byte_size>20*1024*1024)
+          !['video/mp4','video/quicktime'].includes(item.content_type) || !Number.isSafeInteger(item.byte_size) || item.byte_size<12 ||
+          item.byte_size>40*1024*1024)
           return json({error:'Invalid media metadata'},503,origin);
         const range = request.headers.get('Range');
         const hasRange = range !== null;
@@ -267,10 +267,10 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
             (hasRange && !obj.range) ||
             (obj.range && (obj.range.offset!==first || obj.range.length!==length)))
           return json({error:'Invalid media size or range'},503,origin);
-        const headers = new Headers({ 'Content-Type': 'video/mp4', 'Cache-Control': 'private, no-store',
+        const headers = new Headers({ 'Content-Type': item.content_type, 'Cache-Control': 'private, no-store',
           'X-Content-Type-Options': 'nosniff', 'Accept-Ranges': 'bytes' });
         if (ORIGINS.has(origin)) { headers.set('Access-Control-Allow-Origin', origin); headers.set('Vary', 'Origin'); }
-        if (action === 'download') headers.set('Content-Disposition','attachment; filename="video.mp4"');
+        if (action === 'download') headers.set('Content-Disposition','attachment; filename="video.'+(item.content_type==='video/quicktime'?'mov':'mp4')+'"');
         if (hasRange) headers.set('Content-Range', 'bytes '+first+'-'+end+'/'+obj.size);
         headers.set('Content-Length', String(length));
         return new Response(obj.body, { status: hasRange ? 206 : 200, headers });

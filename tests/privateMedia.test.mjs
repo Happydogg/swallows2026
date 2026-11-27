@@ -122,7 +122,7 @@ for (const failure of ['onerror', 'ontimeout']) test(`upload ${failure} reports 
 
 test('bad file type and oversized/empty files fail before network or XHR creation', async t => {
   let calls = 0; const { service } = await serviceHarness(t, { xhrFactory: () => { calls++; } });
-  for (const bad of [{ ...file, name:'clip.mov', type: 'video/quicktime' }, { ...file, type:'image/jpeg' }, { ...file, size: 0 }, { ...file, size: 20971521 }]) {
+  for (const bad of [{ ...file, name:'clip.avi', type: 'video/avi' }, { ...file, type:'image/jpeg' }, { ...file, size: 0 }, { ...file, size: 41943041 }]) {
     await assert.rejects(service.upload(PLAYER, bad, {submission:{category:'pitching',key:VIDEO}}));
   }
   assert.equal(calls, 0);
@@ -395,6 +395,19 @@ test('iOS Files MP4s with generic or QuickTime metadata are accepted without cha
     assert.equal(xhr.headers['Content-Type'],'video/mp4');
     assert.equal(xhr.body,picked);
   }
-  await assert.rejects(service.upload(PLAYER,{...file,name:'IMG_0001.MOV',type:'video/quicktime'},{submission:{category:'pitching',key:VIDEO}}),/Choose an actual MP4 from Files/);
-  await assert.rejects(service.upload(PLAYER,{...file,name:'image.jpg',type:'application/octet-stream'},{submission:{category:'pitching',key:VIDEO}}),/Choose an MP4 video file/);
+  const mov={...file,name:'IMG_0001.MOV',type:'video/quicktime'};
+  assert.equal((await service.upload(PLAYER,mov,{submission:{category:'pitching',key:VIDEO}})).id,VIDEO);
+  assert.equal(xhr.headers['Content-Type'],'video/quicktime');
+  await assert.rejects(service.upload(PLAYER,{...file,name:'image.jpg',type:'application/octet-stream'},{submission:{category:'pitching',key:VIDEO}}),/Choose an MP4 or MOV video/);
+});
+
+test('MOV from Photos and a 40 MiB staging maximum retain the private media contract',async t=>{
+ const {service,xhr}=await serviceHarness(t);
+ const picked={name:'IMG_1234.MOV',type:'',size:41943040};
+ assert.equal((await service.upload(PLAYER,picked,{submission:{category:'pitching',key:VIDEO}})).id,VIDEO);
+ assert.equal(xhr.headers['Content-Type'],'video/quicktime');
+ await assert.rejects(service.upload(PLAYER,{...picked,size:41943041},{submission:{category:'pitching',key:VIDEO}}),e=>e.status===413);
+ const read=await serviceHarness(t,{fetchImpl:async()=>new Response('012345678901',{headers:{'Content-Type':'video/quicktime','Content-Length':'12'}})});
+ const blob=await read.service.playback(VIDEO);
+ assert.equal(blob.type,'video/quicktime');assert.equal(blob.size,12);
 });

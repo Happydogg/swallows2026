@@ -11,7 +11,7 @@ export async function extractVideoThumbnail(blob,{
 }={}){
   if(!doc||!urls||typeof urls.createObjectURL!=='function'
     ||typeof urls.revokeObjectURL!=='function')throw new Error('Video previews unavailable in this browser');
-  if(!blob||!Number.isFinite(blob.size)||blob.size<=0||blob.size>20971520)
+  if(!blob||!Number.isFinite(blob.size)||blob.size<=0||blob.size>41943040)
     throw new Error('Video preview exceeds the private-media size limit');
   if(onSignal?.aborted)throw new DOMException('Cancelled','AbortError');
   const video=doc.createElement('video');

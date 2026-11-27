@@ -148,7 +148,7 @@ export const PrivateMediaPanel = {
     <div v-if="mediaUploadAllowed" class="space-y-3 rounded-2xl border border-slate-700 bg-slate-900/90 p-4 sm:p-5">
       <div>
         <h3 class="text-lg font-bold text-white">Add a practice clip</h3>
-        <p class="mt-1 text-xs text-slate-400">Synthetic staging footage only. Do not upload recordings of real children. Private MP4, maximum 20 MiB.</p>
+        <p class="mt-1 text-xs text-slate-400">Synthetic staging footage only. Do not upload recordings of real children. Private MP4 or MOV, maximum 40 MiB. HEVC playback depends on the device.</p>
       </div>
       <label class="block text-sm font-semibold text-slate-300">
         Video category
@@ -160,8 +160,8 @@ export const PrivateMediaPanel = {
         </select>
       </label>
       <label class="block text-sm font-semibold text-slate-300" for="sdl-private-upload">
-        Choose an MP4 from Files (up to 20 MiB)
-        <input id="sdl-private-upload" type="file" accept="video/mp4,.mp4,application/octet-stream"
+        Choose from Photo Library or Files (MP4/MOV, up to 40 MiB)
+        <input id="sdl-private-upload" type="file" accept="video/*,.mp4,.mov"
           :disabled="mediaUploading" @change="selectMediaFile"
           class="mt-2 block w-full rounded-xl border border-slate-600 bg-slate-950 px-3 py-3 text-sm text-slate-200"/>
       </label>

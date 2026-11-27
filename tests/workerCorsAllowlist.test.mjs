@@ -81,3 +81,31 @@ test('deterministic player UUID reaches server role check; malformed IDs and mis
  assert.equal((await run('/v2/submissions?player_id=bad')).status,400);
  assert.equal(calls.length,2);
 });
+
+test('MOV upload preserves native MIME through private storage and service-only finalization',async t=>{
+ const prior=globalThis.fetch;t.after(()=>{globalThis.fetch=prior;});
+ const player='11111111-1111-4111-8111-111111111111',video='33333333-3333-4333-8333-333333333333',key='pilot/'+player+'/'+video+'.mp4';
+ const bytes=new Uint8Array([0,0,0,12,102,116,121,112,113,116,32,32]);
+ let stored,finalized=false;
+ globalThis.fetch=async(url,init)=>{
+   const path=new URL(url).pathname;
+   if(path==='/auth/v1/user')return Response.json({id:player});
+   if(path.endsWith('/sdl_004_session_active'))return Response.json(true);
+   if(path.endsWith('/sdl_004_submission_contract'))return Response.json({rbacVersion:5,revision:'sdl004-club-enrollment-v2',mediaRevision:'v5.1-clean-start'});
+   if(path.endsWith('/sdl_004_submission_can_submit'))return Response.json(true);
+   if(path.endsWith('/sdl_004_reserve_submission'))return Response.json({state:'reserved',id:video,object_key:key});
+   if(path.endsWith('/sdl_v5_finish_quicktime')){assert.equal(new Headers(init.headers).get('apikey'),'sb_secret_synthetic');assert.equal(new Headers(init.headers).get('Authorization'),null);finalized=true;return Response.json({id:video,player_id:player,category:'pitching',status:'approved'});}
+   if(path.endsWith('/sdl_v5_authorize_playback'))return Response.json(true);
+   if(path.endsWith('/sdl_media_objects'))return Response.json([{object_key:key,player_id:player,byte_size:12,content_type:'video/quicktime'}]);
+   throw Error(path);
+ };
+ const env={SUPABASE_URL:'https://wvurolqbjhuckkkjiiiv.supabase.co',SUPABASE_PUBLISHABLE_KEY:'sb_publishable_synthetic',SUPABASE_SECRET_KEY:'sb_secret_synthetic',MEDIA_UPLOAD_ENABLED:'true',MEDIA_PLAYBACK_ENABLED:'true',MEDIA_BUCKET:{
+   async put(k,b,o){assert.equal(k,key);assert.equal(o.httpMetadata.contentType,'video/quicktime');stored=b;},
+   async get(k){assert.equal(k,key);return {size:stored.length,body:new Blob([stored]).stream()};}
+ }};
+ const req=new Request(WORKER+'/v2/submissions?player_id='+player+'&category=pitching',{method:'POST',headers:{Origin:LIVE,Authorization:'Bearer synthetic','Content-Type':'video/quicktime','Content-Length':'12','Idempotency-Key':video},body:bytes});
+ const response=await entry.fetch(req,env);assert.equal(response.status,201);assert.equal(finalized,true);assert.deepEqual(stored,bytes);
+ const playback=await entry.fetch(new Request(WORKER+'/v2/submissions/'+video+'/playback',{headers:{Origin:LIVE,Authorization:'Bearer synthetic'}}),env);
+ assert.equal(playback.status,200);assert.equal(playback.headers.get('Content-Type'),'video/quicktime');
+ assert.deepEqual(new Uint8Array(await playback.arrayBuffer()),bytes);
+});
