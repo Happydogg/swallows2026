@@ -22,6 +22,7 @@ function makeMediaDemo(){
   ];
   // Fictional server projections. They are scenarios, not a proposed RBAC implementation.
   let rows=sample.map(x=>({...x})), consent={view:true,download:true}, revoked=false, seq=0, uploadSeq=0;
+  const revokedAccounts=new Set();
   const s={accounts,account:accounts[0],page:"videos",section:"library",filter:{player:"",category:"",status:""},selected:null,notice:"",availability:"ready",upload:null,consentDraft:null,confirm:null};
   function snapshot(){
     if(s.availability!=="ready")return {library:[],gallery:[],canUpload:[],consent:null};
@@ -31,7 +32,7 @@ function makeMediaDemo(){
     return {library:library.map(r=>({...r,can_publish:staff&&r.id==="a"&&r.publication==="private"&&!revoked&&r.status==="approved",can_unpublish:staff&&r.publication==="published"})),gallery,canUpload:staff||family?[...players]:[],consent:family?{...consent}:null};
   }
   function invalidate(){seq++;s.selected=null;s.confirm=null;s.upload=null;s.consentDraft=null;s.notice="";s.filter={player:"",category:"",status:""};}
-  function switchAccount(i){if(!accounts[i])return false;invalidate();s.account=accounts[i];s.page="videos";s.section=s.account.players.length?"library":"clubhouse";s.availability="ready";return true;}
+  function switchAccount(i){if(!accounts[i])return false;invalidate();s.account=accounts[i];s.page="videos";s.section=s.account.players.length?"library":"clubhouse";s.availability=revokedAccounts.has(s.account.id)?"revoked":"ready";return true;}
   function navigate(page,section="library"){
     if(!["home","team","stats","videos","me"].includes(page))return false;
     invalidate();s.page=page;s.section=section;return true;
@@ -83,9 +84,9 @@ function makeMediaDemo(){
     if(!consent.view){revoked=true;rows=rows.map(r=>r.id==="a"?{...r,publication:"private"}:r);}
     s.notice="Demo: choices saved. Restoring a choice never automatically republishes.";return true;
   }
-  function revokeAccess(){invalidate();s.availability="revoked";s.notice="Access changed. Private previews and selected video cleared.";}
+  function revokeAccess(){revokedAccounts.add(s.account.id);invalidate();s.availability="revoked";s.notice="Access changed. Private previews and selected video cleared.";}
   function unavailable(){invalidate();s.availability="unavailable";s.notice="Media service unavailable. No previous private rows retained.";}
-  function refresh(){invalidate();s.availability="ready";}
+  function refresh(){invalidate();s.availability=revokedAccounts.has(s.account.id)?"revoked":"ready";}
   function ticket(){return seq;}
   function receivePreview(t,id){return t===seq&&!!selected()&&selected().id===id&&s.availability==="ready";}
   return {s,snapshot,switchAccount,navigate,visible,setFilter,open,selected,request,confirm,beginUpload,uploadEvent,dismissUpload,editConsent,saveConsent,revokeAccess,unavailable,refresh,ticket,receivePreview};
@@ -111,6 +112,7 @@ function mediaChecks(){
  test("Account change invalidates pending upload, confirmation and preview",()=>{const m=makeMediaDemo();m.open("a");const t=m.ticket();m.request("archive","a");m.beginUpload("Demo 12","pitching","MP4");m.switchAccount(2);return !m.receivePreview(t,"a")&&!m.confirm()&&!m.uploadEvent(100,"saved")&&m.s.upload===null&&m.selected()===null;});
  test("Revoked access immediately clears selected video, rows and download confirmation",()=>{const m=makeMediaDemo();m.switchAccount(4);m.open("a");m.request("download","a");const t=m.ticket();m.revokeAccess();return m.visible().length===0&&m.selected()===null&&!m.confirm()&&!m.receivePreview(t,"a");});
  test("Unavailable state clears private rows and does not present a normal empty library",()=>{const m=makeMediaDemo();m.open("a");m.unavailable();return m.s.availability==="unavailable"&&m.visible().length===0&&m.selected()===null;});
+ test("Refreshing or returning to a revoked account does not restore access",()=>{const m=makeMediaDemo();m.switchAccount(4);m.revokeAccess();m.refresh();if(m.s.availability!=="revoked"||m.visible().length)return false;m.switchAccount(0);m.switchAccount(4);return m.s.availability==="revoked"&&m.visible().length===0&&!m.open("a");});
  return tests;
 }
 </script>
