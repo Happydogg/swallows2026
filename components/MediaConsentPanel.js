@@ -34,7 +34,10 @@ export const MediaConsentPanel={
  },
  template:`
  <section class="sdl-panel space-y-3 p-4 sm:p-5" aria-label="Clubhouse video sharing consent">
-  <h2 class="sdl-section-title">Clubhouse video sharing</h2>
+  <header class="flex flex-wrap items-center justify-between gap-2">
+   <h2 class="sdl-section-title">Clubhouse video sharing</h2>
+   <span class="rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-300">Optional</span>
+  </header>
   <p class="text-xs text-amber-200">Synthetic staging test only. Do not grant consent for real player footage in this test environment.</p>
   <label class="block text-sm text-slate-300">Player
    <select :value="selected" @change="select($event.target.value)" class="mt-1 w-full min-h-11 rounded-lg border border-slate-600 bg-slate-950 px-3">
@@ -46,13 +49,16 @@ export const MediaConsentPanel={
   <p v-if="notice" role="status" class="text-sm text-emerald-200">{{notice}}</p>
   <button v-if="selected" type="button" @click="refresh" :disabled="busy" class="sdl-secondary px-3 py-2 text-sm">Refresh consent</button>
   <template v-if="status">
-   <p class="font-semibold">{{status.organization_name}} · {{status.active ? 'Consent active' : 'Not sharing'}}</p>
+   <div class="rounded-xl border border-slate-700 bg-slate-950/60 p-3">
+    <p class="font-semibold">{{status.organization_name}}</p>
+    <p class="mt-1 text-sm" :class="status.active?'text-emerald-200':'text-slate-300'">{{status.active ? 'Consent active' : 'Not sharing'}}</p>
+   </div>
    <p class="text-sm text-slate-300">Optional standing consent for this continuous club enrollment. Private storage and statistics sharing are separate. Only independently approved, explicitly published single-athlete clips may be shared with authorized current team members.</p>
    <p class="text-sm text-slate-300">Consent includes viewing and downloading. Authorized team members may save explicitly published clips when the download feature is enabled. Withdrawal stops future shared access; copies already delivered cannot be remotely deleted. Leaving the club ends consent.</p>
    <p class="text-xs text-slate-400">Policy: {{status.policy_version}}</p>
    <p v-if="status.active && status.accepted_at" class="text-xs text-slate-400">Accepted: {{new Date(status.accepted_at).toLocaleString()}}</p>
    <template v-if="!status.active && status.can_accept">
-    <label class="flex items-start gap-2 text-sm"><input type="checkbox" v-model="checked" :disabled="busy">I voluntarily authorize approved videos of this synthetic player to be viewed and downloaded by authorized current team members within this club.</label>
+    <label class="flex min-h-11 items-start gap-3 rounded-xl border border-slate-600 bg-slate-950/60 p-3 text-sm"><input type="checkbox" v-model="checked" :disabled="busy" class="mt-1 h-5 w-5 shrink-0">I voluntarily authorize approved videos of this synthetic player to be viewed and downloaded by authorized current team members within this club.</label>
     <button type="button" @click="accept" :disabled="busy || !checked" class="sdl-primary px-4 py-3 text-sm disabled:opacity-50">Grant sharing consent</button>
    </template>
    <p v-else-if="!status.active" class="text-sm text-amber-200">Acceptance unavailable. Check current enrollment, participation restrictions or unresolved guardian objections.</p>
