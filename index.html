@@ -146,6 +146,7 @@
         <p class="mt-2 text-sm text-slate-300">Your membership and permissions determine which team, family and administrative tools are available.</p>
         <button type="button" @click="navigateTab('me')" class="mt-4 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold">Open account workspace</button>
       </section>
+      <action-center v-if="activeTab === 'home' && !authError" :items="actionCenterItems" :status="actionCenterStatus" @navigate="openActionCenter" @refresh="reviewQueue.retry"></action-center>
       <h1 v-if="activeTab === 'stats' && currentView === 'overview'" class="mb-3 text-2xl font-black text-white sm:text-3xl">Stats</h1>
       <managed-roster v-if="activeTab === 'stats' && isManagedWorkspace" scope-only :controller="managedRosterController"
         @organization="changeManagedOrganization" @team="changeManagedTeam" @retry="retryManagedRoster" @more="loadMoreManagedRoster"></managed-roster>
@@ -329,13 +330,19 @@
       <h1 class="text-2xl font-black text-white">Videos</h1>
       <nav class="sdl-tabs flex flex-wrap gap-2 p-1.5" aria-label="Video sections">
         <button type="button" @click="changeVideoSection('library')" :aria-pressed="videoSection==='library'" :disabled="videoSectionBusy && videoSection!=='library'" :class="videoSection==='library'?'bg-cyan-900 text-cyan-100':'text-slate-300'" class="min-h-11 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">Library</button>
+        <button v-if="reviewScope" type="button" @click="changeVideoSection('review')" :aria-pressed="videoSection==='review'" :disabled="videoSectionBusy && videoSection!=='review'" :class="videoSection==='review'?'bg-cyan-900 text-cyan-100':'text-slate-300'" class="min-h-11 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">Review</button>
         <button v-if="clubhouseMediaTeams.length" type="button" @click="changeVideoSection('clubhouse')" :aria-pressed="videoSection==='clubhouse'" :disabled="videoSectionBusy && videoSection!=='clubhouse'" :class="videoSection==='clubhouse'?'bg-cyan-900 text-cyan-100':'text-slate-300'" class="min-h-11 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">Clubhouse</button>
       </nav>
       <p v-if="videoSectionBusy" role="status" class="text-xs text-slate-400">Finish the current media action before switching sections.</p>
-      <p v-else-if="['coach','admin'].includes(workspaceMode) && videoSection==='library'" class="text-xs text-slate-400">Review pending clips inside the authorized player library. The central review inbox is not yet available.</p>
+      <p v-else-if="reviewScope && videoSection==='library'" class="text-xs text-slate-400">Open Review for the centralized pending inbox, or review clips inside the authorized player library.</p>
     </section>
     <private-media-panel v-if="activeTab === 'videos' && mediaOriginAllowed && videoSection==='library'"
       :controller="privateMediaController"></private-media-panel>
+    <template v-if="activeTab === 'videos' && mediaOriginAllowed && !authError && videoSection==='review' && reviewScope">
+      <video-review-inbox :available="reviewQueue.available.value" :scope="reviewScope" :status="reviewQueue.status.value" :rows="reviewQueue.rows.value" :filters="reviewQueue.filters.value" :teams="reviewQueue.teams.value" :players="reviewQueue.players.value" :total="reviewQueue.total.value" :filtered-total="reviewQueue.filteredTotal.value" :has-more="!!reviewQueue.next.value" :busy="reviewQueue.opening.value || privateMediaController.mediaReviewing.value" @filter="reviewQueue.filter" @refresh="reviewQueue.retry" @more="reviewQueue.refreshInbox(true)" @open="reviewQueue.open"></video-review-inbox>
+      <p v-if="reviewQueue.notice.value" role="status" class="my-3 text-sm text-amber-200">{{reviewQueue.notice.value}}</p>
+      <private-media-panel review-only :controller="privateMediaController" @close-review="closeInboxReview"></private-media-panel>
+    </template>
     <media-publication-panel v-if="activeTab === 'videos' && mediaOriginAllowed && !authError && videoSection==='library' && ['coach','admin'].includes(workspaceMode) && privateMediaController.mediaPlayerId.value"
       ref="publicationPanel" :key="authUser.id + ':' + workspaceMode + ':' + privateMediaController.mediaPlayerId.value" :auth="loginController" :controller="privateMediaController"></media-publication-panel>
     <clubhouse-media-panel v-if="activeTab === 'videos' && mediaOriginAllowed && !authError && videoSection==='clubhouse' && clubhouseMediaTeams.length"
