@@ -5,11 +5,12 @@ export const CoachHome = {
   props: {
     roster: { type: Array, required: true },
     loading: { type: Boolean, default: false },
-    error: { type: String, default: '' }
+    error: { type: String, default: '' },
+    authorizedTeamCount: { type: Number, default: null }
   },
   emits: ['navigate', 'open-profile', 'open-video'],
   setup(props) {
-    const teamCount = Vue.computed(() => new Set(props.roster.map(p => p.team_id).filter(Boolean)).size);
+    const teamCount = Vue.computed(() => props.authorizedTeamCount ?? new Set(props.roster.map(p => p.team_id).filter(Boolean)).size);
     const preview = Vue.computed(() => props.roster); // Full authorized roster; no five-player truncation.
     const avatarFor = player => {
       const approved=String(player?.photo_url||'');

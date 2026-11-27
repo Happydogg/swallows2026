@@ -189,7 +189,7 @@ test('Fix 4: newly registered unlinked user makes zero players, sessions, or coa
 test('Fix 4: failed membership lookup fails closed with zero player or session queries', async t => {
   const h = await harness(t);
   h.rows.players = [{ id: 'p-1', athlete_id: 'child-1', jersey: '11' }];
-  h.queue('team_memberships', { data: null, error: { message: 'membership lookup failed' } });
+  h.queue('sdl_v5_account_context', { data: null, error: { message: 'membership lookup failed' } });
   h.app.loginEmail.value = 'user@example.invalid';
   h.app.loginPassword.value = 'synthetic';
   await h.app.signInAndLoad();
@@ -201,7 +201,7 @@ test('Fix 4: failed membership lookup fails closed with zero player or session q
   assert.equal(h.app.players.value.length, 0);
 });
 
-test('Fix 4: administrator-only account retains admin role without receiving unrestricted player or session data', async t => {
+test('administrator-only account uses the scoped roster without receiving unrestricted player or session data', async t => {
   const h = await harness(t);
   h.rows.organization_memberships = [{ organization_id: 'org-1', role: 'admin', status: 'active' }];
   h.rows.players = [{ id: 'p-1', athlete_id: 'child-1', jersey: '11' }];
@@ -212,6 +212,7 @@ test('Fix 4: administrator-only account retains admin role without receiving unr
   await until(() => !h.app.loading.value);
   assert.equal(h.app.isOrgAdmin.value, true);
   assert.equal(h.app.isTeamCoach.value, false);
+  assert.equal(h.calls.some(c => c.rpc === 'sdl_v5_authorized_roster' && c.args.p_role === 'club_admin'), true);
   assert.equal(playerCalls(h).length, 0);
   assert.equal(sessionCalls(h).length, 0);
   assert.equal(h.app.players.value.length, 0);

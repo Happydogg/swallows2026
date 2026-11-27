@@ -31,11 +31,20 @@ export const AppShell = {
     mode: { type: String, required: true },
     canCoach: { type: Boolean, default: false },
     canFamily: { type: Boolean, default: false },
+    workspaceOptions: { type: Array, default: null },
     accountEmail: { type: String, default: '' },
     signOutBusy: { type: Boolean, default: false }
   },
   emits: ['navigate', 'mode-change', 'sign-out'],
-  setup() { return { destinations: DESTINATIONS }; },
+  setup(props) {
+    // The separate synthetic design preview still supplies the original props.
+    // The authenticated application always passes its verified workspace list.
+    const displayOptions = Vue.computed(() => props.workspaceOptions ?? [
+      ...(props.canCoach ? [{id:'coach',label:'Coach'}] : []),
+      ...(props.canFamily ? [{id:'family',label:'Family'}] : [])
+    ]);
+    return { destinations: DESTINATIONS, displayOptions };
+  },
   template: `
     <div class="min-h-screen text-slate-100 md:flex md:gap-6">
       <aside class="hidden md:sticky md:top-4 md:z-30 md:flex md:h-[calc(100vh-2rem)] md:max-h-[calc(100dvh-2rem)] md:w-52 lg:w-60 md:shrink-0 md:self-start md:flex-col md:overflow-y-auto md:overscroll-contain md:rounded-3xl md:border md:border-slate-700/70 md:bg-slate-950/95 md:p-4 md:shadow-xl no-print" aria-label="App navigation">
@@ -54,7 +63,7 @@ export const AppShell = {
         </nav>
         <div class="mt-auto space-y-3 border-t border-slate-800 px-2 pt-5">
           <p class="truncate text-xs text-slate-400" :title="accountEmail">{{ accountEmail }}</p>
-          <p class="text-xs font-semibold text-emerald-300">{{ mode==='coach' ? 'Coach workspace' : mode==='family' ? 'Family workspace' : mode==='admin' ? 'Club administration' : 'Limited access' }}</p>
+          <p class="text-xs font-semibold text-emerald-300">{{ displayOptions.find(option=>option.id===mode)?.label || 'Limited access' }} workspace</p>
           <button type="button" @click="$emit('sign-out')" :disabled="signOutBusy"
             class="w-full rounded-lg border border-slate-700 px-3 py-3 text-left text-sm font-semibold text-slate-300 hover:border-slate-500 disabled:opacity-50">Sign out</button>
         </div>
@@ -66,18 +75,18 @@ export const AppShell = {
             <img src="./logo.png" alt="" class="h-9 w-9 rounded-lg object-contain md:hidden"/>
             <div class="min-w-0">
               <p class="truncate text-xs font-black tracking-widest text-white md:text-sm">SWALLOWS <span class="text-cyan-400">DATALAB</span></p>
-              <p class="text-xs text-slate-400">{{ mode==='coach' ? 'Coach' : mode==='family' ? 'My family' : mode==='admin' ? 'Club admin' : 'My account' }} · {{ destinations.find(item=>item.id===activeTab)?.text || 'Home' }}</p>
+              <p class="text-xs text-slate-400">{{ displayOptions.find(option=>option.id===mode)?.label || 'My account' }} · {{ destinations.find(item=>item.id===activeTab)?.text || 'Home' }}</p>
             </div>
           </div>
           <div class="flex shrink-0 items-center gap-2">
-            <label v-if="canCoach && canFamily" class="text-xs text-slate-300">
+            <label v-if="displayOptions.length > 1" class="text-xs text-slate-300">
               <span class="sr-only">Workspace mode</span>
               <select :value="mode" @change="$emit('mode-change',$event.target.value)"
                 class="max-w-36 rounded-lg border border-slate-600 bg-slate-900 px-2 py-2 text-xs font-semibold text-white">
-                <option value="coach">Coach</option><option value="family">Family</option>
+                <option v-for="option in displayOptions" :key="option.id" :value="option.id">{{ option.label }}</option>
               </select>
             </label>
-            <span v-else class="rounded-full border border-emerald-500/30 bg-emerald-950/30 px-2.5 py-1.5 text-xs font-semibold text-emerald-300">{{ mode==='coach' ? 'COACH' : mode==='family' ? 'FAMILY' : mode==='admin' ? 'ADMIN' : 'MEMBER' }}</span>
+            <span v-else class="rounded-full border border-emerald-500/30 bg-emerald-950/30 px-2.5 py-1.5 text-xs font-semibold text-emerald-300">{{ displayOptions[0]?.label || 'MEMBER' }}</span>
           </div>
         </header>
 

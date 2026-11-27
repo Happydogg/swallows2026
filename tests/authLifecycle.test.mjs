@@ -89,10 +89,10 @@ test('late getUser cannot restore identity after logout', async t => {
 });
 
 test('late memberships cannot overwrite another account or restore guardian links', async t => {
-  const h = await harness(t); const pending = deferred(); h.queue('team_memberships', pending.promise);
+  const h = await harness(t); const pending = deferred(); h.queue('sdl_v5_account_context', pending.promise);
   h.rows.athlete_guardians = [{ athlete_id: 'old-child', status: 'verified' }];
   h.emit('SIGNED_IN', user('old'));
-  await until(() => h.calls.some(c => c.table === 'team_memberships'));
+  await until(() => h.calls.some(c => c.rpc === 'sdl_v5_account_context'));
   h.rows.athlete_guardians = [];
   h.emit('SIGNED_IN', user('new'));
   await until(() => h.app.authUser.value?.id === 'new' && !h.app.loading.value);

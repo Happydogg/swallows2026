@@ -136,6 +136,7 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   // Verify parent landing does not render legacy Coach Overview (Active Roster / Arm Safety Flags)
   submissions.changeTab('players');
   h.app.guardianLinks.value=[{athlete_id:'athlete-1',status:'verified'}];
+  h.setFixtureRoles(['guardian']);
   h.app.players.value=[{
     id:'11111111-1111-4111-8111-111111111111',
     athlete_id:'athlete-1',
@@ -196,6 +197,25 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   assert.match(flatten(host), /Received a WhatsApp invitation/);
   h.app.setAuthMethod('email'); await Vue.nextTick();
   assert.match(flatten(host), /Sign in securely/);
+  // Render the new role-aware workspace using a versioned synthetic response,
+  // including an effective team with no direct CA membership or roster row.
+  h.loginUser=user('admin-fixture');
+  h.rows.sdl_v5_account_context={version:1,user_id:'admin-fixture',roles:['club_admin'],
+    direct_memberships:{organizations:[],teams:[],guardian_links:0},
+    organizations:[{id:'club-a',name:'Synthetic Club A',roles:['club_admin']}],
+    teams:[{id:'team-a1',organization_id:'club-a',name:'Synthetic Team A1',roles:['club_admin']},
+      {id:'empty',organization_id:'club-a',name:'Empty Team',roles:['club_admin']}],
+    platform:{view:false,export:false,sensitive_write:false}};
+  h.rows.sdl_v5_authorized_roster={version:1,role:'club_admin',rows:[{id:'fixture-player',organization_id:'club-a',team_ids:['team-a1'],preferred_name:'Synthetic Roster Player',jersey:'10',position:'P',throws:'R',bats:'L'}],next_after:null};
+  await h.app.signInAndLoad();await Vue.nextTick();
+  assert.match(flatten(host),/Club Admin Dashboard/);assert.match(flatten(host),/Synthetic Roster Player/);
+  assert.match(flatten(host),/Empty Team/);
+  h.app.navigateTab('team');await Vue.nextTick();assert.match(flatten(host),/Club Admin Roster/);
+  h.rows.sdl_v5_authorized_roster={version:1,role:'club_admin',rows:[],next_after:null};
+  await h.app.changeManagedTeam('empty');await Vue.nextTick();
+  assert.match(flatten(host),/No players in this authorized scope/);
+  assert.doesNotMatch(flatten(host),/Synthetic Roster Player/);
+  await h.app.signOutAndClear();await Vue.nextTick();
   assert.equal(errors.length, 0, errors.map(String).join('\n'));
   assert.equal(warnings.length, 0, warnings.join('\n'));
 });

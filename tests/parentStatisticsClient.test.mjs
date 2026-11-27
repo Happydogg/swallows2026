@@ -48,7 +48,7 @@ test('dual-role coach uses narrow coach history on navigation and separate guard
  assert.equal(h.app.profileHistoryLoading.value,false);
  assert.equal(h.app.getLatestMetric(P,'exit_velo'),77,'Explicit coach profile navigation uses scoped history');
  assert.equal(c.cards.value[0].profiles[0].latestExitVelo,62);
- h.app.changeWorkspace('family');
+ await h.app.changeWorkspace('family');
  assert.equal(h.app.getLatestMetric(P,'exit_velo'),null);
  await h.app.selectPlayer(h.app.familyPlayers.value[0]);
  assert.equal(h.calls.filter(call=>call.rpc===guardianHistory).at(-1).args.p_player_id,P);
@@ -61,7 +61,7 @@ test('a guardian link does not grant coach history or access to an unrelated pla
  await h.app.selectPlayer(h.app.familyPlayers.value[0]);
  assert.equal(h.app.selectedPlayer.value,null);
  assert.equal(h.calls.some(call=>[coachHistory,guardianHistory].includes(call.rpc)),false);
- h.app.changeWorkspace('family');
+ await h.app.changeWorkspace('family');
  await h.app.selectPlayer({id:S});
  assert.equal(h.app.selectedPlayer.value,null);
  assert.equal(h.calls.some(call=>call.rpc===guardianHistory),false);
@@ -87,7 +87,7 @@ test('late coach history cannot replace the next player, family scope or a new i
  const oldRole=deferred();
  h.queue(coachHistory,oldRole.promise);
  const coachSelection=h.app.selectCoachRosterPlayer(first);
- h.app.changeWorkspace('family');
+ await h.app.changeWorkspace('family');
  await h.app.openFamilyPlayerProfile(h.app.familyPlayers.value[0]);
  oldRole.resolve(ok([{...stats,exit_velo:77}]));
  await coachSelection;
@@ -110,12 +110,12 @@ test('late family workspace history cannot reopen a profile after switching to c
  let pending;
  const {h,login}=await app(t,{coach:true,response:async()=>pending?pending.promise:Response.json({items:[stats]})});
  await login;
- h.app.changeWorkspace('family');
+ await h.app.changeWorkspace('family');
  pending=deferred();
  const selection=h.app.submissionController.showProfile(P);
- h.app.changeWorkspace('coach');
+ const roleChange=h.app.changeWorkspace('coach');
  pending.resolve(Response.json({items:[stats]}));
- await selection;
+ await selection; await roleChange;
  assert.equal(h.app.currentView.value,'overview');
  assert.equal(h.app.getLatestMetric(P,'exit_velo'),null);
 });

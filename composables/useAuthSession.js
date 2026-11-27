@@ -1,9 +1,10 @@
 // SDL-004-005: staging authentication/read-only workspace.
 // Server RLS, not this client state, determines data access.
 import { SUBMISSION_FEATURES_ENABLED, supabaseClient } from '../js/config.js';
+import { fetchAccountContext } from '../js/accountContextService.js';
 const { ref, computed } = Vue;
 
-export function useAuthSession({ onIdentityChange = () => {}, onAuthenticated = async () => {}, onInvitation=()=>{} } = {}) {
+export function useAuthSession({ onIdentityChange = () => {}, onAuthenticated = async () => {}, onContextChange = () => {}, onInvitation=()=>{} } = {}) {
   const authReady = ref(false);
   const authUser = ref(null);
   const authError = ref('');
@@ -20,23 +21,27 @@ export function useAuthSession({ onIdentityChange = () => {}, onAuthenticated = 
   const orgMemberships = ref([]);
   const teamMemberships = ref([]);
   const guardianLinks = ref([]);
+  const accountContext = ref(null);
 
-  const isTeamCoach = computed(() => teamMemberships.value.some(m => m.role === 'coach' && m.status === 'active'));
-  const isOrgAdmin = computed(() => orgMemberships.value.some(m => m.role === 'admin' && m.status === 'active'));
-  const isVerifiedGuardian = computed(() => guardianLinks.value.some(m => m.status === 'verified'));
-  const isParentOnly = computed(() => !isTeamCoach.value && !isOrgAdmin.value && isVerifiedGuardian.value);
+  const hasRole = role => !authError.value && accountContext.value?.roles.includes(role) === true;
+  const isTeamCoach = computed(() => hasRole('coach'));
+  const isOrgAdmin = computed(() => hasRole('club_admin'));
+  const isTeamManager = computed(() => hasRole('manager'));
+  const isVerifiedGuardian = computed(() => hasRole('guardian') && guardianLinks.value.some(m => m.status === 'verified'));
+  const isParentOnly = computed(() => !isTeamCoach.value && !isOrgAdmin.value && !isTeamManager.value && isVerifiedGuardian.value);
 
   // Every session transition invalidates work started by the previous session,
   // even when a user signs out and back in with the same account.
   let sessionVersion = 0;
+  let contextVersion = 0;
   let actionVersion = 0;
   let refreshTimer = null;
   let subscription = null;
   let disposed = false;
 
-  const captureIdentity = () => ({ version: sessionVersion, userId: authUser.value?.id });
+  const captureIdentity = () => ({ version: sessionVersion, contextVersion, userId: authUser.value?.id });
   const isCurrentIdentity = identity => !disposed && Boolean(identity.userId) &&
-    identity.version === sessionVersion && identity.userId === authUser.value?.id;
+    identity.version === sessionVersion && identity.contextVersion === contextVersion && identity.userId === authUser.value?.id;
 
   function invalidateIdentity() {
     const previousId=authUser.value?.id;
@@ -47,6 +52,7 @@ export function useAuthSession({ onIdentityChange = () => {}, onAuthenticated = 
     orgMemberships.value = [];
     teamMemberships.value = [];
     guardianLinks.value = [];
+    accountContext.value = null;
     loginPassword.value = '';
     loginPhone.value = '';
     loginOtpCode.value = '';
@@ -108,29 +114,43 @@ export function useAuthSession({ onIdentityChange = () => {}, onAuthenticated = 
   }
 
   async function refreshIdentity(version,notify=true) {
-    const current = () => !disposed && version === sessionVersion;
+    const revision = ++contextVersion;
+    const current = () => !disposed && version === sessionVersion && revision === contextVersion;
+    let verifiedUser = null;
     try {
       // getUser verifies the JWT with the authentication server.
       const { data, error } = await supabaseClient.auth.getUser();
-      if (!current() || error || !data?.user) return;
-      const results = await Promise.all([
-        supabaseClient.from('organization_memberships').select('organization_id, role, status'),
-        supabaseClient.from('team_memberships').select('team_id, role, status'),
-        supabaseClient.from('athlete_guardians').select('athlete_id, relationship, status')
-      ]);
       if (!current()) return;
-      authUser.value = data.user;
-      const failure = results.find(r => r.error);
-      if (failure) authError.value = failure.error.message;
-      else {
-        orgMemberships.value = results[0].data || [];
-        teamMemberships.value = results[1].data || [];
-        guardianLinks.value = results[2].data || [];
+      if (error || !data?.user) {
+        authUser.value = null;
+        if (error) authError.value = error.message || 'Session verification failed';
+        return;
       }
+      verifiedUser = data.user;
+      const context = await fetchAccountContext(data.user.id);
+      if (!current()) return;
+      // Keep the established narrow guardian projection (the new context only
+      // reports a guardian link count, not athlete identifiers).
+      const links = context.roles.includes('guardian')
+        ? await supabaseClient.from('athlete_guardians').select('athlete_id, relationship, status')
+        : { data: [], error: null };
+      if (!current()) return;
+      if (links.error) throw links.error;
+      authUser.value = verifiedUser;
+      orgMemberships.value = context.direct_memberships.organizations;
+      teamMemberships.value = context.direct_memberships.teams;
+      guardianLinks.value = (links.data || []).filter(link => link.status === 'verified');
+      authError.value = '';
+      accountContext.value = context;
       authReady.value = true;
       if(notify)await onAuthenticated();
     } catch (error) {
-      if (current()) authError.value = error.message || 'Authentication could not be verified';
+      if (current()) {
+        authUser.value = verifiedUser;
+        accountContext.value = null;
+        orgMemberships.value = []; teamMemberships.value = []; guardianLinks.value = [];
+        authError.value = error.message || 'Authentication could not be verified';
+      }
     } finally {
       if (current()) authReady.value = true;
     }
@@ -219,7 +239,13 @@ export function useAuthSession({ onIdentityChange = () => {}, onAuthenticated = 
     }catch(error){if(!disposed&&version===sessionVersion)authError.value=error.message||'Registration failed';}
     finally{if(!disposed&&version===sessionVersion){loginPassword.value='';authBusy.value=false;}}
   }
-  const reloadMemberships=()=>refreshIdentity(sessionVersion,false);
+  const reloadMemberships=async()=>{
+    accountContext.value=null;
+    orgMemberships.value=[];teamMemberships.value=[];guardianLinks.value=[];
+    authReady.value=false;
+    onContextChange();
+    await refreshIdentity(sessionVersion,true);
+  };
 
   async function signOut() {
     if (disposed) return;
@@ -253,8 +279,8 @@ export function useAuthSession({ onIdentityChange = () => {}, onAuthenticated = 
     loginEmail, loginPassword, loginPhone, loginOtpCode, otpSent,
     inviteCode, inviteEmail,
     requestPhoneOtp, verifyOtpCode, redeemInvitation,
-    orgMemberships, teamMemberships, guardianLinks,
-    isTeamCoach, isOrgAdmin, isVerifiedGuardian, isParentOnly,
+    orgMemberships, teamMemberships, guardianLinks, accountContext,
+    isTeamCoach, isOrgAdmin, isTeamManager, isVerifiedGuardian, isParentOnly,
     initializeAuth, signIn, signOut, registerEmail,reloadMemberships,
     captureIdentity, isCurrentIdentity, disposeAuth
   };

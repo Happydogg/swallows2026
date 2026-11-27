@@ -44,10 +44,10 @@ export function createAvatarService({
     return /^https:\/\//.test(data?.signedUrl || '') ? data.signedUrl : '';
   }
 
-  async function listManagedPlayers() {
+  async function listManagedPlayers({filterRows=rows=>rows}={}) {
     const { data, error } = await client.rpc('sdl_ux_avatar_managed_players');
     if (error) throw error;
-    const rows = Array.isArray(data) ? data : [];
+    const rows = filterRows(Array.isArray(data) ? data : []);
     const signed = await Promise.all(rows.map(async row => ({
       ...row,
       display_photo_url: await resolvePhoto(row).catch(() => fallbackDemoAvatar(row))

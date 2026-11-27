@@ -2,7 +2,7 @@
 // Browser controls improve UX, but the database RPC and storage RLS enforce access.
 import { avatarService } from '../js/avatarService.js';
 
-export function useAvatarManager({ auth, service = avatarService } = {}) {
+export function useAvatarManager({ auth, service = avatarService, filterRows = rows => rows } = {}) {
   const rows = Vue.ref([]);
   const loading = Vue.ref(false);
   const busy = Vue.ref(false);
@@ -33,13 +33,14 @@ export function useAvatarManager({ auth, service = avatarService } = {}) {
 
   const load = async () => {
     const identity = auth.captureIdentity();
-    if (!auth.isCurrentIdentity(identity) || auth.authError.value) return;
+    if (busy.value || !auth.isCurrentIdentity(identity) || auth.authError.value) return;
     const stamp = ++generation;
     loading.value = true;
     error.value = '';
     try {
-      const allowed = await service.listManagedPlayers();
-      if (stamp === generation && auth.isCurrentIdentity(identity)) rows.value = allowed;
+      const allowed = await service.listManagedPlayers({filterRows: rows =>
+        stamp === generation && auth.isCurrentIdentity(identity) ? filterRows(rows) : []});
+      if (stamp === generation && auth.isCurrentIdentity(identity)) rows.value = filterRows(allowed);
     } catch (reason) {
       if (stamp === generation && auth.isCurrentIdentity(identity)) {
         rows.value = [];
@@ -70,6 +71,7 @@ export function useAvatarManager({ auth, service = avatarService } = {}) {
   };
   const save = async () => {
     const identity = auth.captureIdentity();
+    const stamp = generation;
     const playerId = selectedId.value;
     if (busy.value || !selectedFile.value || !canEdit(playerId)
       || !auth.isCurrentIdentity(identity) || auth.authError.value) return;
@@ -78,7 +80,7 @@ export function useAvatarManager({ auth, service = avatarService } = {}) {
     notice.value = '';
     try {
       const result = await service.uploadPlayerPhoto(playerId,selectedFile.value);
-      if (!auth.isCurrentIdentity(identity)) return;
+      if (stamp !== generation || !auth.isCurrentIdentity(identity)) return;
       rows.value = rows.value.map(row => row.id === playerId ? {
         ...row,photo_url: result.photo_url, display_photo_url: result.display_photo_url
       } : row);
@@ -86,9 +88,9 @@ export function useAvatarManager({ auth, service = avatarService } = {}) {
       notice.value = 'Private profile photo saved.';
       open.value = false;
     } catch (reason) {
-      if (auth.isCurrentIdentity(identity)) error.value = reason.message || 'Photo update failed.';
+      if (stamp === generation && auth.isCurrentIdentity(identity)) error.value = reason.message || 'Photo update failed.';
     } finally {
-      if (auth.isCurrentIdentity(identity)) busy.value = false;
+      if (stamp === generation && auth.isCurrentIdentity(identity)) busy.value = false;
     }
   };
   return { rows,photos,loading,busy,open,selectedId,selectedPlayer,selectedFile,error,notice,

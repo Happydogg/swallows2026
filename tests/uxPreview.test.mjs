@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { buildUxPreview } from '../scripts/build-ux-preview.mjs';
 
 const EXPECTED = [
@@ -62,7 +63,7 @@ test('all exported modules pass Node syntax and resolve only allowlisted local i
   const dir=new URL('../dist-ux-preview/',import.meta.url);
   for (const item of EXPECTED.filter(p=>p.endsWith('.js'))) {
     const target=new URL(item,dir);
-    const check=spawnSync(process.execPath,['--check',target.pathname],{encoding:'utf8'});
+    const check=spawnSync(process.execPath,['--check',fileURLToPath(target)],{encoding:'utf8'});
     assert.equal(check.status,0,item+' '+check.stderr);
     const content=fs.readFileSync(target,'utf8');
     for (const match of content.matchAll(/from\s+['"]([^'"]+)['"]/g)) {

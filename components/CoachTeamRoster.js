@@ -25,7 +25,8 @@ export const CoachTeamRoster = {
   props: {
     roster: { type: Array, required: true },
     loading: { type: Boolean, required: true },
-    error: { type: String, default: '' }
+    error: { type: String, default: '' },
+    showTeamFilter: { type: Boolean, default: true }
   },
   template: `
     <section class="space-y-4" aria-label="Coach team roster">
@@ -36,7 +37,7 @@ export const CoachTeamRoster = {
         </div>
         <span class="text-sm text-slate-300">{{ displayedRoster.length }} players</span>
       </header>
-      <label class="block text-sm">Team<select v-model="selectedTeam" class="block w-full mt-1 rounded bg-slate-900 p-3"><option value="">All authorized teams</option><option v-for="team in teamOptions" :key="team.id" :value="team.id">{{ team.name }}</option></select></label>
+      <label v-if="showTeamFilter" class="block text-sm">Team<select v-model="selectedTeam" class="block w-full mt-1 rounded bg-slate-900 p-3"><option value="">All authorized teams</option><option v-for="team in teamOptions" :key="team.id" :value="team.id">{{ team.name }}</option></select></label>
       <label class="block text-sm">Search by name or jersey
         <input v-model="search" type="search" class="mt-1 block w-full rounded bg-slate-900 p-3">
       </label>

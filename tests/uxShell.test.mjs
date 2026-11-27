@@ -30,12 +30,15 @@ test('family dashboard shows only verified linked athletes, even for dual-role u
   const good={id:'good',athlete_id:'linked',preferred_name:'Linked child',jersey:'12'};
   const bad={id:'bad',athlete_id:'other',preferred_name:'Unrelated child',jersey:'99'};
   h.app.guardianLinks.value=[{athlete_id:'linked',status:'verified'},{athlete_id:'other',status:'revoked'}];
+  h.setFixtureRoles(['guardian']);
   h.app.players.value=[good,bad];
   assert.equal(h.app.workspaceMode.value,'family');
   assert.deepEqual([...h.app.familyPlayers.value.map(p=>p.id)],['good']);
   h.app.teamMemberships.value=[{team_id:'team',role:'coach',status:'active'}];
+  h.setFixtureRoles(['coach','guardian']);
   assert.equal(h.app.workspaceMode.value,'coach');
-  h.app.changeWorkspace('family');
+  h.rows.athlete_guardians=h.app.guardianLinks.value; h.rows.players=[good,bad];
+  await h.app.changeWorkspace('family');
   assert.equal(h.app.workspaceMode.value,'family');
   assert.deepEqual([...h.app.familyPlayers.value.map(p=>p.id)],['good']);
 });
@@ -97,10 +100,13 @@ test('authenticated player browser uses scoped coach or verified-guardian data o
   h.app.players.value=[linked,other];
   h.app.coachRoster.value=[coach];
   h.app.guardianLinks.value=[{athlete_id:'guardian-athlete',status:'verified'}];
+  h.setFixtureRoles(['guardian']);
   assert.deepEqual([...h.app.visibleStagingPlayers.value.map(row=>row.id)],['linked-child']);
   h.app.teamMemberships.value=[{team_id:'authorized-team',role:'coach',status:'active'}];
+  h.setFixtureRoles(['coach','guardian']);
   assert.deepEqual([...h.app.visibleStagingPlayers.value.map(row=>row.id)],['coach-child']);
-  h.app.changeWorkspace('family');
+  h.rows.athlete_guardians=h.app.guardianLinks.value; h.rows.players=[linked,other];
+  await h.app.changeWorkspace('family');
   assert.deepEqual([...h.app.visibleStagingPlayers.value.map(row=>row.id)],['linked-child']);
   h.app.authError.value='Membership service denied';
   assert.deepEqual([...h.app.visibleStagingPlayers.value],[]);
@@ -110,6 +116,7 @@ test('new preview host does not claim private Worker CORS eligibility', async t 
   const h=await harness(t,user('staging-review'));
   assert.equal(h.app.mediaOriginAllowed.value,false);
   h.app.guardianLinks.value=[{athlete_id:'guardian-athlete',status:'verified'}];
+  h.setFixtureRoles(['guardian']);
   h.app.submissionController.changeTab('clubhouse');
   h.app.navigateTab('team');
   assert.equal(h.app.submissionController.tab.value,'players');
@@ -121,14 +128,14 @@ test('new preview host does not claim private Worker CORS eligibility', async t 
 test('media fallback links to original staging host for unapproved origins',()=>{
   assert.match(index,/href="https:\/\/sdl-staging\.pages\.dev\/"/);
   assert.match(index,/v-if="activeTab === 'videos' && !mediaOriginAllowed"/);
-  assert.ok(index.includes("v-if=\"activeTab === 'videos' && mediaOriginAllowed\""));
+  assert.ok(index.includes("v-if=\"activeTab === 'videos' && mediaOriginAllowed && !isManagedWorkspace\""));
   assert.ok(index.includes("activeTab === 'team' && mediaOriginAllowed && visibleStagingPlayers.some"));
 });
 
 test('approved live UX hostname enables the existing private-media panel without changing Worker calls', () => {
   assert.ok(appSource.includes('https://sdl-ux-live.pages.dev'));
   assert.match(appSource,/mediaOriginAllowed = computed/);
-  assert.ok(index.includes("v-if=\"activeTab === 'videos' && mediaOriginAllowed\""));
+  assert.ok(index.includes("v-if=\"activeTab === 'videos' && mediaOriginAllowed && !isManagedWorkspace\""));
   assert.ok(index.includes("activeTab === 'team' && mediaOriginAllowed && visibleStagingPlayers.some"));
   assert.match(index,/<private-media-panel/);
   assert.match(index,/v-if="activeTab === 'videos' && !mediaOriginAllowed"/);
@@ -203,6 +210,7 @@ test('video shortcuts are wired through one server-scoped player route', () => {
 test('a video shortcut cannot navigate for unlinked or revoked players', async t => {
   const h = await harness(t,user('video-shortcut'));
   h.app.guardianLinks.value = [{ athlete_id:'linked',status:'verified' },{ athlete_id:'revoked',status:'revoked' }];
+  h.setFixtureRoles(['guardian']);
   h.app.players.value = [
     {id:'authorized-player',athlete_id:'linked',preferred_name:'Linked'},
     {id:'blocked-player',athlete_id:'revoked',preferred_name:'Not linked'}
@@ -233,10 +241,10 @@ test('compact mobile player editing is reached only from the dedicated Player Pr
   assert.ok(editor.includes('Other player details remain read-only'));
   assert.ok(!editor.includes('>Change photo'));
   assert.ok(app.includes("loadAuthorizedHistory(selected.id,'guardian')"), 'family profile uses pre-existing guardian-protected history RPC');
-  assert.ok(app.includes('avatarManager.rows.value.find'));
+  assert.ok(app.includes('managedRoster.rows.value.find'));
   assert.ok(index.includes('@open-profile="openFamilyPlayerProfile"'));
   assert.ok(index.includes('@open-profile="openManagedPlayerProfile"'));
-  assert.ok(index.includes(':show-list="activeTab === \'me\' && workspaceMode === \'admin\'"'));
+  assert.ok(index.includes(':show-list="activeTab === \'me\' && workspaceMode === \'admin\'"'), 'existing admin photo directory remains separate from roster');
 });
 
 test('private video room occupies the video section of authorized player profiles',()=>{

@@ -14,6 +14,8 @@ import { createArAnalyzerController } from './arAnalyzer.js';
 import { compareJerseys } from '../utils/jerseyUtils.js';
 import { useCoachMode } from '../composables/useCoachMode.js';
 import { useAuthSession } from '../composables/useAuthSession.js';
+import { useManagedRoster } from '../composables/useManagedRoster.js';
+import { ManagedRoster } from '../components/ManagedRoster.js';
 import { usePlayers } from '../composables/usePlayers.js';
 import { useSessions } from '../composables/useSessions.js';
 import { useEnrollmentAdmin } from '../composables/useEnrollmentAdmin.js';
@@ -51,7 +53,7 @@ const { createApp, ref, onMounted, onUnmounted, markRaw, computed } = Vue;
 createApp({
   components: {
     PilotWorkspace, PerformanceInbox, LoginLanding, AppShell, CoachHome, ParentHome, StatsHub, AuthorizedStatsBoard, StagingDataBrowser, AvatarManager, InviteOnboarding, AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
-    SessionFormModal, UploadVideoModal, ArAnalyzerModal
+    SessionFormModal, UploadVideoModal, ArAnalyzerModal, ManagedRoster
   },
   setup() {
     const savedLang = localStorage.getItem('swallows_lang');
@@ -76,12 +78,15 @@ createApp({
     const coachRoster = ref([]);
     const coachRosterLoading = ref(false);
     const coachRosterError = ref('');
+    const coachOrganizationId = ref(''), coachTeamId = ref('');
+    let workspaceRevision = 0;
 
     let initialInvitation='';
     const pendingInvitation=ref(false);
     const auth = useAuthSession({
       onInvitation:token=>{initialInvitation=token;},
       onIdentityChange: previous => {if(previous?.userId)initialInvitation='';clearSensitiveState();},
+      onContextChange: () => clearSensitiveState(),
       onAuthenticated: async () => {
         const identity = auth.captureIdentity();
         if (auth.isVerifiedGuardian.value && !auth.isTeamCoach.value) {
@@ -89,15 +94,14 @@ createApp({
           currentView.value = 'overview';
         }
         void arAnalyzer.initPoseTracker();
-        await fetchAllData();
-        if (auth.isCurrentIdentity(identity)) await avatarManager.load();
-        await submissionWorkspace.load();
-        await enrollmentAdmin.load();
-        await pilotWorkspace.load();
+        await loadWorkspace();
         if(initialInvitation && auth.isCurrentIdentity(identity)){pilotWorkspace.redemptionToken.value=initialInvitation;pendingInvitation.value=true;initialInvitation='';}
       }
     });
-    const avatarManager = useAvatarManager({auth});
+    const avatarManager = useAvatarManager({auth, filterRows: rows => {
+      const visible = new Set((workspaceMode.value === 'admin' ? managedRoster.rows.value : visibleStagingPlayers.value).map(row => row.id));
+      return rows.filter(row => visible.has(row.id));
+    }});
     const avatarForPlayer = player => {
       if (!player) return '';
       return avatarManager.photos.value[player.id] || publicAvatarOrFallback(player.photo_url,player);
@@ -106,14 +110,24 @@ createApp({
       ...row, photo_url: avatarForPlayer(row)
     })));
     // Presentation-only selection. Every data request still uses verified server roles.
+    const workspaceOptions = computed(() => [
+      ...(auth.isTeamCoach.value ? [{id:'coach',label:'Coach'}] : []),
+      ...(auth.isVerifiedGuardian.value ? [{id:'family',label:'Family'}] : []),
+      ...(auth.isOrgAdmin.value ? [{id:'admin',label:'Club Admin'}] : []),
+      ...(auth.isTeamManager.value ? [{id:'manager',label:'Team Manager'}] : [])
+    ]);
     const workspaceMode = computed(() => {
-      if (requestedWorkspace.value === 'family' && auth.isVerifiedGuardian.value) return 'family';
-      if (requestedWorkspace.value === 'coach' && auth.isTeamCoach.value) return 'coach';
-      if (auth.isTeamCoach.value) return 'coach';
-      if (auth.isVerifiedGuardian.value) return 'family';
-      if (auth.isOrgAdmin.value) return 'admin';
-      return 'member';
+      if (workspaceOptions.value.some(option => option.id === requestedWorkspace.value)) return requestedWorkspace.value;
+      return workspaceOptions.value[0]?.id || 'member';
     });
+    const managedRoster = useManagedRoster({auth, mode: workspaceMode});
+    const isManagedWorkspace = computed(() => ['admin','manager'].includes(workspaceMode.value));
+    const coachOrganizations = computed(() => (auth.accountContext.value?.organizations || []).filter(row => row.roles.includes('coach')));
+    const coachTeams = computed(() => (auth.accountContext.value?.teams || []).filter(row => row.roles.includes('coach') &&
+      (!coachOrganizationId.value || row.organization_id === coachOrganizationId.value)));
+    const coachTeamCount = computed(() => coachTeams.value.filter(row => !coachTeamId.value || row.id === coachTeamId.value).length);
+    const ordinaryOrganizations = computed(() => (auth.accountContext.value?.organizations || []).filter(row => row.roles.some(role => role!=='platform_admin')));
+    const ordinaryTeams = computed(() => (auth.accountContext.value?.teams || []).filter(row => row.roles.some(role => role!=='platform_admin')));
     const familyPlayers = computed(() => {
       if (!auth.isVerifiedGuardian.value || auth.authError.value) return [];
       const authorized = new Set(auth.guardianLinks.value.filter(link => link.status === 'verified').map(link => link.athlete_id));
@@ -135,15 +149,13 @@ createApp({
       ['https://sdl-staging.pages.dev','https://sdl-ux-live.pages.dev',
         'http://127.0.0.1:5500','http://localhost:5500'].includes(window.location.origin)
     );
-    const changeWorkspace = requested => {
-      if (requested !== 'coach' && requested !== 'family') return;
-      if (requested === 'coach' && !auth.isTeamCoach.value) return;
-      if (requested === 'family' && !auth.isVerifiedGuardian.value) return;
-      clearProfileHistory();
-      if (requested !== workspaceMode.value) privateMedia.resetMedia();
+    const changeWorkspace = async requested => {
+      if (!workspaceOptions.value.some(option => option.id === requested) || requested === workspaceMode.value) return;
+      clearWorkspaceState();
       requestedWorkspace.value = requested;
       activeTab.value = 'home';
       currentView.value = 'overview';
+      await loadWorkspace();
     };
     const coach = useCoachMode(t);
     const analytics = useAnalytics({ players, sessions:analyticsSessions, selectedPlayer, currentView, searchQuery, t });
@@ -199,7 +211,7 @@ createApp({
       onPrivateVideos: playerId => { void privateMedia.selectMediaPlayer(playerId); }
     });
     const enrollmentAdmin = useEnrollmentAdmin({ auth });
-    const pilotWorkspace=usePilotWorkspace({auth,onLinked:async()=>{const identity=auth.captureIdentity();await auth.reloadMemberships();if(!auth.isCurrentIdentity(identity))return;await fetchAllData();if(auth.isCurrentIdentity(identity))await avatarManager.load();if(auth.isCurrentIdentity(identity))await submissionWorkspace.load();if(auth.isCurrentIdentity(identity))pendingInvitation.value=false;},onUpdated:()=>{void submissionWorkspace.load();}});
+    const pilotWorkspace=usePilotWorkspace({auth,onLinked:async()=>{await auth.reloadMemberships();},onUpdated:()=>{void submissionWorkspace.load();}});
     // Fragments are not sent in HTTP requests. Remove the invitation before any sharing/navigation.
     if(window.location?.hash?.startsWith('#guardian-invite=')){
       const token=window.location.hash.slice('#guardian-invite='.length);
@@ -211,23 +223,26 @@ createApp({
     const emptySessionForm = { ...sessionFeature.newSession.value };
     const emptyVideoForm = { ...videoFeature.newDrillVideo.value };
 
-    const fetchSafeCoachRoster = async (identity) => {
-      if (!auth.isCurrentIdentity(identity)) return;
+    const fetchSafeCoachRoster = async (current) => {
+      if (!current()) return;
       coachRoster.value = [];
       coachRosterError.value = '';
       coachRosterLoading.value = true;
       try {
         const roster = await fetchCoachRoster();
-        if (auth.isCurrentIdentity(identity)) coachRoster.value = roster;
+        if (current()) coachRoster.value = roster.filter(row => coachTeams.value.some(team => team.id === row.team_id) &&
+          (!coachTeamId.value || row.team_id === coachTeamId.value));
       } catch (err) {
-        if (auth.isCurrentIdentity(identity)) coachRosterError.value = err.message || 'Could not retrieve team roster';
+        if (current()) coachRosterError.value = err.message || 'Could not retrieve team roster';
       } finally {
-        if (auth.isCurrentIdentity(identity)) coachRosterLoading.value = false;
+        if (current()) coachRosterLoading.value = false;
       }
     };
     const fetchAllData = async () => {
       const identity = auth.captureIdentity();
-      if (!auth.isCurrentIdentity(identity)) return;
+      const revision = workspaceRevision;
+      const current = () => auth.isCurrentIdentity(identity) && revision === workspaceRevision;
+      if (!current()) return;
       loading.value = true;
       try {
         // Default-deny: failed membership lookups or accounts with no active coach or
@@ -238,41 +253,97 @@ createApp({
           drillVideos.value = [];
           return;
         }
-        if (auth.isTeamCoach.value) {
+        if (workspaceMode.value === 'coach' && auth.isTeamCoach.value) {
           // The scoped coach-roster RPC is the only authorized roster entry path.
           // Legacy select('*') on public.sessions returns 403 under staging RLS.
           // Never fall back to unscoped player/session reads when pilot flags are off.
-          await fetchSafeCoachRoster(identity);
-          if(!auth.isCurrentIdentity(identity))return;
-          const linked=auth.isVerifiedGuardian.value
-            ? await fetchVerifiedGuardianPlayers(auth.guardianLinks.value) : [];
-          if(!auth.isCurrentIdentity(identity))return;
+          await fetchSafeCoachRoster(current);
+          if(!current())return;
+          // Preserve the established dual-role family cards. Links are verified
+          // independently; neither projection can grant the other's role.
+          const linked = auth.isVerifiedGuardian.value ? await fetchVerifiedGuardianPlayers(auth.guardianLinks.value) : [];
+          if (!current()) return;
           players.value=[...new Map([...coachRoster.value,...linked].map(p=>[p.id,p])).values()].sort(compareJerseys);
           sessions.value=[];drillVideos.value=[];
           return;
         }
-        if (auth.isVerifiedGuardian.value) {
+        if (workspaceMode.value === 'family' && auth.isVerifiedGuardian.value) {
           // Family history is loaded only through the narrow Worker RPC in the workspace.
           const linked = await fetchVerifiedGuardianPlayers(auth.guardianLinks.value);
-          if (!auth.isCurrentIdentity(identity)) return;
+          if (!current()) return;
           players.value = linked.sort(compareJerseys);
           sessions.value = [];
           drillVideos.value = [];
           return;
         }
-        // Unlinked users, pending/revoked guardians, and admin-only accounts:
-        // no raw player or session queries (enrollmentAdmin.load() handles org admins).
+        // CA/TM use a separate, explicitly scoped RPC, never legacy raw reads.
+        if (isManagedWorkspace.value) {
+          managedRoster.initialize();
+          await managedRoster.fetchPage();
+          return;
+        }
+        // Unlinked users and restricted platform-only accounts receive no data.
         players.value = [];
         sessions.value = [];
         drillVideos.value = [];
       } catch (err) {
-        if (!auth.isCurrentIdentity(identity)) return;
+        if (!current()) return;
+        clearWorkspaceState();
         auth.authError.value = err.message || 'Data request failed';
         console.error('Fetch error:', err);
       } finally {
-        if (auth.isCurrentIdentity(identity)) loading.value = false;
+        if (current()) loading.value = false;
       }
     };
+    const loadWorkspace = async () => {
+      const identity = auth.captureIdentity(), revision = workspaceRevision;
+      const current = () => auth.isCurrentIdentity(identity) && revision === workspaceRevision && !auth.authError.value;
+      if (current() && ['coach','family'].includes(workspaceMode.value)) void arAnalyzer.initPoseTracker();
+      await fetchAllData();
+      if (!current() || workspaceMode.value === 'manager' || workspaceMode.value === 'member') return;
+      if (workspaceMode.value === 'admin' && !managedRoster.rows.value.length) return;
+      await avatarManager.load();
+      if (!current()) return;
+      if (workspaceMode.value === 'admin') return;
+      if (current()) await submissionWorkspace.load();
+      if (current()) await pilotWorkspace.load();
+    };
+    const changeCoachOrganization = async id => {
+      if (workspaceMode.value !== 'coach' || (id && !coachOrganizations.value.some(row=>row.id===id))) return;
+      clearWorkspaceState();
+      coachOrganizationId.value=id;
+      await loadWorkspace();
+    };
+    const changeCoachTeam = async id => {
+      if (workspaceMode.value !== 'coach' || (id && !coachTeams.value.some(row=>row.id===id))) return;
+      clearWorkspaceState({keepCoachScope:true});
+      coachTeamId.value=id;
+      await loadWorkspace();
+    };
+    const changeManagedOrganization = async id => {
+      if (!isManagedWorkspace.value || managedRoster.denied.value || !managedRoster.organizations.value.some(row=>row.id===id)) return;
+      clearWorkspaceState({keepManagedScope:true});
+      managedRoster.chooseOrganization(id);
+      await loadManagedPage();
+    };
+    const changeManagedTeam = async id => {
+      if (!isManagedWorkspace.value || managedRoster.denied.value || (!(managedRoster.role.value==='club_admin' && id==='') && !managedRoster.teams.value.some(row=>row.id===id))) return;
+      clearWorkspaceState({keepManagedScope:true});
+      managedRoster.chooseTeam(id);
+      await loadManagedPage();
+    };
+    const retryManagedRoster = () => managedRoster.denied.value ? auth.reloadMemberships() : loadManagedPage();
+    const loadManagedPage = async (append=false) => {
+      const revision = workspaceRevision;
+      await managedRoster.fetchPage(append);
+      if (revision !== workspaceRevision) return;
+      if (managedRoster.error.value) {
+        clearProfileHistory(); selectedPlayer.value=null; currentView.value='overview'; avatarManager.reset();
+      } else if (workspaceMode.value === 'admin' && managedRoster.rows.value.length) {
+        await avatarManager.load();
+      }
+    };
+    const loadMoreManagedRoster = () => loadManagedPage(true);
     // A convenience route, never a media permission grant. The existing Worker
     // checks the signed-in identity and per-player read access independently.
     const loadAuthorizedHistory = async (id,role) => {
@@ -335,22 +406,22 @@ createApp({
       if(mediaOriginAllowed.value)void privateMedia.selectMediaPlayer(selected.id);
       return loadAuthorizedHistory(selected.id,'guardian');
     };
-    // Admin-only accounts can navigate from their server-filtered player
-    // directory to the same profile, without reading sessions or private video.
+    // CA/TM can open only the selected roster's read-only projection.
     const openManagedPlayerProfile = player => {
-      if (workspaceMode.value !== 'admin' || !auth.isOrgAdmin.value || auth.authError.value) return;
-      const managed=avatarManager.rows.value.find(p => p.id === player?.id);
-      if (!managed || !avatarManager.canEdit(managed.id)) return;
+      if (!isManagedWorkspace.value || auth.authError.value) return;
+      const managed=managedRoster.rows.value.find(p => p.id === player?.id);
+      if (!managed) return;
       clearProfileHistory();
       drillVideos.value=[];
-      playerFeature.selectPlayer({...managed,photo_url:avatarForPlayer(managed)});
+      playerFeature.selectPlayer({...managed,photo_url:workspaceMode.value==='admin'?avatarForPlayer(managed):''});
+      profileHistoryError.value='Statistics history for this workspace is not connected to a verified reader yet.';
       activeTab.value='team';
     };
     const leavePlayerProfile = () => {
       currentView.value='overview';
       clearProfileHistory();
       privateMedia.resetMedia();
-      if (workspaceMode.value === 'admin') activeTab.value='me';
+      selectedPlayer.value=null;
     };
     const saveLanguage = () => {
       localStorage.setItem('swallows_lang', currentLang.value);
@@ -361,6 +432,12 @@ createApp({
       pendingInvitation.value = false;
       activeTab.value = 'home';
       requestedWorkspace.value = 'auto';
+      clearWorkspaceState();
+    };
+    const clearWorkspaceState = ({keepManagedScope=false,keepCoachScope=false}={}) => {
+      workspaceRevision++;
+      if (keepManagedScope) managedRoster.clear(); else managedRoster.reset();
+      if (!keepCoachScope) { coachOrganizationId.value=''; coachTeamId.value=''; }
       players.value = [];
       sessions.value = [];
       drillVideos.value = [];
@@ -431,7 +508,7 @@ createApp({
       selectPlayer: player => {
         if (workspaceMode.value === 'coach') return selectCoachRosterPlayer(player);
         if (workspaceMode.value === 'family') return openFamilyPlayerProfile(player);
-        if (workspaceMode.value === 'admin') return openManagedPlayerProfile(player);
+       if (isManagedWorkspace.value) return openManagedPlayerProfile(player);
       },
       // Passing the original refs (not Vue-unwrapped copies) maintains DOM/video ownership.
       loginController: markRaw(auth),
@@ -441,6 +518,10 @@ createApp({
       privateMediaController: markRaw(privateMedia),
       statsBoardController: markRaw(statsBoard),
        avatarController: markRaw(avatarManager),
+      managedRosterController: markRaw(managedRoster), workspaceOptions, isManagedWorkspace,
+      changeManagedOrganization, changeManagedTeam, retryManagedRoster, loadMoreManagedRoster,
+      coachOrganizations, coachTeams, coachOrganizationId, coachTeamId, coachTeamCount,
+      changeCoachOrganization, changeCoachTeam, ordinaryOrganizations, ordinaryTeams,
       analyzerController: markRaw(arAnalyzer)
     };
   }

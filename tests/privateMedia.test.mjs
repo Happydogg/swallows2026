@@ -221,6 +221,7 @@ test('application identity hook aborts private playback and clears all media aut
   const h = await harness(t, user('parent')); const c = h.app.privateMediaController;
   h.app.players.value = [{ id: PLAYER, athlete_id: 'child', preferred_name: 'Child' }];
   h.app.guardianLinks.value = [{ athlete_id: 'child', status: 'verified' }];
+  h.setFixtureRoles(['guardian']);
   let signal; const pending = deferred();
   h.fetchImpl = async (url, init) => {
     if (url.endsWith('/authorize')) return Response.json({ allowed: JSON.parse(init.body).action === 'read' });
