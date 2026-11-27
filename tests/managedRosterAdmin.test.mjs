@@ -64,7 +64,7 @@ test('Manager registers only in assigned team and cannot create outside its effe
   assert.equal(await managed.registerPlayer(),false);
   assert.equal(changes(h,'sdl_v5_register_player').length,1);
   assert.equal(managed.denied.value,true);
-  assert.deepEqual(managed.rows.value,[]);
+  assert.equal(managed.rows.value.length,0);
 });
 
 test('Network uncertainty preserves registration request key across retries',async t=>{
@@ -91,8 +91,11 @@ test('Club Admin can assign an authorized same-club player to a different team',
   assert.equal(await managed.commitRosterChange(),true);
   const calls=changes(h,'sdl_v5_set_roster');
   assert.equal(calls.length,1);
-  assert.deepEqual(calls[0].args,{p_player:PLAYER,p_team:TEAM_B,p_add:true,p_reason:'Player moving to Team B'});
-  assert.deepEqual(managed.rows.value[0].team_ids,[TEAM_A,TEAM_B]);
+  assert.equal(calls[0].args.p_player,PLAYER);
+  assert.equal(calls[0].args.p_team,TEAM_B);
+  assert.equal(calls[0].args.p_add,true);
+  assert.equal(calls[0].args.p_reason,'Player moving to Team B');
+  assert.equal(managed.rows.value[0].team_ids.join(','),[TEAM_A,TEAM_B].join(','));
 });
 
 test('Manager may end existing team membership but cannot add an undiscovered player',async t=>{
@@ -107,7 +110,7 @@ test('Manager may end existing team membership but cannot add an undiscovered pl
   assert.equal(calls.length,1);
   assert.equal(calls[0].args.p_add,false);
   assert.equal(calls[0].args.p_player,PLAYER);
-  assert.deepEqual(managed.rows.value,[]);
+  assert.equal(managed.rows.value.length,0);
   assert.match(managed.writeNotice.value,/history preserved/);
   assert.equal(h.calls.some(c=>c.table==='players' && c.action==='delete'),false);
 });
