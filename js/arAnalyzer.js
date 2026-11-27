@@ -28,9 +28,9 @@ export function createArAnalyzerController({ selectedPlayer }) {
   const isTrackerLocked = ref(false);
   const isHudExpanded = ref(false);
 
-  const currentCalculatedSpeed = ref(19.9);
-  const currentTrajectoryAngle = ref(16.1);
-  const leadKneeAngle = ref(158);
+  const currentCalculatedSpeed = ref(null);
+  const currentTrajectoryAngle = ref(null);
+  const leadKneeAngle = ref(null);
   const headDriftPx = ref(0);
   const initialHeadX = ref(null);
   const elbowFlexionAngle = ref(90);
@@ -142,6 +142,9 @@ export function createArAnalyzerController({ selectedPlayer }) {
     cancelPendingFrame();
     ++loopGeneration;
     if (localObjectUrl) { URL.revokeObjectURL(localObjectUrl); localObjectUrl = null; }
+    currentCalculatedSpeed.value = null;
+    currentTrajectoryAngle.value = null;
+    leadKneeAngle.value = null;
     activeAnalyzerVideo.value = video;
     manualRearOverride.value = null;
     wristHistory = [];
@@ -160,8 +163,10 @@ export function createArAnalyzerController({ selectedPlayer }) {
   };
 
   // Blob URL stays in this browser tab; never submitted to Supabase or R2.
-  const openLocalAnalyzer = (file, { category = 'batting', cameraAngle = 'side_open', playbackFps = 120, motionFactor = 1 } = {}) => {
+  const openLocalAnalyzer = (file, { category, cameraAngle = 'side_open', playbackFps, motionFactor = 1 } = {}) => {
     if (!file || !file.type.startsWith('video/')) throw new Error('Select an MP4 or MOV video file.');
+    if (!['batting','pitching'].includes(category) || !Number.isFinite(playbackFps) || playbackFps <= 0)
+      throw new Error('Select a movement and enter the original recording FPS.');
     openAnalyzer({
       id: 'local-preview',
       video_url: null,
@@ -222,9 +227,9 @@ export function createArAnalyzerController({ selectedPlayer }) {
     showOverlay.value = true;
     isTrackerLocked.value = false;
     isHudExpanded.value = false;
-    currentCalculatedSpeed.value = 19.9;
-    currentTrajectoryAngle.value = 16.1;
-    leadKneeAngle.value = 158;
+    currentCalculatedSpeed.value = null;
+    currentTrajectoryAngle.value = null;
+    leadKneeAngle.value = null;
     headDriftPx.value = 0;
     elbowFlexionAngle.value = 90;
     trunkTiltAngle.value = 0;
@@ -562,7 +567,7 @@ export function createArAnalyzerController({ selectedPlayer }) {
       const upperArmSlope = Math.atan2(throwElb.y - throwSh.y, throwElb.x - throwSh.x);
       let slotDeg = Math.round(Math.abs((upperArmSlope - shSlope) * (180 / Math.PI)));
       if (slotDeg > 180) slotDeg = 360 - slotDeg;
-      currentTrajectoryAngle.value = slotDeg || 88;
+      currentTrajectoryAngle.value = Number.isFinite(slotDeg) ? slotDeg : null;
 
       // Wrist Whip Trail & Speed
       wristHistory.push({ x: throwWri.x, y: throwWri.y });
