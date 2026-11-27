@@ -1,0 +1,39 @@
+name: SDL UX-003 pinned verification (no deploy)
+on:
+  push:
+    branches: [task/sdl-ux-003-verify-7b0e891]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 7b0e8912c7394e377c2f81704483e1ea3151631a
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - name: Exact candidate
+        run: |
+          test "$(git rev-parse HEAD)" = "7b0e8912c7394e377c2f81704483e1ea3151631a"
+          git status --short
+          node -v
+          npm -v
+      - name: Install locked dependencies
+        run: |
+          npm ci
+          npm ci --prefix backend/worker
+      - name: Worker package check
+        run: npm run check:worker
+      - name: Full Node Vue PGlite Worker suite
+        if: ${{ !cancelled() }}
+        run: npm test
+      - name: Real Vue rendering checks
+        if: ${{ !cancelled() }}
+        run: node scripts/run-ux-ui-smoke.mjs
+      - name: UX build
+        if: ${{ !cancelled() }}
+        run: npm run build:ux-live
