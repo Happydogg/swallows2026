@@ -134,7 +134,7 @@ $$;
 -- Staging library removal: no physical deletion, no permanent-delete grant.
 -- Only current, private, clean-start records may be archived here.
 CREATE FUNCTION sdl_rbac_v5.can_archive_media(p_id uuid)
-RETURNS boolean LANGUAGE sql STABLE SET search_path='' AS $
+RETURNS boolean LANGUAGE sql STABLE SET search_path='' AS $archive_fn$
  SELECT sdl_rbac_v5.active_actor() AND EXISTS(
  SELECT 1 FROM public.sdl_video_submissions s
  JOIN public.players p ON p.id=s.player_id AND p.athlete_id=s.athlete_id AND p.organization_id=s.organization_id
@@ -149,19 +149,19 @@ RETURNS boolean LANGUAGE sql STABLE SET search_path='' AS $
        AND sdl_rbac_v5.has_player_role(s.player_id,'guardian')
        AND sdl_rbac_v5.guardian_participates(auth.uid(),s.player_id)))
  );
-$;
+$archive_fn$;
 REVOKE ALL ON FUNCTION sdl_rbac_v5.can_archive_media(uuid) FROM PUBLIC,anon,authenticated,service_role;
 
 CREATE FUNCTION public.sdl_v5_media_archive_ids(p_player uuid)
-RETURNS uuid[] LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $
+RETURNS uuid[] LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $archive_fn$
  SELECT coalesce(array_agg(eligible.id),ARRAY[]::uuid[]) FROM (
  SELECT s.id FROM public.sdl_video_submissions s
  WHERE s.player_id=p_player AND sdl_rbac_v5.can_archive_media(s.id)
  ORDER BY s.created_at DESC,s.id LIMIT 30) eligible;
-$;
+$archive_fn$;
 
 CREATE FUNCTION public.sdl_v5_archive_media(p_id uuid)
-RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $archive_fn$
 DECLARE s public.sdl_video_submissions%ROWTYPE;
 BEGIN
  SELECT * INTO s FROM public.sdl_video_submissions WHERE id=p_id FOR UPDATE;
@@ -176,7 +176,7 @@ BEGIN
  VALUES(auth.uid(),'media_archived',s.organization_id,s.player_id,s.id,'Private video removed from active library');
  RETURN true;
 END;
-$;
+$archive_fn$;
 -- Hold until a separate reviewed staging activation. Do not grant here.
 REVOKE ALL ON FUNCTION public.sdl_v5_media_archive_ids(uuid),public.sdl_v5_archive_media(uuid)
  FROM PUBLIC,anon,authenticated,service_role;

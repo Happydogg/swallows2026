@@ -148,7 +148,7 @@ export const PrivateMediaPanel = {
     <div v-if="mediaUploadAllowed" class="space-y-3 rounded-2xl border border-slate-700 bg-slate-900/90 p-4 sm:p-5">
       <div>
         <h3 class="text-lg font-bold text-white">Add a practice clip</h3>
-        <p class="mt-1 text-xs text-slate-400">Uploads remain private. Supported format: MP4, maximum 20 MiB.</p>
+        <p class="mt-1 text-xs text-slate-400">Synthetic staging footage only. Do not upload recordings of real children. Private MP4, maximum 20 MiB.</p>
       </div>
       <label class="block text-sm font-semibold text-slate-300">
         Video category
