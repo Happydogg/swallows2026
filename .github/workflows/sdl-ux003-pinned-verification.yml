@@ -11,14 +11,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 7b0e8912c7394e377c2f81704483e1ea3151631a
+          ref: 0120c6b74b048478e52e83c39bef011dcd2d02b3
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22.23.0'
       - name: Exact candidate
         run: |
-          test "$(git rev-parse HEAD)" = "7b0e8912c7394e377c2f81704483e1ea3151631a"
+          test "$(git rev-parse HEAD)" = "0120c6b74b048478e52e83c39bef011dcd2d02b3"
           git status --short
           node -v
           npm -v
