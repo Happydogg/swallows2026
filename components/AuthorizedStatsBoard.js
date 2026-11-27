@@ -3,7 +3,7 @@
 export const AuthorizedStatsBoard = {
   name:'AuthorizedStatsBoard',
   emits:['open-profile'],
-  props:{controller:{type:Object,required:true}},
+  props:{controller:{type:Object,required:true},contextOnly:Boolean,resultsOnly:Boolean},
   setup(props){
     const metrics=Object.freeze([
       {key:'height_cm',name:'Height',unit:'cm',dec:1,color:'#38bdf8'},
@@ -37,20 +37,20 @@ export const AuthorizedStatsBoard = {
     return {...props.controller,recordedMetrics,first,last,value,delta,points};
   },
   template:`
-    <section class="space-y-4 rounded-3xl border border-cyan-400/20 bg-slate-900/90 p-4 sm:p-6"
+    <section :class="contextOnly ? 'space-y-3' : 'space-y-4 rounded-2xl border border-slate-700 bg-slate-900/90 p-4'"
       aria-label="Live authorized player growth statistics">
-      <div class="flex flex-wrap items-start justify-between gap-3">
+      <div v-if="!contextOnly" class="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p class="text-xs font-black uppercase tracking-wider text-cyan-300">Live staging measurements · authorized access</p>
           <h2 class="mt-2 text-xl font-black text-white sm:text-2xl">Player development</h2>
-          <p class="mt-2 max-w-2xl text-sm text-slate-400">Select a permitted player to see recorded results over time. Different testing methods should be compared only within their protocol.</p>
+          <p class="mt-2 max-w-2xl text-sm text-slate-400">Recorded results over time. Compare measurements only within the same testing protocol.</p>
         </div>
         <button type="button" @click="selectedId && select(selectedId)" :disabled="busy || !selectedId"
           class="min-h-11 rounded-xl border border-blue-500/50 bg-blue-900/40 px-4 py-2 text-sm font-semibold text-cyan-200 disabled:opacity-50">
           Refresh history
         </button>
       </div>
-      <label class="block max-w-lg text-sm font-bold text-slate-300">
+      <label v-if="!resultsOnly" class="block max-w-lg text-sm font-bold text-slate-300">
         Choose player
         <select :value="selectedId" @change="select($event.target.value)"
           class="mt-2 w-full rounded-xl border border-slate-600 bg-slate-950 px-4 py-3 text-base text-white">
@@ -58,7 +58,7 @@ export const AuthorizedStatsBoard = {
           <option v-for="p in players" :key="p.id" :value="p.id">#{{ p.jersey || '–' }} · {{ p.preferred_name || 'Player' }}</option>
         </select>
       </label>
-      <div v-if="selected" class="flex items-center gap-3 rounded-xl bg-slate-950/75 p-3">
+      <div v-if="selected && !resultsOnly" class="flex flex-wrap items-center gap-3 rounded-xl bg-slate-950/75 p-3">
         <img v-if="selected.photo_url && !selected.photo_url.startsWith('sdl-private-avatar:')"
           :src="selected.photo_url" alt="" class="h-14 w-14 rounded-xl object-cover">
         <div>
@@ -67,6 +67,7 @@ export const AuthorizedStatsBoard = {
         </div>
         <button type="button" @click="$emit('open-profile',selected)" class="ml-auto rounded-lg bg-blue-700 px-3 py-2 text-sm text-white">View profile</button>
       </div>
+      <template v-if="!contextOnly">
       <p v-if="busy" class="rounded-xl bg-slate-950 p-4 text-sm text-slate-300" role="status">
         Checking access and loading permitted measurements…
       </p>
@@ -104,6 +105,7 @@ export const AuthorizedStatsBoard = {
           </div>
         </details>
         <p class="text-xs leading-relaxed text-slate-400">These are recorded staging measurements, not automatically approved medical or coaching benchmarks. Lower sprint times are faster; no injury-risk claim is made.</p>
+      </template>
       </template>
     </section>
   `

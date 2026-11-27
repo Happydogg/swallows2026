@@ -278,3 +278,24 @@ test('UX-IA-01 places primary Team and Videos content before restricted submissi
   assert.match(familyHome,/\$emit\('open-video',player\)/);
   assert.match(index,/Language\s*<select :value="currentLang" @change="currentLang = \$event.target.value; saveLanguage\(\)"/);
 });
+
+test('UX-IA-02 shares one athlete context and keeps review separate from record and overview',()=>{
+  const performance=fs.readFileSync(new URL('../components/PerformanceWorkspace.js',import.meta.url),'utf8');
+  const board=fs.readFileSync(new URL('../components/AuthorizedStatsBoard.js',import.meta.url),'utf8');
+  const submissions=fs.readFileSync(new URL('../components/SubmissionWorkspace.js',import.meta.url),'utf8');
+  assert.match(index,/<performance-workspace v-if="activeTab === 'stats'[^"]+"\s+organized/);
+  assert.match(index,/:fixed-player-id="isManagedWorkspace \? null : statsBoardController.selectedId.value"/);
+  assert.match(index,/<template #player-context>[\s\S]*?context-only :controller="statsBoardController"/);
+  assert.match(index,/<template #overview>[\s\S]*?results-only :controller="statsBoardController"/);
+  assert.match(board,/<label v-if="!resultsOnly"/);
+  assert.match(board,/<template v-if="!contextOnly">/);
+  assert.match(performance,/ready && \(!organized \|\| section==='record'\)/);
+  assert.match(performance,/ready && \(!organized \|\| section==='overview'\)/);
+  assert.match(performance,/mode==='coach' && teams.length && \(!organized \|\| section==='review'\)/);
+  assert.match(performance,/if \(props.organized\) section.value='record'/);
+  assert.match(performance,/official && row.status==='approved' && !row.superseded_by/);
+  assert.match(performance,/organized:\{type:Boolean,default:false\}/);
+  assert.match(index,/:show-performance-review="activeTab !== 'stats'"/);
+  assert.match(submissions,/v-if="pilot && showPerformanceReview"/);
+  assert.match(index,/:show-synthetic="false"/);
+});

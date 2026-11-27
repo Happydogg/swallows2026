@@ -119,17 +119,34 @@
         <p class="mt-2 text-sm text-slate-300">Your membership and permissions determine which team, family and administrative tools are available.</p>
         <button type="button" @click="navigateTab('me')" class="mt-4 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold">Open account workspace</button>
       </section>
-      <stats-hub v-if="activeTab === 'stats' && currentView === 'overview' && !isManagedWorkspace"
-        :mode="workspaceMode" :coach-roster="coachRosterDisplay" :family-cards="statsFamilyCards"
-        :loading="loading" :enabled="submissionController.enabled" :show-synthetic="false"
-        @navigate="navigateTab" @open-player="submissionController.showProfile($event)"></stats-hub>
-      <authorized-stats-board v-if="activeTab === 'stats' && currentView === 'overview' && (workspaceMode === 'coach' || workspaceMode === 'family')"
-        :controller="statsBoardController" @open-profile="selectPlayer"></authorized-stats-board>
+      <h1 v-if="activeTab === 'stats' && currentView === 'overview'" class="mb-3 text-2xl font-black text-white sm:text-3xl">Stats</h1>
       <managed-roster v-if="activeTab === 'stats' && isManagedWorkspace" scope-only :controller="managedRosterController"
         @organization="changeManagedOrganization" @team="changeManagedTeam" @retry="retryManagedRoster" @more="loadMoreManagedRoster"></managed-roster>
       <performance-workspace v-if="activeTab === 'stats' && currentView === 'overview' && workspaceMode !== 'member'"
-        :auth="loginController" :mode="workspaceMode" :players="performancePlayers" :teams="performanceReviewTeams"
-        :fixed-player-id="isManagedWorkspace ? null : statsBoardController.selectedId.value" @updated="refreshPerformanceHistory"></performance-workspace>
+        organized :auth="loginController" :mode="workspaceMode" :players="performancePlayers" :teams="performanceReviewTeams"
+        :fixed-player-id="isManagedWorkspace ? null : statsBoardController.selectedId.value" @updated="refreshPerformanceHistory">
+        <template #player-context>
+          <authorized-stats-board v-if="workspaceMode === 'coach' || workspaceMode === 'family'"
+            context-only :controller="statsBoardController" @open-profile="selectPlayer"></authorized-stats-board>
+        </template>
+        <template #overview>
+          <authorized-stats-board v-if="workspaceMode === 'coach' || workspaceMode === 'family'"
+            results-only :controller="statsBoardController" @open-profile="selectPlayer"></authorized-stats-board>
+        </template>
+      </performance-workspace>
+      <!-- Retain the existing permissioned family summary as supplementary content,
+           without making the disabled pilot projection the primary Stats experience. -->
+      <details v-if="activeTab === 'stats' && currentView === 'overview' && workspaceMode === 'family' && (submissionController.enabled || statsFamilyCards.length)"
+        class="mb-4 rounded-xl border border-slate-700 p-3">
+        <summary class="min-h-11 cursor-pointer py-3 text-sm font-semibold">Family statistics summary</summary>
+        <stats-hub :mode="workspaceMode" :coach-roster="coachRosterDisplay" :family-cards="statsFamilyCards"
+          :loading="loading" :enabled="submissionController.enabled" :show-synthetic="false"
+          @navigate="navigateTab" @open-player="submissionController.showProfile($event)"></stats-hub>
+      </details>
+      <stats-hub v-if="activeTab === 'stats' && currentView === 'overview' && workspaceMode === 'member'"
+        :mode="workspaceMode" :coach-roster="coachRosterDisplay" :family-cards="statsFamilyCards"
+        :loading="loading" :enabled="submissionController.enabled" :show-synthetic="false"
+        @navigate="navigateTab" @open-player="submissionController.showProfile($event)"></stats-hub>
       <managed-roster v-if="activeTab === 'team' && currentView === 'overview' && isManagedWorkspace" :key="workspaceMode + ':' + managedRosterController.organizationId.value + ':' + managedRosterController.teamId.value" :controller="managedRosterController"
         @organization="changeManagedOrganization" @team="changeManagedTeam" @retry="retryManagedRoster" @more="loadMoreManagedRoster" @open-profile="openManagedPlayerProfile" @navigate="navigateTab"></managed-roster>
 
@@ -254,7 +271,7 @@
     <details :open="submissionController.enabled ? true : undefined"
       :class="!isManagedWorkspace && (activeTab === 'team' || activeTab === 'stats' || (activeTab === 'videos' && mediaOriginAllowed)) && currentView !== 'player' ? 'mt-4 rounded-xl border border-slate-700 p-3 no-print' : 'hidden'">
       <summary class="min-h-11 cursor-pointer py-3 text-sm font-semibold text-slate-300">{{ submissionController.enabled ? 'Submissions and Clubhouse' : 'Submissions and Clubhouse · currently unavailable' }}</summary>
-      <submission-workspace :controller="submissionController" :pilot-controller="pilotController" :t="t"></submission-workspace>
+      <submission-workspace :show-performance-review="activeTab !== 'stats'" :controller="submissionController" :pilot-controller="pilotController" :t="t"></submission-workspace>
     </details>
 
     <!-- SDL-002: Unified Player Form (Add / Edit) -->
