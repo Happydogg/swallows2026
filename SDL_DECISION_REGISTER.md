@@ -1,5 +1,16 @@
 # Swallows DataLab | Decision Register (Working Mirror)
 
+## 2026-11-27 | ADMIN-01 staging acceptance and ADMIN-02 scope authorization (latest)
+
+| Decision ID | Owner decision | Stage and evidence |
+|---|---|---|
+| SDL-D-20261127-13 | Accept and close `SDL-UX-002-ADMIN-01` for the five tested staging UX workflows, preserving strict separation from the production pilot and independent backend security acceptance. | **Staging-verified for owner-tested UI flows.** Owner-reported 5/5 authenticated browser PASS, Cloudflare `sdl-ux-live` success at merge `c9ad810459db6e5ad4c5834f7e4882970842f987`, 155 automated tests and one UI smoke PASS, [PR #9](https://github.com/Happydogg/swallows2026/pull/9) merged. No independently attached browser assertion log. |
+| SDL-D-20261127-14 | Approve start of `SDL-UX-002-ADMIN-02` Staff Management in this chat; reuse verified staff/delegation policies, no implicit grant of expanded authorization or production deployment. | **Approved to prepare, backend contract pending.** Staging has `sdl_v5_set_staff`, but `sdl_004_pilot_administration` does not expose current Manager/Coach assignments. Require a scoped authoritative staff-role read contract and independent security QA before enabling UI writes; [contract](docs/SDL-UX-002-ADMIN-02-STAFF-CONTRACT.md). |
+
+These entries take precedence for ADMIN-01/ADMIN-02 over older coordination snapshots below; retain those snapshots as historical context.
+
+---
+
 **Updated:** 2026-11-27. Reconcile with original decisions and external SDL Master Directory; this is not a replacement for historical evidence.
 
 | ID | Decision and rationale | State | Evidence / consequence |
