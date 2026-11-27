@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SDL UX-003 P1 · Offline media preview</title>
+<style>
+:root{color-scheme:dark;background:#0b1220;color:#f1f5f9;font:16px system-ui;--panel:#152237;--line:#35445b;--muted:#a9bad0;--accent:#7dd3fc}*{box-sizing:border-box}body{margin:0}main,header{max-width:880px;margin:auto;padding:16px}main{padding-bottom:105px}h1{font-size:28px;margin:8px 0}h2{font-size:18px;margin:0 0 12px}h3{font-size:15px;margin:0}p{line-height:1.5;margin:7px 0}.muted,small{color:var(--muted)}.demo{color:#fbbf24;font-size:12px;letter-spacing:.05em;text-transform:uppercase}button,select{font:inherit;min-height:44px;max-width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:#1d3049;color:white}button{cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:3px}button[aria-pressed=true],button[aria-current=page]{background:#12496b;border-color:var(--accent)}select{width:100%}.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:15px;margin:12px 0}.stack{display:grid;gap:10px}.grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(135px,1fr))}.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}label{display:grid;gap:6px;font-size:13px;color:var(--muted);min-width:0}.card{display:grid;grid-template-columns:88px minmax(0,1fr);gap:12px;border:1px solid var(--line);padding:12px;border-radius:12px;background:#192a41}.thumb{min-height:74px;display:grid;place-items:center;background:#243955;border-radius:8px;color:#b9dcf0;font-size:25px}.thumb.large{aspect-ratio:16/9;min-height:0}.info{min-width:0;overflow-wrap:anywhere}.tag{color:#fcd34d;font-size:12px}.card .controls{grid-column:1/-1}.primary{background:#16628c;border-color:var(--accent);font-weight:700}.danger{border-color:#a75b69;color:#fecdd3}.nav{position:fixed;bottom:0;left:0;right:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));padding:8px 5px calc(8px + env(safe-area-inset-bottom));background:#101d30;border-top:1px solid var(--line);z-index:3}.nav button{padding:5px 0;border:0;font-size:12px}.choice{display:flex;align-items:center;gap:12px;min-height:44px}.choice input{width:24px;height:24px;flex:none}progress{width:100%;height:16px;accent-color:var(--accent)}.notice{min-height:1.5em;color:#bae6fd}.confirm{border-color:#a87528}.rule{font-size:13px;color:var(--muted)}
+</style></head><body><header><strong style="color:#7dd3fc">Swallows DataLab</strong><p class="demo">Offline fictional-data prototype · no real media</p><label for="account">Demo account / workspace<select id="account"></select></label></header>
+<main><div id="screen"></div><p class="notice" id="notice" role="status"></p><p class="rule" id="checks"></p></main><nav id="nav" class="nav" aria-label="Main navigation"></nav>
+<script id="media-model">
+function makeMediaDemo(){
+  const accounts=[
+    {label:"Coach · Team A",id:"coach",players:["Demo 12","Demo 24"]},
+    {label:"Club Admin · Team A",id:"admin",players:["Demo 12","Demo 24"]},
+    {label:"Guardian · Demo 12",id:"guardian",players:["Demo 12"]},
+    {label:"Team member · viewing only",id:"member",players:[]},
+    {label:"Team member · download permitted",id:"download",players:[]},
+    {label:"Outside team",id:"outside",players:[]}
+  ];
+  const sample=[
+    {id:"a",player:"Demo 12",category:"pitching",format:"MP4",status:"approved",publication:"published"},
+    {id:"b",player:"Demo 12",category:"batting",format:"MOV",status:"pending",publication:"private"},
+    {id:"c",player:"Demo 24",category:"throwing",format:"MP4",status:"rejected",publication:"private"},
+    {id:"d",player:"Demo 24",category:"pitching",format:"MOV",status:"approved",publication:"private"}
+  ];
+  // Fictional server projections. They are scenarios, not a proposed RBAC implementation.
+  let rows=sample.map(x=>({...x})), consent={view:true,download:true}, revoked=false, seq=0, uploadSeq=0;
+  const s={accounts,account:accounts[0],page:"videos",section:"library",filter:{player:"",category:"",status:""},selected:null,notice:"",availability:"ready",upload:null,consentDraft:null,confirm:null};
+  function snapshot(){
+    if(s.availability!=="ready")return {library:[],gallery:[],canUpload:[],consent:null};
+    const {id,players}=s.account, staff=id==="coach"||id==="admin", family=id==="guardian";
+    const library=rows.filter(r=>players.includes(r.player)).map(r=>({...r,can_view:r.status!=="rejected",can_archive:staff,can_analyze:r.status!=="rejected"}));
+    const gallery=id==="outside"?[]:rows.filter(r=>r.publication==="published"&&r.status==="approved"&&!revoked).map(r=>({...r,can_view:true,can_download:id==="download"&&consent.download,can_unpublish:staff}));
+    return {library:library.map(r=>({...r,can_publish:staff&&r.id==="a"&&r.publication==="private"&&!revoked&&r.status==="approved",can_unpublish:staff&&r.publication==="published"})),gallery,canUpload:staff||family?[...players]:[],consent:family?{...consent}:null};
+  }
+  function invalidate(){seq++;s.selected=null;s.confirm=null;s.upload=null;s.consentDraft=null;s.notice="";s.filter={player:"",category:"",status:""};}
+  function switchAccount(i){if(!accounts[i])return false;invalidate();s.account=accounts[i];s.page="videos";s.section=s.account.players.length?"library":"clubhouse";s.availability="ready";return true;}
+  function navigate(page,section="library"){
+    if(!["home","team","stats","videos","me"].includes(page))return false;
+    invalidate();s.page=page;s.section=section;return true;
+  }
+  function currentRows(){const p=snapshot();return s.page!=="videos"?[]:s.section==="library"?p.library:s.section==="clubhouse"?p.gallery:[];}
+  function visible(){return currentRows().filter(r=>Object.entries(s.filter).every(([k,v])=>!v||r[k]===v));}
+  function setFilter(key,value){if(!Object.hasOwn(s.filter,key))return false;s.filter[key]=value;s.selected=null;s.confirm=null;return true;}
+  function open(id){const row=visible().find(r=>r.id===id&&r.can_view===true);if(!row)return false;s.selected=id;return true;}
+  function selected(){return visible().find(r=>r.id===s.selected&&r.can_view===true)||null;}
+  function request(action,id){
+    const caps={archive:"can_archive",publish:"can_publish",unpublish:"can_unpublish",download:"can_download"};
+    const row=visible().find(r=>r.id===id);
+    if(!row||!caps[action]||row[caps[action]]!==true)return false;
+    s.confirm={action,id,seq};return true;
+  }
+  function confirm(){
+    const c=s.confirm;s.confirm=null;
+    if(!c||c.seq!==seq)return false;
+    if(!request(c.action,c.id))return false;s.confirm=null;
+    if(c.action==="download"){s.notice="Demo only: a download request would be re-authorized. No file was downloaded.";return true;}
+    if(c.action==="archive"){rows=rows.filter(r=>r.id!==c.id);s.selected=null;s.notice="Demo: permanently deleted.";return true;}
+    rows=rows.map(r=>r.id===c.id?{...r,publication:c.action==="publish"?"published":"private"}:r);
+    s.selected=null;s.notice=c.action==="publish"?"Demo: publication confirmed.":"Demo: unpublished; team access removed.";return true;
+  }
+  function beginUpload(player,category,format){
+    if(s.page!=="videos"||s.section!=="library"||s.upload||!snapshot().canUpload.includes(player)||!["pitching","batting","throwing"].includes(category)||!["MP4","MOV"].includes(format))return false;
+    s.upload={player,category,format,progress:0,status:"uploading",seq};s.notice="";return true;
+  }
+  function uploadEvent(progress,result){
+    const u=s.upload;
+    if(!u||u.seq!==seq||u.status!=="uploading"||s.availability!=="ready")return false;
+    if(result==="interrupted"){u.status="interrupted";s.notice="Demo interruption: refresh before retrying; the previous upload may have been saved.";return true;}
+    if(result==="saved"){u.progress=100;u.status="saved";rows.push({id:"new-"+(++uploadSeq),player:u.player,category:u.category,format:u.format,status:"pending",publication:"private"});s.notice="Demo: private upload saved. Awaiting independent review.";return true;}
+    if(!Number.isFinite(progress)||progress<u.progress)return false;
+    u.progress=Math.min(99,Math.max(0,progress));return true;
+  }
+  function dismissUpload(){if(!s.upload||s.upload.status==="uploading")return false;s.upload=null;return true;}
+  function editConsent(kind,value){
+    if(s.page!=="me"||!snapshot().consent||!["view","download"].includes(kind)||typeof value!=="boolean")return false;
+    s.consentDraft={...(s.consentDraft||consent),[kind]:value};
+    if(kind==="view"&&!value)s.consentDraft.download=false;
+    if(kind==="download"&&value&&!s.consentDraft.view){s.consentDraft.download=false;return false;}
+    return true;
+  }
+  function saveConsent(){
+    if(s.page!=="me"||!snapshot().consent||!s.consentDraft)return false;
+    consent={...s.consentDraft};s.consentDraft=null;
+    // This fixture demonstrates an explicit returned revocation snapshot, not a multi-guardian policy.
+    if(!consent.view){revoked=true;rows=rows.map(r=>r.id==="a"?{...r,publication:"private"}:r);}
+    s.notice="Demo: choices saved. Restoring a choice never automatically republishes.";return true;
+  }
+  function revokeAccess(){invalidate();s.availability="revoked";s.notice="Access changed. Private previews and selected video cleared.";}
+  function unavailable(){invalidate();s.availability="unavailable";s.notice="Media service unavailable. No previous private rows retained.";}
+  function refresh(){invalidate();s.availability="ready";}
+  function ticket(){return seq;}
+  function receivePreview(t,id){return t===seq&&!!selected()&&selected().id===id&&s.availability==="ready";}
+  return {s,snapshot,switchAccount,navigate,visible,setFilter,open,selected,request,confirm,beginUpload,uploadEvent,dismissUpload,editConsent,saveConsent,revokeAccess,unavailable,refresh,ticket,receivePreview};
+}
+
+function mediaChecks(){
+ const tests=[];const test=(name,fn)=>{try{if(!fn())throw Error("assertion failed");tests.push({name,pass:true});}catch(e){tests.push({name,pass:false,error:String(e)});}};
+ test("Library supports categories, status and player filters",()=>{const m=makeMediaDemo();m.setFilter("category","pitching");m.setFilter("player","Demo 12");m.setFilter("status","approved");return m.visible().length===1&&m.visible()[0].id==="a";});
+ test("Rejected clip cannot open but authorized staff can request deletion",()=>{const m=makeMediaDemo();return !m.open("c")&&m.request("archive","c")&&m.confirm()&&!m.visible().some(x=>x.id==="c");});
+ test("Guardian library scoped to linked child; no staff archive",()=>{const m=makeMediaDemo();m.switchAccount(2);return m.visible().length===2&&!m.open("c")&&!m.request("archive","a");});
+ test("Member sees only shared gallery; no private library access",()=>{const m=makeMediaDemo();m.switchAccount(3);const ok=m.visible().length===1&&m.visible()[0].id==="a";m.navigate("videos","library");return ok&&m.visible().length===0;});
+ test("Outside team gallery is empty",()=>{const m=makeMediaDemo();m.switchAccount(5);return m.visible().length===0&&!m.open("a");});
+ test("View permission does not imply download permission",()=>{const m=makeMediaDemo();m.switchAccount(3);return m.open("a")&&!m.request("download","a");});
+ test("Explicit download permission offers only demo confirmation",()=>{const m=makeMediaDemo();m.switchAccount(4);return m.request("download","a")&&m.confirm()&&m.s.notice.includes("No file was downloaded");});
+ test("Private approval does not imply publication eligibility",()=>{const m=makeMediaDemo();return !m.request("publish","d")&&!m.request("publish","b");});
+ test("Unpublish removes gallery visibility without deleting private clip",()=>{const m=makeMediaDemo();m.navigate("videos","clubhouse");m.request("unpublish","a");m.confirm();const empty=m.visible().length===0;m.navigate("videos","library");return empty&&m.visible().some(x=>x.id==="a"&&x.publication==="private");});
+ test("Authorized publication requires explicit confirmation",()=>{const m=makeMediaDemo();m.request("unpublish","a");m.confirm();return m.request("publish","a")&&m.visible().find(x=>x.id==="a").publication==="private"&&m.confirm()&&m.visible().find(x=>x.id==="a").publication==="published";});
+ test("Withdrawal clears gallery, regrant never republishes automatically",()=>{const m=makeMediaDemo();m.switchAccount(2);m.navigate("me");m.editConsent("view",false);m.saveConsent();m.editConsent("view",true);m.saveConsent();m.switchAccount(3);return m.visible().length===0;});
+ test("Download consent can be withdrawn independently",()=>{const m=makeMediaDemo();m.switchAccount(2);m.navigate("me");m.editConsent("download",false);m.saveConsent();m.switchAccount(4);return m.open("a")&&!m.request("download","a");});
+ test("Consent is linked guardian only; no out-of-scope write",()=>{const m=makeMediaDemo();m.navigate("me");return !m.editConsent("view",false)&&!m.saveConsent();});
+ test("MP4/MOV upload fixture validates selection and saves privately only on receipt",()=>{for(const fmt of ["MP4","MOV"]){const m=makeMediaDemo();if(!m.beginUpload("Demo 12","pitching",fmt)||!m.uploadEvent(100)||m.s.upload.progress!==99||m.visible().length!==4)return false;if(!m.uploadEvent(100,"saved")||!m.visible().some(x=>x.id==="new-1"&&x.status==="pending"&&x.publication==="private"))return false;}return true;});
+ test("Interrupted upload never pretends to be saved",()=>{const m=makeMediaDemo();m.beginUpload("Demo 12","batting","MOV");m.uploadEvent(45,"interrupted");return m.s.upload.status==="interrupted"&&m.visible().length===4&&!m.uploadEvent(100,"saved");});
+ test("Account change invalidates pending upload, confirmation and preview",()=>{const m=makeMediaDemo();m.open("a");const t=m.ticket();m.request("archive","a");m.beginUpload("Demo 12","pitching","MP4");m.switchAccount(2);return !m.receivePreview(t,"a")&&!m.confirm()&&!m.uploadEvent(100,"saved")&&m.s.upload===null&&m.selected()===null;});
+ test("Revoked access immediately clears selected video, rows and download confirmation",()=>{const m=makeMediaDemo();m.switchAccount(4);m.open("a");m.request("download","a");const t=m.ticket();m.revokeAccess();return m.visible().length===0&&m.selected()===null&&!m.confirm()&&!m.receivePreview(t,"a");});
+ test("Unavailable state clears private rows and does not present a normal empty library",()=>{const m=makeMediaDemo();m.open("a");m.unavailable();return m.s.availability==="unavailable"&&m.visible().length===0&&m.selected()===null;});
+ return tests;
+}
+</script>
+<script id="media-ui">
+const m=makeMediaDemo(),s=m.s,screen=document.getElementById("screen"),nav=document.getElementById("nav"),account=document.getElementById("account");
+const e=(tag,text,cls)=>{const x=document.createElement(tag);if(text!==undefined)x.textContent=text;if(cls)x.className=cls;return x;};
+const b=(text,fn,cls)=>{const x=e("button",text,cls);x.type="button";x.addEventListener("click",fn);return x;};
+function focus(id){document.getElementById(id)?.focus();}
+function update(fn,focusId){fn();render();if(focusId)focus(focusId);}
+function section(title){const x=e("section",undefined,"panel");x.append(e("h2",title));return x;}
+function heading(title,sub){const h=e("h1",title);h.id="heading";h.tabIndex=-1;screen.append(h,e("p",sub,"muted"));}
+function select(label,values,current,change,id){const wrap=e("label",label),x=e("select");x.id=id;for(const [v,n] of values){const o=e("option",n);o.value=v;x.append(o);}x.value=current;x.addEventListener("change",()=>change(x.value));wrap.append(x);return wrap;}
+function go(page,sub){update(()=>m.navigate(page,sub),"heading");}
+const titleCase=x=>x.charAt(0).toUpperCase()+x.slice(1);
+function card(r){const x=e("article",undefined,"card"),thumb=e("div","▶","thumb");thumb.setAttribute("aria-hidden","true");const info=e("div",undefined,"info");
+ info.append(e("h3",r.player),e("p",titleCase(r.category)+" · "+r.format,"muted"),e("p",s.section==="clubhouse"?"Team published":({pending:"Awaiting independent review",approved:"Approved privately",rejected:"Rejected · playback blocked"}[r.status]),"tag"));
+ if(s.section==="library")info.append(e("small",r.publication==="published"?"Published to team":"Not published"));
+ x.append(thumb,info);const actions=e("div",undefined,"controls");
+ if(r.can_view)actions.append(b("Open video",()=>update(()=>m.open(r.id),"detail"),"primary"));
+ for(const [action,label,cap] of [["download","Download","can_download"],["publish","Publish","can_publish"],["unpublish","Unpublish","can_unpublish"],["archive","Permanent delete","can_archive"]])if(r[cap]===true)actions.append(b(label,()=>update(()=>m.request(action,r.id),"confirmation"),action==="archive"?"danger":""));
+ x.append(actions);return x;
+}
+function filters(p){const rows=m.snapshot()[s.section==="library"?"library":"gallery"],g=e("div",undefined,"grid");
+ for(const [key,label,values] of [["player","Player",[...new Set(rows.map(r=>r.player))]],["category","Category",["pitching","batting","throwing"]],...(s.section==="library"?[["status","Review status",["pending","approved","rejected"]]]:[])]){
+  const id="filter-"+key;g.append(select(label,[["","All"],...values.map(v=>[v,key==="player"?v:titleCase(v)])],s.filter[key],v=>update(()=>m.setFilter(key,v),id),id));}
+ p.append(g);
+}
+function upload(){const p=section("Upload private clip · demo");p.append(e("p","Existing live workflow: MP4 or MOV, maximum 40 MiB. This preview uses synthetic descriptors and never reads a file.","rule"));
+ if(s.upload){const u=s.upload,bar=e("progress");bar.max=100;bar.value=u.progress;bar.setAttribute("aria-label","Simulated upload progress");p.append(e("p",u.player+" · "+u.format+" · "+u.status+" · "+u.progress+"%"),bar);
+ const actions=e("div",undefined,"controls");
+ if(u.status==="uploading")actions.append(b("Advance progress",()=>update(()=>m.uploadEvent(u.progress+30))),b("Simulate interruption",()=>update(()=>m.uploadEvent(0,"interrupted"))),b("Simulate saved receipt",()=>update(()=>m.uploadEvent(100,"saved")),"primary"));
+ else actions.append(b(u.status==="interrupted"?"Refresh before retry":"Done",()=>update(()=>{if(u.status==="interrupted")m.refresh();else m.dismissUpload();})));
+ p.append(actions);return p;}
+ const choices=e("div",undefined,"grid"),players=m.snapshot().canUpload;
+ choices.append(select("Player",players.map(x=>[x,x]),players[0],()=>{},"up-player"),select("Category",[["pitching","Pitching"],["batting","Batting"],["throwing","Throwing"]],"pitching",()=>{},"up-category"),select("Synthetic format",[["MP4","MP4"],["MOV","MOV"]],"MP4",()=>{},"up-format"));
+ p.append(choices,b("Start simulated upload",()=>update(()=>m.beginUpload(document.getElementById("up-player").value,document.getElementById("up-category").value,document.getElementById("up-format").value)),"primary"));return p;
+}
+function videos(){heading("Videos","Library · Review · Clubhouse");
+ const tabs=e("div",undefined,"controls");for(const [k,label] of [["library","Library"],...(["coach","admin"].includes(s.account.id)?[["review","Review"]]:[]),["clubhouse","Clubhouse"]]){
+ const x=b(label,()=>go("videos",k));x.setAttribute("aria-pressed",String(s.section===k));tabs.append(x);}screen.append(tabs);
+ const tools=e("div",undefined,"controls");tools.append(b("Refresh demo",()=>update(()=>m.refresh())),b("Simulate access revoked",()=>update(()=>m.revokeAccess())),b("Simulate unavailable",()=>update(()=>m.unavailable())));screen.append(tools);
+ if(s.availability!=="ready"){const p=section(s.availability==="revoked"?"Access revoked":"Service unavailable");p.append(e("p","No private rows, selected clips or pending controls remain in this view.","muted"));screen.append(p);return;}
+ if(s.section==="review"){const p=section("Video Review");p.append(e("p","Open the separate P0 prototype for the independent review inbox. No review mutation lives in this P1 prototype.","rule"));screen.append(p);return;}
+ const p=section(s.section==="library"?"Private library":"Team Clubhouse");filters(p);
+ const rows=m.visible(),list=e("div",undefined,"stack");for(const r of rows)list.append(card(r));if(!rows.length)list.append(e("p","No available matching videos.","muted"));p.append(e("p",rows.length+" matching demo clips","rule"),list);screen.append(p);
+ const selected=m.selected();if(selected){const d=section("Selected video · "+selected.player);d.id="detail";d.tabIndex=-1;d.append(e("div","▶","thumb large"),e("p","Playback placeholder only. Live integration retains existing authorized playback, original recording FPS selection and AR analysis.","rule"));
+ if(selected.can_analyze===true){const g=e("div",undefined,"grid");g.append(select("Motion",[["pitching","Pitching"],["batting","Batting"]],"pitching",()=>{},"ar-motion"),select("Original recording FPS",[["","Choose FPS"],["30","30"],["60","60"],["120","120"],["240","240"]],"",()=>{},"ar-fps"));
+ d.append(g,b("Open existing AR workflow (demo)",()=>{const fps=document.getElementById("ar-fps").value;s.notice=fps?"Demo handoff only; no analysis executed.":"Choose original recording FPS first.";document.getElementById("notice").textContent=s.notice;}));}
+ d.append(b("Back to list",()=>update(()=>{s.selected=null;},"heading")));screen.append(d);}
+ if(s.section==="library"&&m.snapshot().canUpload.length)screen.append(upload());
+ if(s.confirm){const c=section("Confirm "+s.confirm.action);c.classList.add("confirm");c.id="confirmation";c.tabIndex=-1;c.append(e("p",({archive:"Permanent deletion cannot be undone.",publish:"Publication is separate from private approval.",unpublish:"Team access will be removed; the private clip remains.",download:"Demo only; the real request must be independently authorized."})[s.confirm.action]),b("Confirm demo action",()=>update(()=>m.confirm()),"primary"),b("Cancel",()=>update(()=>{s.confirm=null;})));screen.append(c);}
+}
+function me(){heading("Me","Account · family · consent · preferences");
+ const p=section("Optional media sharing");const state=m.snapshot().consent;
+ if(!state){p.append(e("p","No guardian consent action is available in this demo workspace.","muted"));screen.append(p);return;}
+ p.append(e("p","Choose whether authorized teammates may view or download eligible media. Declining does not block ordinary access. Private approval does not publish.","rule"));
+ const draft=s.consentDraft||state;
+ for(const [kind,label] of [["view","Allow authorized team viewing"],["download","Allow authorized team downloading"]]){
+ const wrap=e("label",undefined,"choice"),x=e("input");x.type="checkbox";x.id="consent-"+kind;x.checked=draft[kind];x.disabled=kind==="download"&&!draft.view;x.addEventListener("change",()=>update(()=>m.editConsent(kind,x.checked),x.id));wrap.append(x,e("span",label));p.append(wrap);}
+ p.append(e("p","Saved: viewing "+(state.view?"allowed":"not allowed")+" · downloading "+(state.download?"allowed":"not allowed"),"rule"),b("Save optional choices (demo)",()=>update(()=>m.saveConsent()),"primary"),e("p","This scenario demonstrates an explicit revocation response. Final multi-guardian rules and consent scope belong to RBAC-05.","rule"));screen.append(p);}
+function render(){screen.replaceChildren();nav.replaceChildren();if(s.page==="videos")videos();else if(s.page==="me")me();else{heading(titleCase(s.page),"Existing application destination retained");const p=section(s.page==="home"?"Action Center":"Existing workspace");p.append(e("p","P0 Action Center remains a separate prototype. This P1 preview does not replace the accepted dashboard or roster.","muted"));screen.append(p);}
+ for(const [k,l] of [["home","Home"],["team","Team"],["stats","Stats"],["videos","Videos"],["me","Me"]]){const x=b(l,()=>go(k,k==="videos"&&!s.account.players.length?"clubhouse":"library"));if(s.page===k)x.setAttribute("aria-current","page");nav.append(x);}
+ document.getElementById("notice").textContent=s.notice;
+}
+s.accounts.forEach((a,i)=>{const o=e("option",a.label);o.value=String(i);account.append(o);});account.addEventListener("change",()=>update(()=>m.switchAccount(Number(account.value)),"heading"));const checks=mediaChecks();document.getElementById("checks").textContent="Synthetic model checks: "+checks.filter(x=>x.pass).length+"/"+checks.length+" passed. Not device or security acceptance.";render();
+</script></body></html>
