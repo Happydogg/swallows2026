@@ -1,0 +1,21 @@
+# SDL-004B-RBAC-05 MEDIA-03B-06 / UX-003 integration contract
+2026-11-27. Synthetic staging only. Base fc1396cb41dc797593dc2e64a61fb84b1c98c7eb. Same authenticated caller-JWT, identity-bound no-store service as private media. Both endpoints require review and playback gates and review-inbox-v1 contract. No additional gate, table grant, media bytes, approval mutation, or download authority.
+
+## Calls
+createPrivateMediaService({auth}).reviewInbox(scope,filters={},options)
+createPrivateMediaService({auth}).mediaActionSummary(scope,options)
+scope = {role:'coach'|'club_admin',organizationId?:uuid,scopeTeamId?:uuid}; explicit workspace role, scope team is the selected workspace scope, not an optional inbox filter. Omitted org/team spans only the chosen role's currently authorized scope. Match scope exactly between Home and Inbox. No call for guardian/manager/platform-only or family workspace. Map admin UI workspace to club_admin. options.signal aborts requests. Refresh separately on action completion; never derive counts from partial player libraries or optimistic arithmetic.
+
+GET /v2/media/review-inbox?role=coach&organization_id=...&scope_team_id=...&team_id=...&player_id=...&category=...&limit=30&cursor=...&media_id=...
+All optional except role. Filters object camelCase {teamId,playerId,category,cursor,limit,mediaId}. Cursor opaque timestamp|uuid, URL encoded unchanged, descending createdAt/id. 1–30 rows. mediaId lookup cannot use cursor. Empty unknown player/media filter returns no rows (not an existence oracle). Forbidden team/org scope 403. No legacy fallback.
+Returns {revision:'review-inbox-v1',status:'ready',complete:true,pendingTotal,filteredTotal,items:[{id,playerId,playerLabel,teamId,teamLabel,teamIds,category,status:'pending',can_review:true,createdAt,sourceKind}],teams:[{id,label}],players:[{id,label,teamId,teamIds}],nextCursor:null|string}.
+pendingTotal is distinct actionable submissions in workspace scope before inbox filters, filteredTotal before pagination. Each submission counted once. Team/players options are actionable pending rows only. teamIds is all permitted current teams in workspace scope; teamId canonical smallest UUID unless filtered by team. Club Admin may have an eligible active enrolled player without a team; teamId null, teamLabel Unassigned, teamIds []. UX must adapt VideoReviewInbox.js to accept null canonical team for CA and match team filters using teamIds (not solely teamId). No implicit role union, self-review, archived, rejected, approved, multi-subject, published or out-of-fixture records. sourceKind is uploader role only; no actor/guardian ID, notes, keys or private URLs.
+
+GET /v2/media/action-summary?role=...&organization_id=...&scope_team_id=...
+Returns {revision:'review-inbox-v1',status:'ready',complete:true,items:[{kind:'video_review',available:true,count:pendingTotal,required:false}]}.
+Count-only projection never includes item or option metadata. Other action kinds not implemented. Optional consent is not a pending count.
+
+## Opening an inbox record
+Existing player list is limited to 30 recent clips. Before opening, re-fetch exact row with reviewInbox(scope,{mediaId:row.id,playerId:row.playerId,...appropriate team filter}); verify identity/workspace/scope and current row. If no row, show stale/unavailable and refresh. Existing playPrivateMedia/reviewPrivateMedia remain mutation/byte owners. For older pending records absent from the bounded library, coordinate a narrow controller adapter to insert the server-validated row into the selected player's in-memory review context; do not widen list grant or add duplicate mutation logic. Use existing playback and review authorization regardless of UI. Preserve independent review note/subject/confirmation. Avoid background playback downloads for inbox thumbnails. Server can re-deny stale rows.
+401/403: clear relevant identity/scope state; 409 review conflict refresh, no blind retries; 503 count unknown not zero; abort on navigation/scope changes. Keep private media and Clubhouse accepted workflows. Do not merge UX task branch into live staging before coordinated regression and owner approval.
+Rollback: Worker previous version + revoke only new inbox RPC; additive contract field harmless, no data change. No production, download, legacy RPC or wide submission gate activation.
