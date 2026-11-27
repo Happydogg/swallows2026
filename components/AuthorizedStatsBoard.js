@@ -92,7 +92,7 @@ export const AuthorizedStatsBoard = {
           </article>
         </div>
         <details class="rounded-2xl border border-slate-700 bg-slate-950/80 p-4">
-          <summary class="cursor-pointer py-2 text-sm font-bold text-white">Recorded session history ({{ sessions.length }})</summary>
+          <summary class="cursor-pointer py-2 text-sm font-bold text-white">Official performance history ({{ sessions.length }})</summary>
           <div class="mt-3 overflow-x-auto">
             <table class="w-full min-w-[610px] text-left text-xs">
               <thead><tr class="border-b border-slate-600 text-slate-400">
@@ -104,7 +104,7 @@ export const AuthorizedStatsBoard = {
             </table>
           </div>
         </details>
-        <p class="text-xs leading-relaxed text-slate-400">These are recorded staging measurements, not automatically approved medical or coaching benchmarks. Lower sprint times are faster; no injury-risk claim is made.</p>
+        <p class="text-xs leading-relaxed text-slate-400">Only current recorded results appear here; superseded measurements remain in revision history. These are not automatically approved medical or coaching benchmarks. Lower sprint times are faster; no injury-risk claim is made.</p>
       </template>
       </template>
     </section>
