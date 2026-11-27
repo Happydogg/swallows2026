@@ -327,6 +327,11 @@
     <!-- The same protected media state is available in the Videos tab. -->
     <private-media-panel v-if="activeTab === 'videos' && mediaOriginAllowed"
       :controller="privateMediaController"></private-media-panel>
+    <!-- Narrow acceptance controls. SDL-UX-003 owns final library/Clubhouse navigation. -->
+    <media-publication-panel v-if="activeTab === 'videos' && mediaOriginAllowed && !authError && ['coach','admin'].includes(workspaceMode) && privateMediaController.mediaPlayerId.value"
+      :key="authUser.id + ':' + workspaceMode + ':' + privateMediaController.mediaPlayerId.value" :auth="loginController" :controller="privateMediaController"></media-publication-panel>
+    <clubhouse-media-panel v-if="activeTab === 'videos' && mediaOriginAllowed && !authError && clubhouseMediaTeams.length"
+      :key="authUser.id + ':' + workspaceMode" :auth="loginController" :teams="clubhouseMediaTeams"></clubhouse-media-panel>
 
     <!-- Keep the existing gated workspace mounted and reachable, after the primary roster/library.
          The details disclosure changes presentation only; it does not enable any operation. -->

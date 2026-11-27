@@ -26,6 +26,7 @@ import { SubmissionWorkspace } from '../components/SubmissionWorkspace.js';
 import { usePrivateMedia } from '../composables/usePrivateMedia.js';
 import { PrivateMediaPanel } from '../components/PrivateMediaPanel.js';
 import { MediaConsentPanel } from '../components/MediaConsentPanel.js';
+import { MediaPublicationPanel, ClubhouseMediaPanel } from '../components/MediaSharingPanels.js';
 import { useVideos } from '../composables/useVideos.js';
 import { useAnalytics } from '../composables/useAnalytics.js';
 import { useRosterCsv } from '../composables/useRosterCsv.js';
@@ -54,7 +55,7 @@ const { createApp, ref, onMounted, onUnmounted, markRaw, computed } = Vue;
 
 createApp({
   components: {
-    PilotWorkspace, PerformanceInbox, LoginLanding, AppShell, CoachHome, ParentHome, StatsHub, AuthorizedStatsBoard, StagingDataBrowser, AvatarManager, InviteOnboarding, AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, MediaConsentPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
+    PilotWorkspace, PerformanceInbox, LoginLanding, AppShell, CoachHome, ParentHome, StatsHub, AuthorizedStatsBoard, StagingDataBrowser, AvatarManager, InviteOnboarding, AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, MediaConsentPanel, MediaPublicationPanel, ClubhouseMediaPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
     SessionFormModal, UploadVideoModal, ArAnalyzerModal, ManagedRoster, PerformanceWorkspace
   },
   setup() {
@@ -136,6 +137,14 @@ createApp({
     const coachTeamCount = computed(() => coachTeams.value.filter(row => !coachTeamId.value || row.id === coachTeamId.value).length);
     const ordinaryOrganizations = computed(() => (auth.accountContext.value?.organizations || []).filter(row => row.roles.some(role => role!=='platform_admin')));
     const ordinaryTeams = computed(() => (auth.accountContext.value?.teams || []).filter(row => row.roles.some(role => role!=='platform_admin')));
+    const clubhouseMediaTeams = computed(() => {
+      if(auth.authError.value || !auth.authUser.value)return [];
+      const role={coach:'coach',admin:'club_admin',manager:'manager',family:'guardian'}[workspaceMode.value];
+      if(!role)return [];
+      return ordinaryTeams.value.filter(row=>row.roles.includes(role) &&
+        (workspaceMode.value==='coach'?(!coachOrganizationId.value||row.organization_id===coachOrganizationId.value)&&(!coachTeamId.value||row.id===coachTeamId.value):
+        isManagedWorkspace.value?(!managedRoster.organizationId.value||row.organization_id===managedRoster.organizationId.value)&&(!managedRoster.teamId.value||row.id===managedRoster.teamId.value):true));
+    });
     const familyPlayers = computed(() => {
       if (!auth.isVerifiedGuardian.value || auth.authError.value) return [];
       const authorized = new Set(auth.guardianLinks.value.filter(link => link.status === 'verified').map(link => link.athlete_id));
@@ -544,7 +553,7 @@ createApp({
       managedRosterController: markRaw(managedRoster), workspaceOptions, isManagedWorkspace,
       changeManagedOrganization, changeManagedTeam, retryManagedRoster, loadMoreManagedRoster,
       coachOrganizations, coachTeams, coachOrganizationId, coachTeamId, coachTeamCount,
-      changeCoachOrganization, changeCoachTeam, ordinaryOrganizations, ordinaryTeams,
+      changeCoachOrganization, changeCoachTeam, ordinaryOrganizations, ordinaryTeams, clubhouseMediaTeams,
       analyzerController: markRaw(arAnalyzer)
     };
   }
