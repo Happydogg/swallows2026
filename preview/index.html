@@ -17,10 +17,35 @@
     body{background:#020617}
     button, select, textarea, input{touch-action:manipulation}
     @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+    /* SDL-UX-IA-04: screen-only shared visual tokens. No permission or routing rules. */
+    @media screen {
+      .sdl-shell { --sdl-surface: #151f30; --sdl-inset: #0c1423; --sdl-line: #334155; --sdl-muted: #a8b7cb; }
+      .sdl-shell .sdl-panel { background: var(--sdl-surface); border: 1px solid var(--sdl-line); border-radius: 14px; box-shadow: none; }
+      .sdl-shell .sdl-inset { background: var(--sdl-inset); border: 1px solid var(--sdl-line); border-radius: 12px; box-shadow: none; }
+      .sdl-shell .sdl-muted { color: var(--sdl-muted); }
+      .sdl-shell .sdl-tabs { background: var(--sdl-inset); border: 1px solid var(--sdl-line); border-radius: 12px; }
+      .sdl-shell .sdl-tabs button[aria-pressed="true"] { background: #1d4ed8; color: #fff; }
+      .sdl-shell .sdl-section-title { font-size: 1.125rem; font-weight: 700; line-height: 1.5; }
+      .sdl-shell .sdl-primary { min-height: 44px; border-radius: 10px; background: #1d4ed8; color: #fff; }
+      .sdl-shell .sdl-primary:not(:disabled):hover { background: #2563eb; }
+      .sdl-shell .sdl-secondary { min-height: 44px; border-radius: 10px; border: 1px solid #475569; background: #1e293b; color: #e2e8f0; }
+      .sdl-shell .sdl-secondary:not(:disabled):hover { background: #334155; }
+      .sdl-shell .sdl-content :is(button,select,input,textarea,summary):focus-visible,
+      .sdl-shell nav button:focus-visible { outline: 2px solid #67e8f9; outline-offset: 2px; }
+      .sdl-shell .sdl-content :is(input,select,textarea) { max-width: 100%; }
+      .sdl-shell .sdl-content [aria-label="Private player videos"] { overflow-wrap: anywhere; }
+      .sdl-shell .sdl-content [aria-label="Private player videos"] h2 { font-size: 1.25rem; }
+      .sdl-shell .sdl-content [aria-label="Private player videos"] h2,
+      .sdl-shell .sdl-content [aria-label="Private player videos"] h3 { line-height: 1.5; }
+      .sdl-shell .sdl-content [aria-label="Private player videos"] button { min-height: 44px; }
+      @media (max-width: 767px) {
+        .sdl-shell .sdl-content :is(input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),select,textarea) { font-size: 16px; }
+      }
+    }
   </style>
 </head>
 <body class="min-h-screen bg-slate-950 text-slate-100 antialiased">
-  <div id="preview-app" v-cloak class="mx-auto max-w-screen-2xl px-3 py-3 sm:px-5 sm:py-5">
+  <div id="preview-app" v-cloak class="sdl-shell mx-auto max-w-screen-2xl px-3 py-3 sm:px-5 sm:py-5">
     <header class="mb-4 rounded-2xl border border-amber-500/40 bg-slate-900 px-4 py-3 shadow-lg" aria-label="Preview environment">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex min-w-0 items-center gap-3">

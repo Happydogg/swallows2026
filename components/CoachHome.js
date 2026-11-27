@@ -22,26 +22,26 @@ export const CoachHome = {
     return { teamCount, preview, avatarFor };
   },
   template: `
-  <section class="space-y-5" aria-label="Coach home">
+  <section class="space-y-4" aria-label="Coach home">
     <header class="flex flex-wrap items-center justify-between gap-3">
       <h1 class="text-2xl font-black tracking-tight text-white sm:text-3xl">Team overview</h1>
-      <button type="button" @click="$emit('navigate','team')" class="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-500">Open team roster</button>
+      <button type="button" @click="$emit('navigate','team')" class="sdl-primary px-4 py-2.5 text-sm font-semibold">Open team roster</button>
     </header>
     <p v-if="error" class="rounded-xl border border-rose-700/60 bg-rose-950/30 p-3 text-sm text-rose-200" role="alert">{{ error }}</p>
     <div class="grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-3">
-      <div class="rounded-2xl border border-slate-700 bg-slate-800/70 p-4">
+      <div class="sdl-panel p-4">
         <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Authorized teams</p>
         <p class="mt-2 text-3xl font-black text-white">{{ loading ? '…' : teamCount }}</p>
       </div>
-      <div class="rounded-2xl border border-slate-700 bg-slate-800/70 p-4">
+      <div class="sdl-panel p-4">
         <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Roster players</p>
         <p class="mt-2 text-3xl font-black text-cyan-300">{{ loading ? '…' : roster.length }}</p>
       </div>
     </div>
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-5">
-      <div class="rounded-2xl border border-slate-700 bg-slate-900/90 p-5 lg:col-span-3">
+      <div class="sdl-panel p-4 lg:col-span-3">
         <div class="mb-4 flex items-center justify-between gap-2">
-          <h2 class="text-lg font-bold">Player shortcuts</h2>
+          <h2 class="sdl-section-title">Player shortcuts</h2>
           <span class="text-xs text-slate-400">Up to 3 players</span>
         </div>
         <p v-if="loading" class="text-sm text-slate-400" role="status">Loading authorized players…</p>
@@ -62,13 +62,13 @@ export const CoachHome = {
               <span class="text-xs text-slate-400">B {{ player.bats || '–' }} / T {{ player.throws || '–' }}</span>
               <button type="button" @click="$emit('open-video',player)"
                 :aria-label="'Open private videos for '+(player.preferred_name || 'this player')"
-                class="rounded-lg border border-sky-500/40 bg-blue-900/35 px-3 py-2 text-xs font-bold text-sky-200 hover:bg-blue-800/50">▶ Videos</button>
+                class="sdl-secondary px-3 py-2 text-sm font-semibold">▶ Videos</button>
             </div>
           </li>
         </ul>
       </div>
-      <div class="space-y-3 rounded-2xl border border-slate-700 bg-slate-900/90 p-5 lg:col-span-2">
-        <h2 class="text-lg font-bold">Quick access</h2>
+      <div class="sdl-panel space-y-3 p-4 lg:col-span-2">
+        <h2 class="sdl-section-title">Quick access</h2>
 
         <button type="button" @click="$emit('navigate','stats')" class="flex w-full items-center justify-between rounded-xl bg-slate-800 p-4 text-left text-sm font-semibold hover:bg-slate-700">
           <span>Performance</span><span aria-hidden="true">›</span>

@@ -18,13 +18,13 @@ export const ManagedRoster = {
   },
   template: `
     <section class="space-y-4" aria-label="Authorized administrative roster">
-      <header v-if="!scopeOnly" class="rounded-2xl border border-slate-700 bg-slate-800/70 p-5">
+      <header v-if="!scopeOnly" class="sdl-panel p-4">
         <p class="text-xs font-bold uppercase tracking-wide text-cyan-300">Verified workspace</p>
         <h1 class="mt-2 text-2xl font-black">{{ controller.role.value === 'club_admin' ? 'Club Admin' : 'Team Manager' }} {{ home ? 'Dashboard' : 'Roster' }}</h1>
         <p class="mt-2 text-sm text-slate-400">Authorized roster for your scope. Registration and team assignments are separate from performance, family and media permissions.</p>
-        <button v-if="home" type="button" class="mt-4 rounded-xl bg-blue-600 px-4 py-2.5 font-semibold" @click="$emit('navigate','team')">Open team roster</button>
+        <button v-if="home" type="button" class="sdl-primary mt-4 px-4 py-2.5 text-sm font-semibold" @click="$emit('navigate','team')">Open team roster</button>
       </header>
-      <div class="grid gap-3 rounded-2xl border border-slate-700 bg-slate-900 p-4 sm:grid-cols-2">
+      <div class="sdl-panel grid gap-3 p-3 sm:grid-cols-2">
         <label class="text-sm font-semibold">Club
           <select :disabled="controller.denied.value" :value="controller.organizationId.value" @change="$emit('organization',$event.target.value)" class="mt-2 w-full rounded-lg border border-slate-600 bg-slate-950 p-3">
             <option value="" disabled>Select a club</option>
@@ -41,10 +41,10 @@ export const ManagedRoster = {
         <p class="text-xs text-slate-400 sm:col-span-2">{{ controller.teams.value.length }} authorized team(s) in this club</p>
       </div>
       <section v-if="!home && !scopeOnly && !controller.denied.value && controller.teams.value.length"
-        class="space-y-3 rounded-xl border border-slate-700 bg-slate-900/80 p-4" aria-label="Scoped roster management">
+        class="sdl-panel space-y-3 p-4" aria-label="Scoped roster management">
         <button v-if="!controller.registrationOpen.value" type="button"
           :disabled="controller.writeBusy.value || controller.loading.value"
-          class="rounded-lg bg-blue-700 px-4 py-3 font-semibold disabled:opacity-50"
+          class="sdl-primary px-4 py-3 text-sm font-semibold disabled:opacity-50"
           @click="controller.openRegistration()">Register player</button>
         <form v-else @submit.prevent="controller.registerPlayer()" class="space-y-3">
           <h2 class="font-bold">Register player in an authorized team</h2>
@@ -112,15 +112,15 @@ export const ManagedRoster = {
       <p v-else-if="!controller.organizations.value.length || (controller.role.value === 'manager' && !controller.teams.value.length)" class="rounded-xl border border-slate-700 p-5 text-slate-400">No authorized teams or clubs are available.</p>
       <p v-else-if="!controller.rows.value.length" class="rounded-xl border border-slate-700 p-5 text-slate-400">No players in this authorized scope.</p>
       <div v-else-if="home" class="grid grid-cols-2 gap-3" aria-label="Roster summary">
-        <div class="rounded-xl border border-slate-700 bg-slate-800 p-4"><p class="text-xs text-slate-400">Authorized teams in club</p><p class="mt-2 text-2xl font-bold">{{ controller.teams.value.length }}</p></div>
-        <div class="rounded-xl border border-slate-700 bg-slate-800 p-4"><p class="text-xs text-slate-400">Players loaded{{ controller.nextAfter.value ? ' (more available)' : '' }}</p><p class="mt-2 text-2xl font-bold">{{ controller.rows.value.length }}</p></div>
+        <div class="sdl-panel p-4"><p class="text-xs text-slate-400">Authorized teams in club</p><p class="mt-2 text-2xl font-bold">{{ controller.teams.value.length }}</p></div>
+        <div class="sdl-panel p-4"><p class="text-xs text-slate-400">Players loaded{{ controller.nextAfter.value ? ' (more available)' : '' }}</p><p class="mt-2 text-2xl font-bold">{{ controller.rows.value.length }}</p></div>
       </div>
       <template v-else-if="!scopeOnly">
         <label class="block text-sm">Search loaded players<input v-model="search" type="search" class="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-950 p-3" /></label>
         <p class="text-sm text-slate-400">{{ controller.rows.value.length }} loaded players{{ controller.nextAfter.value ? ' · more available' : '' }}</p>
         <p v-if="!visible.length" class="p-3 text-slate-400">No loaded players match your search.</p>
         <div class="grid gap-3 sm:grid-cols-2">
-          <article v-for="row in visible" :key="row.id" class="space-y-3 rounded-xl border border-slate-700 bg-slate-800 p-4">
+          <article v-for="row in visible" :key="row.id" class="sdl-panel space-y-3 p-4">
             <button type="button" @click="$emit('open-profile',row)"
               class="flex w-full gap-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">
               <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-blue-950 font-bold text-cyan-300">#{{ row.jersey || '–' }}</span>

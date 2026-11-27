@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SWALLOWS DATALAB</title>
   <link rel="icon" type="image/png" href="./logo.png">
   <script src="https://cdn.tailwindcss.com"></script>
@@ -60,6 +60,32 @@
       cursor: pointer;
     }
 
+    /* SDL-UX-IA-04: screen-only shared visual tokens. No permission or routing rules. */
+    @media screen {
+      .sdl-shell { --sdl-surface: #151f30; --sdl-inset: #0c1423; --sdl-line: #334155; --sdl-muted: #a8b7cb; }
+      .sdl-shell .sdl-panel { background: var(--sdl-surface); border: 1px solid var(--sdl-line); border-radius: 14px; box-shadow: none; }
+      .sdl-shell .sdl-inset { background: var(--sdl-inset); border: 1px solid var(--sdl-line); border-radius: 12px; box-shadow: none; }
+      .sdl-shell .sdl-muted { color: var(--sdl-muted); }
+      .sdl-shell .sdl-tabs { background: var(--sdl-inset); border: 1px solid var(--sdl-line); border-radius: 12px; }
+      .sdl-shell .sdl-tabs button[aria-pressed="true"] { background: #1d4ed8; color: #fff; }
+      .sdl-shell .sdl-section-title { font-size: 1.125rem; font-weight: 700; line-height: 1.5; }
+      .sdl-shell .sdl-primary { min-height: 44px; border-radius: 10px; background: #1d4ed8; color: #fff; }
+      .sdl-shell .sdl-primary:not(:disabled):hover { background: #2563eb; }
+      .sdl-shell .sdl-secondary { min-height: 44px; border-radius: 10px; border: 1px solid #475569; background: #1e293b; color: #e2e8f0; }
+      .sdl-shell .sdl-secondary:not(:disabled):hover { background: #334155; }
+      .sdl-shell .sdl-content :is(button,select,input,textarea,summary):focus-visible,
+      .sdl-shell nav button:focus-visible { outline: 2px solid #67e8f9; outline-offset: 2px; }
+      .sdl-shell .sdl-content :is(input,select,textarea) { max-width: 100%; }
+      .sdl-shell .sdl-content [aria-label="Private player videos"] { overflow-wrap: anywhere; }
+      .sdl-shell .sdl-content [aria-label="Private player videos"] h2 { font-size: 1.25rem; }
+      .sdl-shell .sdl-content [aria-label="Private player videos"] h2,
+      .sdl-shell .sdl-content [aria-label="Private player videos"] h3 { line-height: 1.5; }
+      .sdl-shell .sdl-content [aria-label="Private player videos"] button { min-height: 44px; }
+      @media (max-width: 767px) {
+        .sdl-shell .sdl-content :is(input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),select,textarea) { font-size: 16px; }
+      }
+    }
+
     @media print {
       body {
         background: #ffffff !important;
@@ -90,8 +116,8 @@
     }
   </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8 font-sans">
-  <div id="app" v-cloak class="max-w-6xl mx-auto">
+<body class="bg-slate-900 text-slate-100 min-h-screen p-3 sm:p-4 lg:p-6 font-sans">
+  <div id="app" v-cloak class="max-w-7xl mx-auto">
     
     <!-- SDL-004-005: Authentication gate. No private app UI before verified session. -->
     <div v-if="!authReady" class="p-10 text-center text-slate-300" role="status">Checking secure session…</div>
@@ -104,8 +130,8 @@
       <invite-onboarding v-if="pendingInvitation" :controller="pilotController" :account-email="authUser.email || ''"
         @dismiss="dismissInvitePrompt"></invite-onboarding>
 
-      <section v-if="workspaceMode === 'coach' && ['home','team','stats'].includes(activeTab) && currentView === 'overview'" class="mb-4 grid gap-3 rounded-2xl border border-slate-700 bg-slate-900 p-4 sm:grid-cols-2" aria-label="Coach roster scope">
-        <label class="text-sm font-semibold">Club<select :value="coachOrganizationId" @change="changeCoachOrganization($event.target.value)" class="mt-2 block w-full rounded-lg bg-slate-950 p-3"><option value="">All authorized clubs</option><option v-for="org in coachOrganizations" :key="org.id" :value="org.id">{{ org.name }}</option></select></label>
+      <section v-if="workspaceMode === 'coach' && ['home','team','stats'].includes(activeTab) && currentView === 'overview'" class="sdl-panel mb-4 grid gap-3 p-3 sm:grid-cols-2" aria-label="Coach roster scope">
+        <label class="text-sm font-semibold">Club<select :value="coachOrganizationId" @change="changeCoachOrganization($event.target.value)" class="mt-2 block min-h-11 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2"><option value="">All authorized clubs</option><option v-for="org in coachOrganizations" :key="org.id" :value="org.id">{{ org.name }}</option></select></label>
         <label class="text-sm font-semibold">Team<select :value="coachTeamId" @change="changeCoachTeam($event.target.value)" class="mt-2 block w-full rounded-lg bg-slate-950 p-3"><option value="">All assigned teams</option><option v-for="team in coachTeams" :key="team.id" :value="team.id">{{ team.name }}</option></select></label>
       </section>
 

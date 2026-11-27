@@ -3,7 +3,8 @@ import { measurementToday } from '../js/performanceService.js';
 import { PerformanceInbox } from './PerformanceInbox.js';
 
 const inputClass = 'mt-1 block min-h-11 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-base text-white';
-const buttonClass = 'min-h-11 rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50';
+const buttonClass = 'sdl-primary min-h-11 rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50';
+const secondaryClass = 'sdl-secondary min-h-11 px-3 py-2 text-sm font-semibold disabled:opacity-50';
 const statuses = {pending:'Pending review', approved:'Official', rejected:'Rejected', correction_requested:'Correction requested'};
 
 export const PerformanceWorkspace = {
@@ -66,14 +67,14 @@ export const PerformanceWorkspace = {
       }
     }
     return {...workspace,startCorrection,protocolField,playerId,choice,reviewTeam,section,sections,sectionBusy,chooseSection,inboxController:Vue.markRaw(review),
-      inputClass,buttonClass,statuses,today:measurementToday,
+      inputClass,buttonClass,secondaryClass,statuses,today:measurementToday,
       earlier:row=>workspace.rows.value.find(item=>item.id===row.supersedes)};
   },
   template:`
-    <section class="my-4 space-y-4 rounded-2xl border border-slate-700 bg-slate-900/90 p-4 sm:p-6" aria-label="Performance measurements">
+    <section class="sdl-panel my-4 space-y-4 p-4 sm:p-5" aria-label="Performance measurements">
       <header v-if="!organized" class="flex flex-wrap items-center justify-between gap-3">
         <h2 class="text-xl font-bold">Performance measurements</h2>
-        <button v-if="playerId" type="button" :class="buttonClass" :disabled="busy" @click="refresh">Refresh measurements</button>
+        <button v-if="playerId" type="button" :class="secondaryClass" :disabled="busy" @click="refresh">Refresh measurements</button>
       </header>
       <slot v-if="organized" name="player-context" :section="section"></slot>
       <label v-if="fixedPlayerId===null" class="block max-w-lg text-sm font-semibold">Choose player
@@ -82,7 +83,7 @@ export const PerformanceWorkspace = {
           <option v-for="p in players" :key="p.id" :value="p.id">{{ p.preferred_name || 'Player' }}{{ p.jersey ? ' · #'+p.jersey : '' }}</option>
         </select>
       </label>
-      <nav v-if="organized" class="flex flex-wrap gap-2 rounded-xl border border-slate-700 bg-slate-950 p-1.5" aria-label="Statistics sections">
+      <nav v-if="organized" class="sdl-tabs flex flex-wrap gap-2 p-1.5" aria-label="Statistics sections">
         <button v-for="item in sections" :key="item.id" type="button" :aria-pressed="section===item.id"
           :disabled="sectionBusy" @click="chooseSection(item.id)"
           :class="section===item.id ? 'bg-blue-700 text-white' : 'text-slate-300 hover:bg-slate-800'"
@@ -91,7 +92,7 @@ export const PerformanceWorkspace = {
       <slot v-if="organized && section==='overview'" name="overview"></slot>
       <header v-if="organized && section!=='review'" class="flex flex-wrap items-center justify-between gap-2">
         <h2 class="text-lg font-bold">{{ section==='record' ? 'Record measurement' : 'Performance measurements' }}</h2>
-        <button v-if="playerId" type="button" :class="buttonClass" :disabled="busy" @click="refresh">Refresh measurements</button>
+        <button v-if="playerId" type="button" :class="secondaryClass" :disabled="busy" @click="refresh">Refresh measurements</button>
       </header>
       <p v-if="organized && !playerId && players.length && section!=='review'" class="text-sm text-slate-300">Choose an authorized player to continue.</p>
       <p v-if="!players.length" class="text-sm text-slate-300">No players are available in this scope.</p>
@@ -130,12 +131,12 @@ export const PerformanceWorkspace = {
       <div v-if="ready && (!organized || section==='overview')" class="space-y-3">
         <h3 class="font-semibold">Measurement history &amp; revisions</h3>
         <p v-if="!rows.length" class="text-sm text-slate-300">No measurements have been entered.</p>
-        <article v-for="row in rows" :key="row.id" class="space-y-2 rounded-xl border border-slate-700 bg-slate-950 p-3">
+        <article v-for="row in rows" :key="row.id" class="space-y-2 border-t border-slate-700 py-4">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <h4 class="font-semibold">{{ row.protocol_label || row.protocol_id }}</h4>
-            <span class="rounded-md bg-slate-800 px-2 py-1 text-xs font-semibold text-slate-200">{{ row.superseded_by ? 'Superseded' : statuses[row.status] }}</span>
+            <span class="rounded-md px-2 py-1 text-xs font-semibold" :class="row.superseded_by ? 'bg-slate-800 text-slate-300' : row.status==='approved' ? 'bg-emerald-950 text-emerald-200' : 'bg-slate-800 text-slate-200'">{{ row.superseded_by ? 'Superseded' : statuses[row.status] }}</span>
           </div>
-          <p class="text-sm">{{ row.value }} {{ row.unit }} · {{ row.measurement_date }}</p>
+          <p class="flex flex-wrap items-baseline gap-x-3 gap-y-1"><strong class="text-lg tabular-nums" :class="row.superseded_by ? 'text-slate-400 line-through' : 'text-white'">{{ row.value }} {{ row.unit }}</strong><span class="text-sm sdl-muted">{{ row.measurement_date }}</span></p>
           <p v-if="row.evidence" class="whitespace-pre-wrap break-words text-sm text-slate-300">{{ row.evidence }}</p>
           <p v-if="row.review_note" class="whitespace-pre-wrap break-words text-sm text-slate-300">Coach note: {{ row.review_note }}</p>
           <details class="text-sm text-slate-300">
@@ -144,7 +145,7 @@ export const PerformanceWorkspace = {
             <p v-else-if="row.supersedes">Previous result is outside the loaded history.</p>
             <p v-for="(event,index) in row.history" :key="index" class="break-words py-1">{{ event.action?.replaceAll('_',' ') }} · {{ event.at }}<span v-if="event.details?.reason || event.details?.note"> · {{ event.details.reason || event.details.note }}</span></p>
           </details>
-          <button v-if="official && row.status==='approved' && !row.superseded_by && protocols.some(p=>p.id===row.protocol_id)" type="button" :class="buttonClass" :disabled="busy" @click="startCorrection(row)">Correct official result</button>
+          <button v-if="official && row.status==='approved' && !row.superseded_by && protocols.some(p=>p.id===row.protocol_id)" type="button" :class="secondaryClass" :disabled="busy" @click="startCorrection(row)">Correct official result</button>
         </article>
       </div>
       <template v-if="mode==='coach' && teams.length && (!organized || section==='review')">
