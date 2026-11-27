@@ -57,15 +57,73 @@ test('coaches cannot forge club consent, enrollment or recording permission via 
  ['/v2/club-enrollments',{athlete_id:PLAYER,organization_id:OTHER,status:'active'}],[`/v2/club-enrollments/${VIDEO}/recording`,{allowed:true,permission_ref:'forged'}]])
  assert.equal((await x.packaged.fetch(x.request(path,{method:'POST',body:JSON.stringify(body),contentType:'application/json'}),x.env)).status,403);
 });
-test('Worker rejects missing/obsolete consent policy and multi-child publication before authorization RPC',async()=>{
- const x=await h('coach');for(const subjects of [[],[PLAYER,OTHER]])assert.equal((await x.packaged.fetch(x.request(`/v2/submissions/${VIDEO}/publish`,{method:'POST',body:JSON.stringify({team_ids:[OTHER],subject_athletes:subjects}),contentType:'application/json'}),x.env)).status,400);
- assert.equal(x.calls.some(c=>c.url.endsWith('/sdl_004_publish_submission')),false);
- const r=await x.packaged.fetch(x.request(`/v2/club-enrollments/${VIDEO}/consent`,{method:'POST',body:JSON.stringify({accept:true,generation:OTHER,policy_version:'old'}),contentType:'application/json'}),x.env);assert.equal(r.status,400);
+// REG-01: legacy publication is deliberately held; do not re-enable it for old tests.
+test('held legacy publication denies malformed and valid requests even after approval and consent',async()=>{
+ const x=await h('coach');
+ for(const approved of [false,true]){
+  x.approved=approved;x.consent=approved;
+  for(const subjects of [[],[PLAYER,OTHER],[PLAYER]]){
+   const r=await x.packaged.fetch(x.request(`/v2/submissions/${VIDEO}/publish`,{method:'POST',body:JSON.stringify({team_ids:[OTHER],subject_athletes:subjects}),contentType:'application/json'}),x.env);
+   assert.equal(r.status,503);assert.equal((await r.json()).code,'media_disabled');
+  }
+ }
+ assert.equal(x.calls.some(c=>/\/(sdl_004_publish_submission|sdl_v5_set_media_publication)$/.test(c.url)),false);
+ assert.equal(x.writes,0);assert.equal(x.deletes,0);
 });
-test('coach publication requires server approval/consent and forwards explicit team and subject scope',async()=>{
- const x=await h('coach');const request=()=>x.request(`/v2/submissions/${VIDEO}/publish`,{method:'POST',body:JSON.stringify({team_ids:[OTHER],subject_athletes:[PLAYER]}),contentType:'application/json'});
- assert.equal((await x.packaged.fetch(request(),x.env)).status,403);x.approved=true;x.consent=true;assert.equal((await x.packaged.fetch(request(),x.env)).status,200);
- const call=x.calls.filter(c=>c.url.endsWith('/sdl_004_publish_submission')).at(-1);assert.equal(call.init.headers.Authorization,'Bearer synthetic');assert.deepEqual(JSON.parse(call.init.body),{p_id:VIDEO,p_team_ids:[OTHER],p_subject_athletes:[PLAYER]});
+test('obsolete legacy standing consent policy remains invalid before consent RPC',async()=>{
+ const x=await h('coach');
+ const r=await x.packaged.fetch(x.request(`/v2/club-enrollments/${VIDEO}/consent`,{method:'POST',body:JSON.stringify({accept:true,generation:OTHER,policy_version:'old'}),contentType:'application/json'}),x.env);
+ assert.equal(r.status,400);
+ assert.equal(x.calls.some(c=>c.url.endsWith('/sdl_004_club_consent')),false);
+});
+// Synthetic responses model the current narrow database contract only. These tests
+// check Worker validation/forwarding/denial, not PostgreSQL authorization itself.
+const currentPolicy='sdl004-clubhouse-view-download-v2';
+async function sharingHarness(){
+ const x=await h('coach');x.env.MEDIA_CONSENT_ENABLED='true';
+ x.approved=false;x.consent=false;x.singleSubject=false;
+ x.rpcOverride=(rpc,body)=>{
+  if(rpc==='sdl_004_session_active')return Response.json(!x.revoked);
+  if(rpc==='sdl_004_submission_contract')return Response.json({revision:'sdl004-club-enrollment-v2',rbacVersion:5,mediaRevision:'v5.1-clean-start',mediaPublicationRevision:'team-publication-v1',mediaConsentRevision:currentPolicy});
+  if(rpc==='sdl_v5_set_media_publication'){
+   const scope=['coach','admin'].includes(x.role)&&body.p_id===VIDEO&&body.p_team===OTHER;
+   const permitted=scope&&(!body.p_publish||(x.approved&&x.consent&&x.singleSubject));
+   return permitted?Response.json(true):new Response(null,{status:403});
+  }
+  if(rpc==='sdl_v5_set_media_consent')return x.role==='parent'&&body.p_player===PLAYER&&body.p_generation===OTHER?Response.json({active:body.p_accept}):new Response(null,{status:403});
+  assert.fail('Unexpected RPC in current sharing contract: '+rpc);
+ };
+ return x;
+}
+const post=(x,path,body)=>x.packaged.fetch(x.request(path,{method:'POST',body:JSON.stringify(body),contentType:'application/json'}),x.env);
+test('current consent and single-team publication reject malformed input before mutation RPC',async()=>{
+ const x=await sharingHarness();x.role='parent';
+ for(const body of [{accept:true,generation:OTHER},{accept:true,generation:OTHER,policy_version:'sdl004-clubhouse-v1'},{accept:true,generation:OTHER,policy_version:'old'},{accept:true,generation:'invalid',policy_version:currentPolicy}]){
+  assert.equal((await post(x,`/v2/media/consent?player_id=${PLAYER}`,body)).status,400);
+ }
+ x.role='coach';
+ for(const body of [{},{team_id:'invalid'},{team_ids:[OTHER],subject_athletes:[]},{team_ids:[OTHER],subject_athletes:[PLAYER,OTHER]},{team_id:[PLAYER,OTHER]}]){
+  assert.equal((await post(x,`/v2/media/${VIDEO}/publish`,body)).status,400);
+ }
+ assert.equal(x.calls.some(c=>/\/(sdl_v5_set_media_consent|sdl_v5_set_media_publication|sdl_004_publish_submission)$/.test(c.url)),false);
+});
+test('current publication forwards caller JWT and exact narrow scope, propagates authorization denials and receipts',async()=>{
+ const x=await sharingHarness();const publish=()=>post(x,`/v2/media/${VIDEO}/publish`,{team_id:OTHER});
+ assert.equal((await publish()).status,403);x.approved=true;
+ assert.equal((await publish()).status,403);x.consent=true;
+ assert.equal((await publish()).status,403);x.singleSubject=true;
+ for(const role of ['parent','manager','teammate','platform_admin']){x.role=role;assert.equal((await publish()).status,403);}
+ x.role='coach';assert.equal((await post(x,`/v2/media/${VIDEO}/publish`,{team_id:PLAYER})).status,403);
+ const r=await publish();assert.equal(r.status,200);assert.deepEqual(await r.json(),{updated:true,published:true});
+ const call=x.calls.filter(c=>c.url.endsWith('/sdl_v5_set_media_publication')).at(-1);
+ assert.equal(call.init.headers.Authorization,'Bearer synthetic');assert.equal(call.init.headers.apikey,x.env.SUPABASE_PUBLISHABLE_KEY);
+ assert.deepEqual(JSON.parse(call.init.body),{p_id:VIDEO,p_team:OTHER,p_publish:true});
+ // Unpublication must remain possible for authorized staff after consent withdrawal.
+ x.consent=false;const unpublish=await post(x,`/v2/media/${VIDEO}/unpublish`,{team_id:OTHER});
+ assert.equal(unpublish.status,200);assert.deepEqual(await unpublish.json(),{updated:true,published:false});
+ const removal=x.calls.filter(c=>c.url.endsWith('/sdl_v5_set_media_publication')).at(-1);
+ assert.deepEqual(JSON.parse(removal.init.body),{p_id:VIDEO,p_team:OTHER,p_publish:false});
+ assert.equal(x.calls.some(c=>c.url.endsWith('/sdl_004_publish_submission')),false);assert.equal(x.writes,0);assert.equal(x.deletes,0);
 });
 test('all direct v2 routes reject the previous per-video database contract',async()=>{
  const x=await h();x.revision='sdl004-submissions-v1';assert.equal((await x.packaged.fetch(x.request(upload,{method:'POST',body:bytes}),x.env)).status,503);assert.equal(x.writes,0);
