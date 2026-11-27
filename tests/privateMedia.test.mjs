@@ -122,7 +122,7 @@ for (const failure of ['onerror', 'ontimeout']) test(`upload ${failure} reports 
 
 test('bad file type and oversized/empty files fail before network or XHR creation', async t => {
   let calls = 0; const { service } = await serviceHarness(t, { xhrFactory: () => { calls++; } });
-  for (const bad of [{ ...file, type: 'video/quicktime' }, { ...file, size: 0 }, { ...file, size: 20971521 }]) {
+  for (const bad of [{ ...file, name:'clip.mov', type: 'video/quicktime' }, { ...file, type:'image/jpeg' }, { ...file, size: 0 }, { ...file, size: 20971521 }]) {
     await assert.rejects(service.upload(PLAYER, bad, {submission:{category:'pitching',key:VIDEO}}));
   }
   assert.equal(calls, 0);
@@ -385,4 +385,16 @@ test('deterministic PostgreSQL player UUIDs reach the authorized media APIs', as
   const uploaded=await serviceHarness(t,{xhrFactory:()=>xhrMock(201,{...row,player_id:demo})});
   assert.equal((await uploaded.service.upload(demo,file,{submission:{category:'pitching',key:VIDEO}})).player_id,demo);
   assert.throws(()=>uploaded.service.upload(demo,file,{submission:{category:'pitching',key:demo}}),/Invalid media or player ID/);
+});
+
+test('iOS Files MP4s with generic or QuickTime metadata are accepted without changing the wire contract', async t => {
+  const {service,xhr}=await serviceHarness(t);
+  for(const type of ['', 'application/octet-stream', 'video/quicktime', 'VIDEO/MP4']){
+    const picked={...file,type};
+    assert.equal((await service.upload(PLAYER,picked,{submission:{category:'pitching',key:VIDEO}})).id,VIDEO);
+    assert.equal(xhr.headers['Content-Type'],'video/mp4');
+    assert.equal(xhr.body,picked);
+  }
+  await assert.rejects(service.upload(PLAYER,{...file,name:'IMG_0001.MOV',type:'video/quicktime'},{submission:{category:'pitching',key:VIDEO}}),/Choose an actual MP4 from Files/);
+  await assert.rejects(service.upload(PLAYER,{...file,name:'image.jpg',type:'application/octet-stream'},{submission:{category:'pitching',key:VIDEO}}),/Choose an MP4 video file/);
 });

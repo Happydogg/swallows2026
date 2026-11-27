@@ -160,8 +160,8 @@ export const PrivateMediaPanel = {
         </select>
       </label>
       <label class="block text-sm font-semibold text-slate-300" for="sdl-private-upload">
-        Upload a private pilot clip (MP4, up to 20 MiB)
-        <input id="sdl-private-upload" type="file" accept="video/mp4,.mp4"
+        Choose an MP4 from Files (up to 20 MiB)
+        <input id="sdl-private-upload" type="file" accept="video/mp4,.mp4,application/octet-stream"
           :disabled="mediaUploading" @change="selectMediaFile"
           class="mt-2 block w-full rounded-xl border border-slate-600 bg-slate-950 px-3 py-3 text-sm text-slate-200"/>
       </label>

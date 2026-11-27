@@ -24,7 +24,15 @@ const PLAYER_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{1
 const playerIdValue = value => { if (typeof value !== 'string' || !PLAYER_UUID.test(value)) throw new MediaError('Invalid media or player ID.'); return value; };
 const id = value => { if (!UUID.test(value ?? '')) throw new MediaError('Invalid media or player ID.'); return value; };
 export function validateMediaFile(file) {
-  if (!file || file.type !== 'video/mp4' || !/\.mp4$/i.test(file.name ?? '')) throw failure(415);
+  // iOS and Files providers may report a real .mp4 as generic or QuickTime.
+  // The Worker still checks the container bytes and enforces size and authorization.
+  const mime = typeof file?.type === 'string' ? file.type.toLowerCase().trim() : '';
+  const name = typeof file?.name === 'string' ? file.name : '';
+  if (!file || !/\.mp4$/i.test(name) || !['video/mp4','video/quicktime','application/octet-stream',''].includes(mime)) {
+    throw new MediaError(/\.mov$/i.test(name) || mime==='video/quicktime'
+      ? 'This clip is a MOV file or is not named .mp4. Choose an actual MP4 from Files; iPhone Camera recordings may be MOV.'
+      : 'Choose an MP4 video file from Files (not a photo or another video format).',415);
+  }
   if (!Number.isSafeInteger(file.size) || file.size <= 0 || file.size > MEDIA_LIMIT) throw failure(413);
 }
 
