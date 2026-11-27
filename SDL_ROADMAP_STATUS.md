@@ -2,6 +2,25 @@
 
 **As of:** 2026-11-27. **Scope:** Current GitHub branch and independently checked staging services; not a production readiness certificate.
 
+## P0/P1 UX-003 remediation candidate (2026-11-28)
+
+**Current checkpoint, retaining all previous QA issues and history below.** [Draft PR #21](https://github.com/Happydogg/swallows2026/pull/21) remains **unmerged**; active accepted UX staging source still `4590f86c458cacc461f45a8e62aeeda470e8646e`. Reviewed remediation source `8f8c9813aef064bba0e9a782a865793934370d90`, handoff-only tip `f4b452105fd23c5e37a09bf41b32742da83e370f`. [Handoff](https://github.com/Happydogg/swallows2026/blob/f4b452105fd23c5e37a09bf41b32742da83e370f/docs/design/SDL-UX-003/P0P1-QA-HANDOFF.md).
+
+| ID | Status at this checkpoint | Next owner / acceptance gate |
+|---|---|---|
+| **UX-QA-01 · P0** | **Preview prepared / approval pending.** `http://127.0.0.1:5500` planned synthetic local environment, no approved active candidate deployment; hosted Worker preflight not verified in Codex environment. | SDL-000 + owner + RBAC-05: confirm hosted Worker/CORS/Auth redirect, existing staging permissions and exact SHA, approve isolated target; record rollback. Remote iPhone/Android device cannot use a tester computer's loopback address directly. |
+| **UX-QA-02 · P1** | **Fix implemented, local tests reported PASS.** Stale consent context invalidated; current consent generation reread before explicit v2 decision. | RBAC-05 to inspect existing service consent GET/POST generation and revocation; UX-002/owner signed-in Guardian same-player enrollment/role tests. |
+| **UX-QA-03 · P1** | **Fix implemented, local tests reported PASS.** Save-ready notice tied to live object URL and clears at 60s/close. | UX-002/owner actual iPhone/Android authorized Save, expiry, background/switch and revoke tests. |
+| **UX-QA-04 · P1** | **Existing behavior verified by local test.** Review→Library clears private selection and requires fresh authorization. | UX-002 owner device usability confirmation; no authorization shortcut. |
+| **UX-QA-05 · P1** | **Existing behavior verified by local tests.** Home/inbox independent server counts, scope-bound requests, stale cancel and mutation receipt refresh. | UX-002/RBAC-05 signed-in count/race test; do not require equal totals across different server snapshots. |
+| **UX-QA-06/07 · P2** | **Open.** Legacy duplicate disclosure and 320px potential crowding. | UX-002 device visual assessment; separate authorized presentation batch if warranted. |
+
+**Reported automated verification:** `npm test` **530/530** (14 additional cases over previous 516), UX-003 subset **73/73**, Vue **8/8**, UX build **178/178**, Worker local package PASS with release-preservation warning open. Counts overlap. This run is **Codex locally reported**, with log/manifest held outside GitHub and no new PR-tip CI status verified; previous [independent CI 516/516](https://github.com/Happydogg/swallows2026/actions/runs/46025411813/job/140595434819) is historical baseline, not substitute for new-source verification.
+
+**Critical path:** (1) RBAC-05 review consent generation check/current Worker and origin/binding inventory, (2) acquire reproducible exact-source CI evidence or reviewer-verifiable local logs, (3) SDL-000/owner explicit approval for exact isolated synthetic preview and rollback, (4) UX-002/owner sign-in synthetic cross-role/browser/iPhone/Android QA, (5) SDL-GOV release-preservation and deferred security negatives, then separately decide combined staging merge/promotion. **No approval to merge/deploy in this update.**
+
+---
+
 ## P0 UX-002 independent QA / UX-003 integration readiness (2026-11-27)
 
 **Current checkpoint supersedes the earlier UX-IA-01–06 and media-planning status snapshots below; preserve those as dated history.** Working mirror only; not a production authorization.
