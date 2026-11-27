@@ -299,3 +299,22 @@ test('UX-IA-02 shares one athlete context and keeps review separate from record 
   assert.match(submissions,/v-if="pilot && showPerformanceReview"/);
   assert.match(index,/:show-synthetic="false"/);
 });
+
+test('UX-IA-03 separates profile tasks without replacing existing chart, report, video or performance handlers',()=>{
+  const profile=fs.readFileSync(new URL('../components/PlayerProfile.js',import.meta.url),'utf8');
+  assert.match(profile,/Object.freeze\(\['Overview','Growth','Stats','Videos','History'\]\)/);
+  assert.match(profile,/props.setChartMode\(next === 'Growth' \? 'growth' : 'velocity'\)/);
+  assert.match(profile,/else clearPlayerChart\(\)/);
+  assert.match(profile,/section==='Overview' && !historyLoading && !historyError/);
+  assert.equal((profile.match(/id="playerVelocityChart"/g)||[]).length,1);
+  assert.match(profile,/section==='Stats' \? '' : 'hidden'/);
+  assert.match(profile,/<slot name="performance">/);
+  assert.match(profile,/section==='Videos'" class="no-print"/);
+  assert.match(profile,/section==='History' \? '' : 'hidden'/);
+  assert.match(profile,/session.shoulder_check == null \|\| session.shoulder_check === '' \? 'Not recorded'/);
+  assert.match(profile,/@click="triggerPrintReport"/);
+  assert.match(index,/\.profile-print-section \{ display: block !important; \}/);
+  assert.match(index,/:key="workspaceMode \+ ':' \+ selectedPlayer.id"/);
+  assert.match(index,/activeTab === 'team' && mediaOriginAllowed && visibleStagingPlayers.some/);
+  assert.match(index,/performancePlayers.some\(row => row.id === selectedPlayer.id\)/);
+});
