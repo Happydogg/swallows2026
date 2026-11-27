@@ -101,7 +101,7 @@ export const PlayerProfile = {
     :calculate-jump-ratio="calculateJumpRatio" :get-jump-ratio-color="getJumpRatioColor"
     :format-height-weight="formatHeightWeight"></player-hero-card>
 
-  <nav aria-label="Player profile sections" class="grid grid-cols-3 gap-1.5 rounded-xl border border-slate-700 bg-slate-950 p-1.5 no-print sm:grid-cols-5">
+  <nav aria-label="Player profile sections" class="sdl-tabs grid grid-cols-3 gap-1.5 p-1.5 no-print sm:grid-cols-5">
     <button v-for="item in sections" :key="item" type="button" :aria-pressed="section===item"
       @click="chooseSection(item)" :class="section===item ? 'bg-blue-700 text-white' : 'text-slate-300 hover:bg-slate-800'"
       class="min-h-11 rounded-lg px-2 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">{{ item }}</button>
@@ -109,7 +109,7 @@ export const PlayerProfile = {
   <section v-if="section==='Overview' && !historyLoading && !historyError" class="space-y-3 no-print" aria-label="Latest recorded results">
     <h3 class="text-lg font-semibold">Latest recorded results</h3>
     <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      <div v-for="m in [{key:'exit_velo',label:t('exitVelo'),unit:'km/h'},{key:'throwing_velo',label:t('throwingVelo'),unit:'km/h'},{key:'height_cm',label:t('heightCm'),unit:'cm'},{key:'weight_kg',label:t('weightKg'),unit:'kg'}]" :key="m.key" class="min-w-0 rounded-xl border border-slate-700 bg-slate-800/50 p-3">
+      <div v-for="m in [{key:'exit_velo',label:t('exitVelo'),unit:'km/h'},{key:'throwing_velo',label:t('throwingVelo'),unit:'km/h'},{key:'height_cm',label:t('heightCm'),unit:'cm'},{key:'weight_kg',label:t('weightKg'),unit:'kg'}]" :key="m.key" class="sdl-panel min-w-0 p-3 sm:p-4">
         <p class="text-xs text-slate-400">{{ m.label }}</p><p class="mt-2 break-words text-lg font-bold">{{ metric(m.key,m.unit) }}</p>
       </div>
     </div>
@@ -127,14 +127,14 @@ export const PlayerProfile = {
     No permitted measurements have been recorded for this player yet.
   </div>
   <p v-if="!historyLoading && !historyError && getPlayerSessions(selectedPlayer.id).length>0"
-    class="text-xs font-bold uppercase tracking-wider text-emerald-300 no-print">Live authorized measurement history · {{ getPlayerSessions(selectedPlayer.id).length }} sessions</p>
+    class="sdl-muted text-sm no-print">{{ getPlayerSessions(selectedPlayer.id).length }} official session{{ getPlayerSessions(selectedPlayer.id).length===1 ? '' : 's' }}</p>
 
   <!-- Synthetic design fallback only when no authorized live measurements exist. -->
   <demo-growth-lab v-if="(section==='Growth' || section==='Stats') && demoMatch && !historyLoading && !historyError && getPlayerSessions(selectedPlayer.id).length===0"
     :player-name="selectedPlayer.preferred_name" :embedded="true"></demo-growth-lab>
 
   <!-- Interactive Chart (Hidden on Print) -->
-  <div v-if="(section==='Growth' || section==='Stats') && (!demoMatch || getPlayerSessions(selectedPlayer.id).length>0) && !historyLoading && !historyError" class="bg-slate-800/50 border border-slate-700 rounded-xl p-5 no-print">
+  <div v-if="(section==='Growth' || section==='Stats') && (!demoMatch || getPlayerSessions(selectedPlayer.id).length>0) && !historyLoading && !historyError" class="sdl-panel p-4 no-print">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-slate-700/60 pb-3">
       <div>
         <h3 class="text-base font-bold text-white flex items-center gap-2">
