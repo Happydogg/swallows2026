@@ -16,7 +16,7 @@ export const SubmissionWorkspace={
   <nav class="grid grid-cols-2 sm:flex sm:flex-wrap gap-2" aria-label="Player workspace views">
     <button v-for="view in ['players','submissions','review','clubhouse']" :key="view" @click="changeTab(view)" :aria-pressed="tab===view" class="px-3 py-3 rounded-lg bg-slate-700 text-sm font-medium text-left sm:text-center transition" :class="tab===view?'ring-2 ring-blue-400 bg-slate-700/90 text-white font-semibold':'text-slate-200 hover:bg-slate-600'">{{ {players:'My Players',submissions:'Video submissions',review:'Coach review',clubhouse:'Team Clubhouse'}[view] }}</button>
   </nav>
-  <p v-if="!enabled" class="text-sm text-amber-300 bg-amber-950/30 border border-amber-800/50 rounded-lg p-3" role="status">Submission, review and team-sharing operations await backend deployment and verification. You can prepare a local video preview. The working private-media pilot remains available below.</p>
+  <p v-if="!enabled" class="text-sm text-amber-300 bg-amber-950/30 border border-amber-800/50 rounded-lg p-3" role="status">Submission, review and team sharing are currently unavailable. You can prepare a local video preview; this does not submit or share it.</p>
   <button v-if="enabled&&!ready" @click="load" :disabled="busy" class="w-full sm:w-auto p-3 rounded-lg bg-blue-600 font-semibold text-sm">Load authorized workspace</button>
   <p v-if="busy" role="status" class="text-sm text-slate-300">Working securely…</p>
   <p v-if="error" role="alert" class="text-sm text-rose-300 bg-rose-950/40 border border-rose-800/60 rounded-lg p-3">{{ error }}</p>
