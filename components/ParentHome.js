@@ -12,7 +12,7 @@ export const ParentHome = {
   },
   emits: ['navigate', 'edit-photo', 'open-video', 'open-profile'],
   template: `
-  <section class="space-y-5" aria-label="Parent home">
+  <section class="space-y-4" aria-label="Parent home">
     <header class="flex flex-wrap items-center justify-between gap-3">
       <h1 class="text-2xl font-black tracking-tight text-white sm:text-3xl">My players</h1>
 
@@ -24,16 +24,16 @@ export const ParentHome = {
       <button type="button" @click="$emit('navigate','me')" class="mt-4 rounded-xl bg-blue-700 px-4 py-3 text-sm font-semibold">Family and account details</button>
     </div>
     <div v-else class="grid grid-cols-1 gap-4 xl:grid-cols-2">
-      <article v-for="player in players" :key="player.id" class="overflow-hidden rounded-2xl border border-blue-400/25 bg-slate-900 shadow-xl">
+      <article v-for="player in players" :key="player.id" class="sdl-panel overflow-hidden">
         <player-hero-card :player="player" variant="compact"></player-hero-card>
         <div class="p-4">
           <div class="grid gap-2 sm:grid-cols-2">
             <button type="button" @click="$emit('open-profile',player)"
               :aria-label="'Open '+(player.preferred_name || 'player')+' profile'"
-              class="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white hover:bg-blue-500">Profile and growth</button>
+              class="sdl-primary w-full px-4 py-3 text-sm font-semibold">Profile and growth</button>
             <button type="button" @click="$emit('open-video',player)"
               :aria-label="'Open private videos for '+(player.preferred_name || 'this player')"
-              class="w-full rounded-xl border border-sky-500/40 bg-blue-950 px-4 py-3 font-bold text-sky-200 hover:bg-blue-900">Player videos</button>
+              class="sdl-secondary w-full px-4 py-3 text-sm font-semibold">Player videos</button>
           </div>
         </div>
       </article>
