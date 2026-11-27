@@ -2,6 +2,18 @@
 
 **Updated:** 2026-11-27. **Status:** Working GitHub coordination mirror. Reconcile against the independent SDL Master Directory before calling this authoritative.
 
+## 2026-11-27 UX-IA-01 approved implementation candidate
+
+**Supersedes Issue #12's earlier 'approval pending' status for UX-IA-01 only.** The owner approved **UX-IA-01** after the current-desktop visual evidence supplement. [Issue #12](https://github.com/Happydogg/swallows2026/issues/12) now has two comments: [visual evidence supplement](https://github.com/Happydogg/swallows2026/issues/12#issuecomment-7214518696) and [approval/implementation candidate](https://github.com/Happydogg/swallows2026/issues/12#issuecomment-7214618734).
+
+**Draft [PR #13](https://github.com/Happydogg/swallows2026/pull/13)** is confirmed open, draft, unmerged; branch `task/sdl-ux-ia-01` head `239e29c5655ca692908d182b6b05158463c31ea9` targets `feature/SDL-UX-002-login-redesign`. The diff has seven presentation files and three updated tests. Changes place Team roster first, compact Home summaries, private video before gated submission UI, hide the legacy toolbar and move language to Me. Existing authentication, API contracts, DB, Worker and gates are stated unchanged in PR scope; this does not independently establish behavior.
+
+**Testing status:** 17 focused source/syntax checks reported passing. Full Node/Vue regression suite NOT run; current signed-in mobile/desktop owner acceptance pending; preview auto-deploy disabled on review. Next gate is full regression and isolated preview/owner acceptance **before** any separately approved merge or promotion. Retain Round 2 12/12, ADMIN-01 5/5, RBAC-10A and direct authorization safeguards. UX-IA-02..06 remain proposed and unimplemented.
+
+**Outstanding visual evidence:** Current mobile screenshots plus Team Manager, broader Guardian and Club Admin tabs, multi-role and empty/denied states; desktop captures do not settle phone usability.
+
+---
+
 ## SDL-UX-002 usability audit handoff — issue #12 (2026-11-27)
 
 **Proposed, not yet owner-approved for implementation.** The [read-only audit](https://github.com/Happydogg/swallows2026/issues/12) reviewed UX source baseline `c9ad810459db6e5ad4c5834f7e4882970842f987`. Its top issues: overlapping headers and workspace sections, full roster duplication on Home/Team, fragmented performance contexts, long mixed-content Player Profile and confusing legacy/disabled controls. SDL-000 independently spot-checked `index.html`, `CoachHome.js`, `AppShell.js`, `PlayerProfile.js` and `AppHeader.js` at the cited commit; source supports duplication/placement concerns, not final device usability conclusions.
