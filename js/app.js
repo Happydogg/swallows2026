@@ -68,6 +68,8 @@ createApp({
     const currentView = ref('overview');
     const overviewTab = ref('roster');
     const activeTab = ref('home');
+    const requestedVideoSection = ref('library');
+    const publicationPanel = ref(null);
     const requestedWorkspace = ref('auto');
     const searchQuery = ref('');
     const selectedPlayer = ref(null);
@@ -218,6 +220,18 @@ createApp({
       coachRoster: computed(() => workspaceMode.value === 'coach' ? coachRoster.value : []),
       managedPlayers: computed(() => isManagedWorkspace.value ? managedRoster.rows.value : [])
     });
+    // UX-003: presentation navigation only. The existing controllers own authorization.
+    const videoSection = computed(() => requestedVideoSection.value==='clubhouse' && clubhouseMediaTeams.value.length ? 'clubhouse' : 'library');
+    const videoSectionBusy = computed(() => privateMedia.mediaUploading.value || privateMedia.mediaReviewing.value || privateMedia.mediaArchiving.value || publicationPanel.value?.busy===true);
+    const changeVideoSection = section => {
+      if(activeTab.value!=='videos' || !mediaOriginAllowed.value || auth.authError.value || !['library','clubhouse'].includes(section)) return false;
+      if(section===videoSection.value) return true;
+      if(videoSectionBusy.value || (section==='clubhouse' && !clubhouseMediaTeams.value.length)) return false;
+      // Reset private playback, thumbnails, pending file and selected player before opening shared media.
+      if(section==='clubhouse') privateMedia.resetMedia();
+      requestedVideoSection.value=section;
+      return true;
+    };
     const submissionWorkspace = useSubmissionWorkspace({
       auth,
       players,
@@ -468,6 +482,7 @@ createApp({
     };
     const clearWorkspaceState = ({keepManagedScope=false,keepCoachScope=false}={}) => {
       workspaceRevision++;
+      requestedVideoSection.value='library';
       if (keepManagedScope) managedRoster.clear(); else managedRoster.reset();
       if (!keepCoachScope) { coachOrganizationId.value=''; coachTeamId.value=''; }
       players.value = [];
@@ -514,7 +529,10 @@ createApp({
         submissionWorkspace.changeTab(workspaceMode.value === 'coach' ? 'review' : 'players');
         overviewTab.value = 'leaderboard';
       }
-      if (tab === 'videos') submissionWorkspace.changeTab('submissions');
+      if (tab === 'videos') {
+        requestedVideoSection.value='library';
+        submissionWorkspace.changeTab('submissions');
+      }
       if (tab === 'team' && workspaceMode.value === 'coach') overviewTab.value = 'roster';
     };
     Vue.watch(currentView, view => { if (view === 'player') activeTab.value = 'team'; });
@@ -547,7 +565,7 @@ createApp({
        pilotController:markRaw(pilotWorkspace),
       submissionController: markRaw(submissionWorkspace),
       enrollmentAdminController: markRaw(enrollmentAdmin),
-      privateMediaController: markRaw(privateMedia),
+      privateMediaController: markRaw(privateMedia), videoSection, videoSectionBusy, changeVideoSection, publicationPanel,
       statsBoardController: markRaw(statsBoard), performancePlayers, performanceReviewTeams, refreshPerformanceHistory,
        avatarController: markRaw(avatarManager),
       managedRosterController: markRaw(managedRoster), workspaceOptions, isManagedWorkspace,
