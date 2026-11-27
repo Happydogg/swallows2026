@@ -158,7 +158,7 @@ async function main(){
    start(data);
    process.env.SDL_TEST_SOCKET=socket;
    process.env.SDL004_PGLITE_RUNTIME=here;
-   execFileSync(process.execPath,['--test',fileURLToPath(new URL('../rbac-v5-operations.test.mjs',import.meta.url))],{stdio:'inherit'});
+   execFileSync(process.execPath,['--test','--test-concurrency=1',...['rbac-v5-operations.test.mjs','media-clean-start.test.mjs'].map(name=>fileURLToPath(new URL('../'+name,import.meta.url)))],{stdio:'inherit'});
    await checkPreflight();
    await competingWrites();
    const fixture=await backupFixture();

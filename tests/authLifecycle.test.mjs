@@ -45,16 +45,26 @@ test('restored session loads data and initializes tracker', async t => {
   assert.equal(h.poseCalls, 1);
 });
 
-test('external login and token refresh verify and reload identity', async t => {
+test('initial external session loads once; same-user focus, token refresh and metadata events preserve workspace', async t => {
   const h = await harness(t);
   h.rows.athlete_guardians = [{ athlete_id: 'a1', status: 'verified' }];
-  for (const event of ['INITIAL_SESSION', 'SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED']) {
-    h.rows.players = [{ id: event, athlete_id: 'a1', jersey: '1' }];
-    h.emit(event, user('external'));
-    assert.equal(h.app.authUser.value, null);
-    assert.equal(h.app.authReady.value, false);
-    await until(() => h.app.players.value[0]?.id === event);
-    assert.equal(h.app.authUser.value.id, 'external');
+  h.rows.players = [{ id: 'original', athlete_id: 'a1', jersey: '1' }];
+  h.emit('INITIAL_SESSION', user('external'));
+  await until(() => h.app.players.value[0]?.id === 'original' && h.app.authReady.value);
+  const requests = h.calls.length, pose = h.poseCalls;
+  h.app.currentView.value = 'player';
+  h.app.selectedPlayer.value = {id:'original'};
+  h.app.activeTab.value = 'team';
+  for (const event of ['SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED', 'INITIAL_SESSION']) {
+    h.emit(event,user('external'));
+    await new Promise(resolve => setTimeout(resolve, 2));
+    assert.equal(h.app.authUser.value?.id, 'external');
+    assert.equal(h.app.authReady.value, true);
+    assert.equal(h.app.selectedPlayer.value?.id, 'original');
+    assert.equal(h.app.currentView.value, 'player');
+    assert.equal(h.app.activeTab.value, 'team');
+    assert.equal(h.calls.length,requests,'no re-fetch on '+event);
+    assert.equal(h.poseCalls,pose,'no GPU reinitialization on '+event);
   }
 });
 
@@ -79,10 +89,10 @@ test('late getUser cannot restore identity after logout', async t => {
 });
 
 test('late memberships cannot overwrite another account or restore guardian links', async t => {
-  const h = await harness(t); const pending = deferred(); h.queue('team_memberships', pending.promise);
+  const h = await harness(t); const pending = deferred(); h.queue('sdl_v5_account_context', pending.promise);
   h.rows.athlete_guardians = [{ athlete_id: 'old-child', status: 'verified' }];
   h.emit('SIGNED_IN', user('old'));
-  await until(() => h.calls.some(c => c.table === 'team_memberships'));
+  await until(() => h.calls.some(c => c.rpc === 'sdl_v5_account_context'));
   h.rows.athlete_guardians = [];
   h.emit('SIGNED_IN', user('new'));
   await until(() => h.app.authUser.value?.id === 'new' && !h.app.loading.value);
@@ -96,14 +106,15 @@ test('late memberships cannot overwrite another account or restore guardian link
 for (const transition of ['logout', 'account switch', 'same-account relogin']) {
   test(`late players, sessions and videos are ignored after ${transition}`, async t => {
     const h = await harness(t); const pending = deferred(); h.queue('players', pending.promise);
-    h.rows.team_memberships = [{ team_id: 't', role: 'coach', status: 'active' }];
+    h.rows.athlete_guardians = [{ athlete_id: 'a1', status: 'verified' }];
     h.rows.sessions = [{ id: 'old-session' }]; h.rows.drill_videos = [{ id: 'old-video' }];
     const login = h.app.signInAndLoad();
     await until(() => h.calls.some(c => c.table === 'players'));
     if (transition === 'logout') await h.app.signOutAndClear();
     else {
-      h.rows.players = [{ id: 'new-child', jersey: '2' }];
+      h.rows.players = [{ id: 'new-child', athlete_id: 'a1', preferred_name: 'Child', jersey: '2' }];
       h.rows.sessions = []; h.rows.drill_videos = [];
+      if (transition === 'same-account relogin') h.emit('SIGNED_OUT', null);
       h.emit('SIGNED_IN', user(transition === 'account switch' ? 'new' : 'parent'));
       await until(() => h.app.players.value[0]?.id === 'new-child');
     }
@@ -162,7 +173,10 @@ test('an older identity request failure cannot replace current errors', async t 
 test('logout releases video/blob/canvas/tracker and resets analyzer and form state', async t => {
   const h = await harness(t, user('parent')); const a = h.app;
   let paused = 0, detached = 0, loaded = 0, erased = 0;
-  a.openLocalAnalyzer({ type: 'video/mp4', name: 'synthetic.mp4' });
+  const clip = { type: 'video/mp4', name: 'synthetic.mp4' };
+  assert.throws(() => a.openLocalAnalyzer(clip), /movement.*FPS/);
+  a.openLocalAnalyzer(clip, {category:'pitching', playbackFps:120});
+  assert.equal(a.currentCalculatedSpeed.value, null);
   a.analyzerVideoRef.value = { pause() { paused++; }, removeAttribute(name) { assert.equal(name, 'src'); detached++; }, load() { loaded++; } };
   a.analyzerCanvasRef.value = { width: 100, height: 100, getContext: () => ({ clearRect() { erased++; } }) };
   a.currentCalculatedSpeed.value = 88; a.isTrackerLocked.value = true; a.videoDuration.value = 5;
@@ -175,7 +189,7 @@ test('logout releases video/blob/canvas/tracker and resets analyzer and form sta
   assert.equal(paused, 1); assert.equal(detached, 1); assert.equal(loaded, 1); assert.equal(erased, 1);
   assert.equal(h.closedTrackers, 1);
   assert.equal(a.analyzerVideoRef.value, null); assert.equal(a.analyzerCanvasRef.value, null);
-  assert.equal(a.currentCalculatedSpeed.value, 19.9); assert.equal(a.videoDuration.value, 0);
+  assert.equal(a.currentCalculatedSpeed.value, null); assert.equal(a.videoDuration.value, 0);
   assert.equal(a.bauerPhases.value.length, 0); assert.equal(a.isTrackerLocked.value, false);
   assert.equal(a.editingPlayer.value, null); assert.equal(a.editingSession.value, null);
   assert.equal(a.newPlayer.value.parent_phone, ''); assert.equal(a.newDrillVideo.value.coach_feedback, '');
@@ -353,4 +367,39 @@ test('Fix 5: logout and identity invalidation clear phone, OTP, invitation code 
   assert.equal(h.app.otpSent.value, false);
   assert.equal(h.app.inviteCode.value, '');
   assert.equal(h.app.inviteEmail.value, '');
+});
+
+test('offline tab return does not re-check session or clear loaded data',async t=>{
+  const h=await harness(t,user('coach'));
+  h.app.activeTab.value='videos';
+  h.app.selectedPlayer.value={id:'authorized'};
+  h.app.players.value=[{id:'authorized',jersey:'21'}];
+  const before=h.calls.length;
+  const calls=h.poseCalls;
+  h.queue('getUser',{data:{user:null},error:{message:'offline connectivity'}});
+  h.emit('SIGNED_IN',user('coach'));
+  h.emit('TOKEN_REFRESHED',user('coach'));
+  await new Promise(resolve=>setTimeout(resolve,5));
+  assert.equal(h.app.authReady.value,true);
+  assert.equal(h.app.authUser.value.id,'coach');
+  assert.equal(h.app.players.value[0].id,'authorized');
+  assert.equal(h.app.activeTab.value,'videos');
+  assert.equal(h.calls.length,before);
+  assert.equal(h.poseCalls,calls);
+});
+
+test('temporary network errors do not turn next same-user focus into a fresh login',async t=>{
+  const h=await harness(t,user('coach'));
+  h.app.selectedPlayer.value={id:'selected'};
+  h.app.authError.value='temporary network error';
+  const before=h.calls.length,pose=h.poseCalls;
+  h.emit('SIGNED_IN',user('coach'));
+  await new Promise(resolve=>setTimeout(resolve,3));
+  assert.equal(h.app.authUser.value.id,'coach');
+  assert.equal(h.app.selectedPlayer.value?.id,'selected');
+  assert.equal(h.app.authReady.value,true);
+  assert.equal(h.calls.length,before);
+  assert.equal(h.poseCalls,pose);
+  h.emit('SIGNED_OUT',null);
+  assertCleared(h.app);
 });

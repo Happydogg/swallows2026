@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { harness, deferred, user } from './helpers/appHarness.mjs';
+import fs from 'node:fs';
+import { harness, deferred, until, user } from './helpers/appHarness.mjs';
 const PLAYER = '11111111-1111-4111-8111-111111111111';
 const OTHER = '22222222-2222-4222-8222-222222222222';
 const VIDEO = '33333333-3333-4333-8333-333333333333';
-const row = { id: VIDEO, player_id: PLAYER, content_type: 'video/mp4', byte_size: 12, created_at: '2026-11-17T00:00:00Z' };
+const row = { id: VIDEO, player_id: PLAYER, content_type: 'video/mp4', byte_size: 12, category:'pitching', status:'pending', created_at: '2026-11-17T00:00:00Z' };
 const file = { name: 'clip.mp4', type: 'video/mp4', size: 12 };
 function xhrMock(status = 201, response = row, failure = null) {
   const xhr = { headers: {}, upload: {}, open(method, url) { this.method = method; this.url = url; },
@@ -43,9 +44,9 @@ async function controllerHarness(t, overrides = {}, options = {}) {
 
 test('media requests only target verified staging and carry bearer auth without cookies or redirects', async t => {
   const { service, requests } = await serviceHarness(t);
-  assert.equal(await service.authorize(PLAYER, 'read'), true);
+  assert.equal(await service.authorize(PLAYER, 'upload'), true);
   const { url, init } = requests[0];
-  assert.equal(url, 'https://sdl-r2-staging-gate.sampson-ho.workers.dev/v1/authorize');
+  assert.equal(url, 'https://sdl-r2-staging-gate.sampson-ho.workers.dev/v2/submissions/upload-eligibility?player_id=' + PLAYER);
   assert.equal(init.headers.Authorization, 'Bearer synthetic-token');
   assert.equal(init.credentials, 'omit'); assert.equal(init.redirect, 'error');
 });
@@ -69,7 +70,7 @@ test('expired local session sends no upload or playback request', async t => {
     user: user('parent'), access_token: 'expired', expires_at: 1
   } } }) } }, fetchImpl: () => { requests++; }, xhrFactory: () => { requests++; } });
   await assert.rejects(service.playback(VIDEO), e => e.status === 401);
-  await assert.rejects(service.upload(PLAYER, file), e => e.status === 401);
+  await assert.rejects(service.upload(PLAYER, file, {submission:{category:'pitching',key:VIDEO}}), e => e.status === 401);
   assert.equal(requests, 0);
 });
 
@@ -87,9 +88,9 @@ test('session account mismatch is denied before sending the bearer', async t => 
 
 test('successful upload uses existing POST contract and reports progress through commit receipt', async t => {
   const { service, xhr } = await serviceHarness(t); const progress = [];
-  const result = await service.upload(PLAYER, file, { onProgress: n => progress.push(n) });
+  const result = await service.upload(PLAYER, file, {submission:{category:'pitching',key:VIDEO}, onProgress: n => progress.push(n) });
   assert.equal(result.id, VIDEO); assert.equal(xhr.method, 'POST');
-  assert.equal(xhr.url, `https://sdl-r2-staging-gate.sampson-ho.workers.dev/v1/media?player_id=${PLAYER}`);
+  assert.equal(xhr.url, `https://sdl-r2-staging-gate.sampson-ho.workers.dev/v2/submissions?player_id=${PLAYER}&category=pitching`);
   assert.equal(xhr.headers['Content-Type'], 'video/mp4'); assert.equal(xhr.headers['Content-Length'], undefined);
   assert.equal(xhr.body, file); assert.deepEqual(progress, [50, 100]);
 });
@@ -110,19 +111,19 @@ test('unauthorized player IDs never trigger media authorization or upload', asyn
 test('HTTP denied upload never returns success or progress 100', async t => {
   const progress = [];
   const { service } = await serviceHarness(t, { xhrFactory: () => xhrMock(403) });
-  await assert.rejects(service.upload(PLAYER, file, { onProgress: n => progress.push(n) }), e => e.status === 403);
+  await assert.rejects(service.upload(PLAYER, file, {submission:{category:'pitching',key:VIDEO}, onProgress: n => progress.push(n) }), e => e.status === 403);
   assert.equal(progress.includes(100), false);
 });
 
 for (const failure of ['onerror', 'ontimeout']) test(`upload ${failure} reports uncertain persistence without automatic retry`, async t => {
   const { service } = await serviceHarness(t, { xhrFactory: () => xhrMock(0, null, failure) });
-  await assert.rejects(service.upload(PLAYER, file), /Refresh the list before retrying/);
+  await assert.rejects(service.upload(PLAYER, file, {submission:{category:'pitching',key:VIDEO}}), /Refresh the list before retrying/);
 });
 
 test('bad file type and oversized/empty files fail before network or XHR creation', async t => {
   let calls = 0; const { service } = await serviceHarness(t, { xhrFactory: () => { calls++; } });
   for (const bad of [{ ...file, type: 'video/quicktime' }, { ...file, size: 0 }, { ...file, size: 20971521 }]) {
-    await assert.rejects(service.upload(PLAYER, bad));
+    await assert.rejects(service.upload(PLAYER, bad, {submission:{category:'pitching',key:VIDEO}}));
   }
   assert.equal(calls, 0);
 });
@@ -162,10 +163,18 @@ test('coach media access does not enable official statistics editing', async t =
 
 test('playback and analyzer reuse a revocable Blob; clearing media releases it', async t => {
   const { c, calls, revoked } = await controllerHarness(t);
-  await c.selectMediaPlayer(PLAYER); await c.playPrivateMedia(row); c.analyzePrivateMedia();
-  assert.equal(c.mediaPlaybackUrl.value, 'blob:private-test');
-  assert.equal(calls.includes('init'), true); assert.equal(calls.at(-1).video_url, 'blob:private-test');
-  c.resetMedia(); assert.deepEqual(revoked, ['blob:private-test']); assert.equal(c.mediaPlaybackUrl.value, '');
+  await c.selectMediaPlayer(PLAYER); await c.playPrivateMedia(row);
+  c.analyzePrivateMedia();
+  assert.equal(calls.includes('init'),false,'no guess at unknown recording metadata');
+  assert.match(c.mediaError.value,/Choose the motion type/);
+  c.analysisCategory.value='pitching';c.analysisFps.value='120';c.analyzePrivateMedia();
+  assert.equal(c.mediaPlaybackUrl.value,'blob:private-test');
+  assert.equal(calls.includes('init'),true);
+  assert.equal(calls.at(-1).video_url,'blob:private-test');
+  assert.equal(calls.at(-1).category,'pitching');
+  assert.equal(calls.at(-1).fps_mode,120);
+  c.resetMedia(); assert.deepEqual(revoked,['blob:private-test']);
+  assert.equal(c.mediaPlaybackUrl.value,'');assert.equal(c.analysisCategory.value,'');assert.equal(c.analysisFps.value,'');
 });
 
 test('late playback after logout/account switch never creates a URL', async t => {
@@ -179,7 +188,7 @@ test('late list/upload/progress cannot restore old account state', async t => {
   const upload = deferred(); let progress;
   const { c } = await controllerHarness(t, { authorize: async () => true,
     upload: (_id, _file, options) => { progress = options.onProgress; return upload.promise; } });
-  await c.selectMediaPlayer(PLAYER); c.mediaFile.value = file; const task = c.uploadPrivateMedia();
+  await c.selectMediaPlayer(PLAYER); c.mediaFile.value = file; c.uploadCategory.value='pitching'; const task = c.uploadPrivateMedia();
   c.resetMedia(); progress(99); upload.resolve(row); await task;
   assert.equal(c.mediaProgress.value, 0); assert.equal(c.mediaItems.value.length, 0); assert.equal(c.mediaNotice.value, '');
 });
@@ -212,6 +221,7 @@ test('application identity hook aborts private playback and clears all media aut
   const h = await harness(t, user('parent')); const c = h.app.privateMediaController;
   h.app.players.value = [{ id: PLAYER, athlete_id: 'child', preferred_name: 'Child' }];
   h.app.guardianLinks.value = [{ athlete_id: 'child', status: 'verified' }];
+  h.setFixtureRoles(['guardian']);
   let signal; const pending = deferred();
   h.fetchImpl = async (url, init) => {
     if (url.endsWith('/authorize')) return Response.json({ allowed: JSON.parse(init.body).action === 'read' });
@@ -246,7 +256,7 @@ test('aborting an in-flight upload cancels XHR without a successful receipt', as
   xhr.send = () => { started = true; };
   xhr.abort = () => { aborted = true; xhr.onabort(); };
   const { service } = await serviceHarness(t, { xhrFactory: () => xhr });
-  const uploading = service.upload(PLAYER, file, { signal: controller.signal });
+  const uploading = service.upload(PLAYER, file, { submission:{category:'pitching',key:VIDEO}, signal: controller.signal });
   for (let n = 0; n < 10 && !started; n++) await Promise.resolve();
   assert.equal(started, true); controller.abort();
   await assert.rejects(uploading, e => e.name === 'AbortError'); assert.equal(aborted, true);
@@ -272,4 +282,93 @@ test('v2 JSON query support does not permit absolute URLs, encoded path traversa
  const {service,requests}=await serviceHarness(t);
  for(const route of['https://example.invalid','//example.invalid','/v2/%2e%2e/v1/media','/v2/admin/organizations#fragment','/v2/admin/enrollments?q=%ZZ'])assert.throws(()=>service.requestJson(route),/Invalid submission route/);
  assert.equal(requests.length,0);
+});
+
+test('visible private clips generate real in-memory thumbnails once and reauthorize playback',async t=>{
+  let downloads=0,frames=0;
+  const {c}=await controllerHarness(t,{
+    playback:async()=>{downloads++;return new Blob(['mp4-synthetic'],{type:'video/mp4'});}
+  },{
+    thumbnailExtractor:async(blob)=>{frames++;assert.equal(blob.type,'video/mp4');return 'data:image/jpeg;base64,QQ==';}
+  });
+  await c.selectMediaPlayer(PLAYER);
+  c.ensureMediaThumbnail(row);
+  await new Promise(resolve=>setTimeout(resolve,15));
+  assert.equal(c.mediaThumbnails.value[VIDEO],'data:image/jpeg;base64,QQ==');
+  assert.equal(downloads,1);assert.equal(frames,1);
+  c.ensureMediaThumbnail(row);
+  await c.playPrivateMedia(row);
+  assert.equal(downloads,2,'playback must reauthorize after thumbnail retrieval');
+  c.resetMedia();
+  assert.deepEqual(Object.keys(c.mediaThumbnails.value),[]);
+  assert.deepEqual(Object.keys(c.mediaThumbnailBusy.value),[]);
+});
+test('unauthorized clip thumbnails never fetch bytes or expose stale frames after player switch',async t=>{
+  let downloads=0;
+  const pending=deferred();
+  const {c}=await controllerHarness(t,{
+    playback:async()=>{downloads++;return pending.promise;}
+  },{
+    thumbnailExtractor:async()=> 'data:image/jpeg;base64,QQ=='
+  });
+  await c.selectMediaPlayer(PLAYER);
+  c.ensureMediaThumbnail({...row,id:OTHER});
+  assert.equal(downloads,0);
+  c.ensureMediaThumbnail(row);
+  await new Promise(resolve=>setTimeout(resolve,3));
+  assert.equal(downloads,1);
+  c.resetMedia();
+  pending.resolve(new Blob(['old'],{type:'video/mp4'}));
+  await new Promise(resolve=>setTimeout(resolve,6));
+  assert.equal(c.mediaPlayerId.value,'');
+  assert.deepEqual(Object.keys(c.mediaThumbnails.value),[]);
+});
+test('private thumbnails render real images, not decorative fake video artwork',()=>{
+ const markup=fs.readFileSync(new URL('../components/PrivateMediaPanel.js',import.meta.url),'utf8');
+ assert.ok(markup.includes('v-media-visible="item"'));
+ assert.ok(markup.includes('v-if="mediaThumbnails[item.id]"'));
+ assert.ok(markup.includes(':src="mediaThumbnails[item.id]"'));
+ assert.ok(markup.includes('Preview unavailable'));
+ assert.ok(!markup.includes('image/pseudo'));
+});
+
+test('private analysis screen asks for recording metadata, never labels every clip batting at 60 FPS',()=>{
+ const panel=fs.readFileSync(new URL('../components/PrivateMediaPanel.js',import.meta.url),'utf8');
+ assert.ok(panel.includes('v-model="analysisCategory"'));
+ assert.ok(panel.includes('v-model="analysisFps"'));
+ assert.ok(panel.includes('automatic motion checkpoints remain experimental'));
+ assert.ok(!panel.includes('default batting / 60 FPS'));
+});
+
+test('all visible authorized clips get a turn and a failed preview can be retried', async t => {
+  const items = Array.from({length: 9}, (_, index) => ({...row, id: String(index)}));
+  let fail = true;
+  const {c} = await controllerHarness(t, {list: async () => items}, {
+    thumbnailExtractor: async () => {
+      if (fail) {
+        fail = false;
+        throw Error('temporary decode failure');
+      }
+      return 'data:image/jpeg;base64,QQ==';
+    }
+  });
+  await c.selectMediaPlayer(PLAYER);
+  items.forEach(c.ensureMediaThumbnail);
+  await until(() => c.mediaThumbnails.value['8']);
+  assert.equal(c.mediaThumbnailFailed.value['0'], true);
+  c.retryMediaThumbnail(items[0]);
+  await until(() => c.mediaThumbnails.value['0']);
+  assert.equal(Object.keys(c.mediaThumbnails.value).length, items.length);
+});
+
+test('media transport distinguishes disabled delivery, outage, denied scope and an empty library',async t=>{
+  let next=Response.json({items:[]});
+  const {service}=await serviceHarness(t,{fetchImpl:async()=>next});
+  assert.equal((await service.list(PLAYER)).length,0);
+  next=Response.json({code:'media_disabled'},{status:503});
+  await assert.rejects(service.list(PLAYER),error=>error.status===503&&error.code==='media_disabled');
+  next=Response.json({error:'Provider unavailable'},{status:503});
+  await assert.rejects(service.list(PLAYER),error=>error.status===503&&!error.code);
+  next=Response.json({error:'Denied'},{status:403});
+  await assert.rejects(service.list(PLAYER),error=>error.status===403);
 });

@@ -1,3 +1,4 @@
+import {mediaAction} from './mediaGates.mjs';
 import {pilotWorkflowRoute} from './pilotWorkflowRoutes.mjs';
 // Staging release candidate. Not deployed.
 export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedBytes, configOk, validId, json, ORIGINS }) {
@@ -33,24 +34,8 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
       if (active.value !== true) return json({error:'Session expired or revoked'},401,origin);
       const contract = await call('sdl_004_submission_contract', {});
       if (contract.error || contract.value?.revision !== 'sdl004-club-enrollment-v2') return json({error:'Backend contract unavailable'},503,origin);
-      if (path.startsWith('/v1/')) {
-        if (contract.value.rbacVersion!==5) return json({error:'Forbidden'},403,origin);
-        const mediaId=path.match(/^\/v1\/media\/([^/]+)$/)?.[1];
-        if (validId(mediaId) && request.method==='GET') path='/v2/submissions/'+mediaId+'/playback';
-        else if (path==='/v1/media' && request.method==='POST') path='/v2/submissions';
-        else if (path==='/v1/media' && request.method==='GET') {
-          const result=await call('sdl_v5_legacy_media',{p_player:url.searchParams.get('player_id')});
-          return result.error ? json({error:'Media unavailable'},result.status,origin) : json({items:result.value},200,origin);
-        } else if (path==='/v1/authorize' && request.method==='POST') {
-          const input=await request.json();
-          const upload=input.action==='upload';
-          const result=upload ? await call('sdl_004_submission_can_submit',{p_player_id:input.player_id})
-            : await call('sdl_v5_legacy_media',{p_player:input.player_id});
-          if(result.error)return json({error:'Media unavailable'},result.status,origin);
-          const allowed=upload ? result.value===true : Array.isArray(result.value)&&result.value.length>0;
-          return json({allowed,media_enabled:true},allowed?200:403,origin);
-        } else return json({error:'Forbidden'},403,origin);
-      }
+      if (mediaAction(path, request.method) && (contract.value.rbacVersion!==5 || contract.value.mediaRevision!=='v5.1-clean-start'))
+        return json({error:'Media authorization contract unavailable'},503,origin);
       if (path === '/v2/capabilities' && request.method === 'GET') return json({...(contract.value.rbacVersion===5?{rbacVersion:5}:{}),pilotWorkflow:contract.value.pilotWorkflow??null,revision:'sdl004-club-enrollment-v2',submissions:true,review:true,clubhouse:true,clubConsent:true,enrollmentAdmin:contract.value.enrollmentAdmin===true,clubhouseRoster:contract.value.clubhouseRoster===true,clubhouseLeaderboard:contract.value.clubhouseLeaderboard===true,parentStatistics:contract.value.parentStatistics===true,statisticsConsent:contract.value.statisticsConsent===true},200,origin);
       const pilotResult=await pilotWorkflowRoute({request,url,path,contract:contract.value,call,validId,json,origin});
       if(pilotResult)return pilotResult;
@@ -145,6 +130,13 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
         return result.error ? json({error:'Review access denied or unavailable'},result.status,origin) : json({items:result.value},200,origin);
       }
       const error = result => json({ error: result.status===409?'Upload or review conflict; refresh before retrying':'Authorization or submission service unavailable' }, result.status || 503, origin);
+      if (path === '/v2/submissions/upload-eligibility' && request.method === 'GET') {
+        const playerId=url.searchParams.get('player_id');
+        if(!validId(playerId)) return json({error:'Invalid player_id'},400,origin);
+        const allowed=await call('sdl_004_submission_can_submit',{p_player_id:playerId});
+        if(allowed.error) return error(allowed);
+        return json({allowed:allowed.value===true},200,origin);
+      }
       if (path === '/v2/submissions' && request.method === 'POST') {
         const playerId = url.searchParams.get('player_id'), category = url.searchParams.get('category');
         if(url.searchParams.has('share_with_team')||url.searchParams.has('team_ids'))return json({error:'Uploads are private; manage standing club consent separately'},400,origin);
@@ -159,6 +151,7 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
         if (upload.error) return json({ error: upload.error }, upload.status, origin);
         const requestKey=request.headers.get('Idempotency-Key');
         if(!validId(requestKey)) return json({error:'Idempotency-Key UUID required'},400,origin);
+        if (request.signal.aborted) return json({error:'Upload interrupted'},400,origin);
         const claim=crypto.randomUUID();
         const digest=await crypto.subtle.digest('SHA-256',upload.bytes);
         const fileHash=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
@@ -168,7 +161,12 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
           p_claim:claim,p_fingerprint:fingerprint,p_size:upload.bytes.byteLength,p_category:category});
         if(reservation.error) return error(reservation);
         const r=reservation.value;
-        if(r?.state==='complete') return json({id:r.id,player_id:r.player_id,category:r.category,status:r.status},201,origin);
+        if(r?.state==='complete') {
+          if(!validId(r.id) || r.player_id!==playerId || r.category!==category ||
+              !['pending','approved','rejected'].includes(r.status))
+            return json({error:'Invalid completed upload receipt'},503,origin);
+          return json({id:r.id,player_id:r.player_id,category:r.category,status:r.status},201,origin);
+        }
         if(r?.state!=='reserved'||!validId(r.id)||r.object_key!==`pilot/${playerId}/${r.id}.mp4`) return json({error:'Invalid upload reservation'},503,origin);
         try { await env.MEDIA_BUCKET.put(r.object_key,upload.bytes,{httpMetadata:{contentType:'video/mp4',cacheControl:'private, no-store'}}); }
         catch { return json({error:'Object write failed; retry with the same request key'},503,origin); }
@@ -179,7 +177,10 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
             body:JSON.stringify({p_request_key:requestKey,p_claim:claim,p_user_id:identity.userId})});
           if(!result.ok) return json({error:'Upload not committed; retry with the same request key'},[401,403,409].includes(result.status)?result.status:503,origin);
           const receipt=await result.json();
-          return json(receipt,201,origin);
+          if (receipt?.id!==r.id || receipt.player_id!==playerId || receipt.category!==category ||
+              !['pending','approved','rejected'].includes(receipt.status))
+            return json({error:'Invalid upload receipt; retry with the same request key'},503,origin);
+          return json({id:receipt.id,player_id:receipt.player_id,category:receipt.category,status:receipt.status},201,origin);
         } catch { return json({error:'Upload result unknown; refresh or retry with the same request key'},503,origin); }
       }
       if (path === '/v2/submissions' && request.method === 'GET') {
@@ -213,27 +214,30 @@ export function createSubmissionRoutes({ verifyIdentity, adminQuery, limitedByte
       if (['playback','download'].includes(action) && request.method === 'GET') {
         const allowed = action === 'download'
           ? await call('sdl_v5_authorize_download', { p_id: id })
-          : contract.value.rbacVersion===5
-            ? await call('sdl_v5_authorize_playback', {p_id:id})
-            : await call('sdl_004_submission_can_read', { p_submission_id: id });
+          : await call('sdl_v5_authorize_playback', {p_id:id});
         if (allowed.error) return error(allowed);
         if (allowed.value !== true) return json({ error: 'Forbidden' }, 403, origin);
         let response, item;
         try {
-          response = await adminQuery(env, `sdl_media_objects?select=object_key&id=eq.${id}&limit=1`);
+          response = await adminQuery(env, `sdl_media_objects?select=object_key,player_id,byte_size,content_type&id=eq.${id}&limit=1`);
           if (!response.ok) return json({ error: 'Metadata unavailable' }, 503, origin);
           item = (await response.json())?.[0];
         } catch { return json({ error: 'Metadata unavailable' }, 503, origin); }
         if (!item) return json({ error: 'Not found' }, 404, origin);
-        if (typeof item.object_key !== 'string' || !item.object_key.endsWith('/'+id+'.mp4') ||
-          !/^pilot\/[a-f0-9-]{36}\/[a-f0-9-]{36}\.mp4$/i.test(item.object_key))
+        if (!validId(item.player_id) || item.object_key!==`pilot/${item.player_id}/${id}.mp4` ||
+          item.content_type!=='video/mp4' || !Number.isSafeInteger(item.byte_size) || item.byte_size<12 ||
+          item.byte_size>20*1024*1024)
           return json({error:'Invalid media metadata'},503,origin);
         const range = request.headers.get('Range');
-        if (range && !/^bytes=\d+-\d*$/i.test(range)) return json({ error: 'Unsupported range' }, 416, origin);
+        const bounds = range && /^bytes=(\d+)-(\d*)$/i.exec(range);
+        if (range && (!bounds || Number(bounds[1])>=item.byte_size ||
+            (bounds[2] && Number(bounds[2])<Number(bounds[1]))))
+          return json({error:'Unsupported range'},416,origin);
         let obj;
         try { obj = await env.MEDIA_BUCKET.get(item.object_key, range ? { range: new Headers({ Range: range }) } : undefined); }
         catch { return json({ error: 'Object unavailable' }, 503, origin); }
         if (!obj?.body) return json({ error: 'Not found' }, 404, origin);
+        if (obj.size!==item.byte_size || (range && !obj.range)) return json({error:'Invalid media size'},503,origin);
         const headers = new Headers({ 'Content-Type': 'video/mp4', 'Cache-Control': 'private, no-store',
           'X-Content-Type-Options': 'nosniff', 'Accept-Ranges': 'bytes' });
         if (ORIGINS.has(origin)) { headers.set('Access-Control-Allow-Origin', origin); headers.set('Vary', 'Origin'); }

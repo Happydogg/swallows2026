@@ -2,7 +2,7 @@ import {PerformanceInbox} from './PerformanceInbox.js';
 import {translations} from '../js/translations.js';
 // No privileged flags are derived from form fields; server capabilities remain required.
 export const SubmissionWorkspace={
-  name:'SubmissionWorkspace',components:{PerformanceInbox},props:{controller:{type:Object,required:true},pilotController:{type:Object,default:null},t:{type:Function,default:key=>translations.en[key]||key}},
+  name:'SubmissionWorkspace',components:{PerformanceInbox},props:{controller:{type:Object,required:true},pilotController:{type:Object,default:null},showPerformanceReview:{type:Boolean,default:true},t:{type:Function,default:key=>translations.en[key]||key}},
   setup(props){return {...props.controller,pilot:props.pilotController,t:props.t};},
   template:`
 <section class="my-6 rounded-xl border border-slate-700 bg-slate-800 p-4 space-y-4 no-print" aria-label="Player and video workspace">
@@ -16,7 +16,7 @@ export const SubmissionWorkspace={
   <nav class="grid grid-cols-2 sm:flex sm:flex-wrap gap-2" aria-label="Player workspace views">
     <button v-for="view in ['players','submissions','review','clubhouse']" :key="view" @click="changeTab(view)" :aria-pressed="tab===view" class="px-3 py-3 rounded-lg bg-slate-700 text-sm font-medium text-left sm:text-center transition" :class="tab===view?'ring-2 ring-blue-400 bg-slate-700/90 text-white font-semibold':'text-slate-200 hover:bg-slate-600'">{{ {players:'My Players',submissions:'Video submissions',review:'Coach review',clubhouse:'Team Clubhouse'}[view] }}</button>
   </nav>
-  <p v-if="!enabled" class="text-sm text-amber-300 bg-amber-950/30 border border-amber-800/50 rounded-lg p-3" role="status">Submission, review and team-sharing operations await backend deployment and verification. You can prepare a local video preview. The working private-media pilot remains available below.</p>
+  <p v-if="!enabled" class="text-sm text-amber-300 bg-amber-950/30 border border-amber-800/50 rounded-lg p-3" role="status">Submission, review and team sharing are currently unavailable. You can prepare a local video preview; this does not submit or share it.</p>
   <button v-if="enabled&&!ready" @click="load" :disabled="busy" class="w-full sm:w-auto p-3 rounded-lg bg-blue-600 font-semibold text-sm">Load authorized workspace</button>
   <p v-if="busy" role="status" class="text-sm text-slate-300">Working securely…</p>
   <p v-if="error" role="alert" class="text-sm text-rose-300 bg-rose-950/40 border border-rose-800/60 rounded-lg p-3">{{ error }}</p>
@@ -132,7 +132,7 @@ export const SubmissionWorkspace={
   <div v-if="tab==='review'||tab==='clubhouse'" class="space-y-4">
     <label class="block">Authorized team<select :value="teamId" @change="selectTeam($event.target.value,tab)" class="mt-1 block w-full bg-slate-900 p-3 rounded"><option value="">Select a team</option><option v-for="team in teams" :key="team.id" :value="team.id">{{ team.name }}</option></select></label>
     <template v-if="tab==='review'">
-      <performance-inbox v-if="pilot" :controller="pilot" :team-id="teamId"></performance-inbox>
+      <performance-inbox v-if="pilot && showPerformanceReview" :controller="pilot" :team-id="teamId"></performance-inbox>
       <p class="text-sm text-slate-400">{{ ready?'Pending among the displayed submissions: '+pendingCount:'Review counts await the authorized backend.' }} Up to 50 items are displayed.</p>
       <select v-model="reviewFilter" @change="refreshQueue" :disabled="!enabled||!ready||busy" class="p-3 bg-slate-900 rounded"><option value="pending">Pending</option><option value="all">All statuses</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select>
       <button @click="refreshQueue" :disabled="!enabled||!ready||!teamId||busy" class="p-3 ml-2 bg-slate-700 rounded disabled:opacity-50">Refresh reviews</button>

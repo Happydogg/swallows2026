@@ -1,11 +1,12 @@
 // Synthetic identities, ephemeral signing key, local Unix database and loopback HTTP only.
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {spawn} from 'node:child_process';
 import {createHmac,randomBytes} from 'node:crypto';
 import {once} from 'node:events';
 import {createServer} from 'node:net';
 import {setTimeout as delay} from 'node:timers/promises';
-import {player,parent,outsider} from '../helpers/submissionDatabase.mjs';
+import {player,parent,outsider,teammate} from '../helpers/submissionDatabase.mjs';
 
 export async function checkRest(db){
  const socket=process.env.SDL_TEST_SOCKET;
@@ -21,6 +22,7 @@ export async function checkRest(db){
  $$ SELECT (nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'sub')::uuid $$;
  CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS
  $$ SELECT nullif(current_setting('request.jwt.claims',true),'')::jsonb $$;`);
+ await db.exec(readFileSync(new URL('../../backend/proposals/sdl004-rbac-v5/media-clean-start.sql',import.meta.url),'utf8'));
  const listener=createServer().listen(0,'127.0.0.1');
  await once(listener,'listening');
  const port=listener.address().port;
@@ -47,6 +49,17 @@ export async function checkRest(db){
    const read=(path,user)=>fetch(base+path,{headers:{Authorization:'Bearer '+token(user,'aal1')}});
    const rpc=(user,name='private_statistics',aal='aal1',accept='application/json')=>fetch(base+'/rpc/sdl_v5_'+name,{method:'POST',
      headers:{Authorization:'Bearer '+token(user,aal),'Content-Type':'application/json',Accept:accept},body:JSON.stringify({p_player:player})});
+   const media=(user,name,body)=>fetch(base+'/rpc/'+name,{method:'POST',
+     headers:{Authorization:'Bearer '+token(user,'aal1'),'Content-Type':'application/json'},body:JSON.stringify(body)});
+   const listed=await media(parent,'sdl_004_list_submissions',{p_player_id:player});
+   assert.equal(listed.status,200);
+   assert.deepEqual(await listed.json(),[]);
+   assert.equal((await media(teammate,'sdl_004_list_submissions',{p_player_id:player})).status,403);
+   const direct=await read('/sdl_media_objects?select=object_key',parent);
+   assert.ok([403,404].includes(direct.status));
+   const legacy=await media(parent,'sdl_004_media_can_access',{p_player_id:player,p_action:'read'});
+   assert.ok([200,403,404].includes(legacy.status));
+   if(legacy.ok)assert.equal(await legacy.json(),false);
    assert.equal((await rpc(parent)).status,200);
    assert.equal((await rpc(outsider)).status,200);
    assert.equal((await rpc(outsider,'private_statistics','aal1','text/csv')).status,403);
@@ -60,6 +73,7 @@ export async function checkRest(db){
    assert.ok([403,404].includes((await read('/platform_admin_grants?select=user_id',parent)).status));
    await db.query('UPDATE auth.sessions SET not_after=now() WHERE user_id=$1',[parent]);
    assert.equal((await rpc(parent)).status,403);
+   assert.equal((await media(parent,'sdl_004_list_submissions',{p_player_id:player})).status,403);
    const roster=await read('/players?select=id',parent);
    assert.equal(roster.status,200);
    assert.deepEqual(await roster.json(),[]);

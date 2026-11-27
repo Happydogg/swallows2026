@@ -9,6 +9,22 @@ const realVue = process.env.SDL004_VUE_RUNTIME
 const root = fileURLToPath(new URL('../../', import.meta.url));
 export const user = id => ({ id, email: `${id}@example.invalid` });
 export const ok = data => ({ data, error: null });
+// Test-only translation of old fixture inputs to the v1 account contract.
+// Production code never derives effective scopes from direct memberships.
+function fixtureContext(h, explicitRoles) {
+  const organizations=(h.rows.organization_memberships || []).filter(m=>m.status==='active').map(m=>({...m,organization_id:m.organization_id || 'synthetic-org'}));
+  const teams=(h.rows.team_memberships || []).filter(m=>m.status==='active').map(m=>({...m,team_id:m.team_id || 'synthetic-team'}));
+  const guardianLinks=(h.rows.athlete_guardians || []).filter(m=>m.status==='verified').length;
+  const roles=explicitRoles || [...new Set([...organizations.filter(m=>m.role==='admin').map(()=> 'club_admin'),...teams.filter(m=>['coach','manager'].includes(m.role)).map(m=>m.role),...(guardianLinks?['guardian']:[])])];
+  const orgs=new Map();
+  const add=(id,role)=>{if(!orgs.has(id))orgs.set(id,{id,name:id,roles:[]});const row=orgs.get(id);if(!row.roles.includes(role))row.roles.push(role);};
+  for(const m of organizations)if(m.role==='admin')add(m.organization_id,'club_admin');
+  const teamRows=teams.filter(m=>roles.includes(m.role)).map(m=>{
+    const organization_id=organizations[0]?.organization_id || 'synthetic-org';add(organization_id,m.role);
+    return {id:m.team_id,organization_id,name:m.team_id,roles:[m.role]};
+  });
+  return {version:1,user_id:h.user?.id,roles,organizations:[...orgs.values()],teams:teamRows,direct_memberships:{organizations,teams,guardian_links:guardianLinks},platform:{view:false,export:false,sensitive_write:false}};
+}
 export function deferred() {
   let resolve, reject;
   const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
@@ -61,7 +77,13 @@ export async function harness(t, initialUser = null, options = {}) {
       };
       return q;
     },
-    rpc(name) { h.calls.push({ rpc: name }); return Promise.resolve(result('roster', ok(h.rows.roster ?? []))); }
+    rpc(name, args) {
+      h.calls.push({ rpc: name, args, userId: h.user?.id });
+      const key = name === 'sdl_004_coach_roster' ? 'roster' : name;
+      const fallback = name==='sdl_v5_account_context' ? fixtureContext(h)
+        : name==='sdl_v5_authorized_roster' ? {version:1,role:args.p_role,rows:[],next_after:null} : [];
+      return Promise.resolve(result(key, ok(h.rows[key] ?? fallback)));
+    }
   };
   h.emit = (event, identity) => {
     h.user = identity;
@@ -114,6 +136,7 @@ export async function harness(t, initialUser = null, options = {}) {
   const app = load(path.join(root, 'js/app.js'));
   await app.link((specifier, parent) => load(path.resolve(path.dirname(parent.identifier), specifier)));
   await app.evaluate();
+  h.setFixtureRoles = roles => { h.app.accountContext.value={...(h.app.accountContext.value || fixtureContext(h)),roles}; };
   h.module = name => modules.get(path.join(root, name)).namespace;
   t.after(() => h.unmount());
   await h.mount();

@@ -1,18 +1,22 @@
 // Synthetic auth/database/HTTP fixtures. No live requests.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {harness,user,deferred,until} from './helpers/appHarness.mjs';
+import {harness,user,ok,deferred,until} from './helpers/appHarness.mjs';
 const P='11111111-1111-4111-8111-111111111111',A='22222222-2222-4222-8222-222222222222',S='33333333-3333-4333-8333-333333333333';
 const stats={id:S,player_id:P,session_date:'2026-11-01',exit_velo:62,throwing_velo:68,height_cm:140,weight_kg:35};
 const capabilities={revision:'sdl004-club-enrollment-v2',submissions:true,review:true,clubhouse:true,clubConsent:true,parentStatistics:true,pilotWorkflow:'sdl004-final-pilot-v1'};
-async function app(t,{coach=false,response=async()=>Response.json({items:[stats]})}={}){
+const coachHistory='sdl_004_pilot_coach_statistics';
+const guardianHistory='sdl_004_player_statistics';
+async function app(t,{coach=false,assigned=coach,response=async()=>Response.json({items:[stats]})}={}){
  const h=await harness(t,null,{submissionsEnabled:true});h.rows.athlete_guardians=[{athlete_id:A,status:'verified'}];
  h.rows.players=[{id:P,athlete_id:A,preferred_name:'Synthetic child',jersey:'7',dob:'PRIVATE',parent_phone:'PRIVATE'}];
+ h.rows.roster=assigned?[{id:P,athlete_id:A,team_id:'synthetic-team',preferred_name:'Synthetic child',jersey:'7'}]:[];
+ h.rows[coachHistory]=[{...stats,exit_velo:77}];
+ h.rows[guardianHistory]=[stats];
  h.rows.sessions=[{...stats,exit_velo:999,shoulder_check:'PRIVATE'}];h.rows.team_memberships=coach?[{role:'coach',status:'active'}]:[];
  const requests=[];h.fetchImpl=async url=>{
   requests.push(url);if(url.endsWith('/v2/capabilities'))return Response.json(capabilities);
   if(url.endsWith('/v2/pilot/workspace'))return Response.json({players:[],protocols:[],invitation_organizations:[],staff_scopes:[]});
-  if(url.endsWith(`/v2/players/${P}/coach-statistics`))return Response.json({items:[{...stats,exit_velo:77}]});
   if(url.endsWith('/v2/workspace'))return Response.json({items:[]});
   if(url.endsWith(`/v2/players/${P}/statistics`))return response();
   throw Error('Unexpected synthetic request');
@@ -32,7 +36,88 @@ test('dual-role coach uses narrow coach history on navigation and separate guard
  const c=h.app.submissionController;assert.equal(c.cards.value[0].profiles[0].latestExitVelo,62);
  await c.showProfile(P);assert.equal(h.app.getLatestMetric(P,'exit_velo'),62);assert.equal(h.app.selectedPlayer.value.dob,undefined);
  h.app.currentView.value='overview';assert.equal(h.app.getLatestMetric(P,'exit_velo'),null,'Coach history is loaded only through the assigned-athlete API');
- await h.app.selectPlayer(h.app.players.value[0]);assert.equal(h.app.getLatestMetric(P,'exit_velo'),77,'Explicit coach profile navigation uses scoped history');
+ assert.equal(h.app.coachRoster.value[0].id,P);
+ const pending=deferred();
+ h.queue(coachHistory,pending.promise);
+ const selected=h.app.selectPlayer(h.app.coachRoster.value[0]);
+ assert.equal(h.app.profileHistoryLoading.value,true);
+ assert.equal(h.app.getLatestMetric(P,'exit_velo'),null);
+ assert.equal(h.calls.filter(call=>call.rpc===coachHistory).at(-1).args.p_player,P);
+ pending.resolve(ok([{...stats,exit_velo:77}]));
+ await selected;
+ assert.equal(h.app.profileHistoryLoading.value,false);
+ assert.equal(h.app.getLatestMetric(P,'exit_velo'),77,'Explicit coach profile navigation uses scoped history');
+ assert.equal(c.cards.value[0].profiles[0].latestExitVelo,62);
+ await h.app.changeWorkspace('family');
+ assert.equal(h.app.getLatestMetric(P,'exit_velo'),null);
+ await h.app.selectPlayer(h.app.familyPlayers.value[0]);
+ assert.equal(h.calls.filter(call=>call.rpc===guardianHistory).at(-1).args.p_player_id,P);
+ assert.equal(h.app.getLatestMetric(P,'exit_velo'),62);
+ assert.equal(h.calls.some(call=>call.table==='sessions'),false);
+});
+test('a guardian link does not grant coach history or access to an unrelated player',async t=>{
+ const {h,login}=await app(t,{coach:true,assigned:false});
+ await login;
+ await h.app.selectPlayer(h.app.familyPlayers.value[0]);
+ assert.equal(h.app.selectedPlayer.value,null);
+ assert.equal(h.calls.some(call=>[coachHistory,guardianHistory].includes(call.rpc)),false);
+ await h.app.changeWorkspace('family');
+ await h.app.selectPlayer({id:S});
+ assert.equal(h.app.selectedPlayer.value,null);
+ assert.equal(h.calls.some(call=>call.rpc===guardianHistory),false);
+ await h.app.selectPlayer(h.app.familyPlayers.value[0]);
+ assert.equal(h.app.getLatestMetric(P,'exit_velo'),62);
+ assert.equal(h.calls.some(call=>call.rpc===coachHistory),false);
+});
+test('late coach history cannot replace the next player, family scope or a new identity',async t=>{
+ const {h,login}=await app(t,{coach:true});
+ await login;
+ const first=h.app.coachRoster.value[0],second={...first,id:S};
+ h.app.coachRoster.value=[first,second];
+ const pending=deferred();
+ h.queue(coachHistory,pending.promise);
+ const oldSelection=h.app.selectCoachRosterPlayer(first);
+ h.queue(coachHistory,ok([{...stats,player_id:S,exit_velo:81}]));
+ await h.app.selectCoachRosterPlayer(second);
+ pending.resolve(ok([{...stats,exit_velo:77}]));
+ await oldSelection;
+ assert.equal(h.app.getLatestMetric(S,'exit_velo'),81);
+ assert.equal(h.app.getLatestMetric(P,'exit_velo'),null);
+
+ const oldRole=deferred();
+ h.queue(coachHistory,oldRole.promise);
+ const coachSelection=h.app.selectCoachRosterPlayer(first);
+ await h.app.changeWorkspace('family');
+ await h.app.openFamilyPlayerProfile(h.app.familyPlayers.value[0]);
+ oldRole.resolve(ok([{...stats,exit_velo:77}]));
+ await coachSelection;
+ assert.equal(h.app.getLatestMetric(P,'exit_velo'),62);
+
+ const oldAccount=deferred();
+ h.queue(guardianHistory,oldAccount.promise);
+ const guardianSelection=h.app.openFamilyPlayerProfile(h.app.familyPlayers.value[0]);
+ h.rows.team_memberships=[];
+ h.rows.athlete_guardians=[];
+ h.emit('SIGNED_IN',user('other'));
+ await until(()=>h.app.authUser.value?.id==='other' && !h.app.isVerifiedGuardian.value);
+ oldAccount.resolve(ok([stats]));
+ await guardianSelection;
+ assert.equal(h.app.selectedPlayer.value,null);
+ assert.equal(h.app.getLatestMetric(P,'exit_velo'),null);
+ assert.equal(h.app.profileHistoryLoading.value,false);
+});
+test('late family workspace history cannot reopen a profile after switching to coach',async t=>{
+ let pending;
+ const {h,login}=await app(t,{coach:true,response:async()=>pending?pending.promise:Response.json({items:[stats]})});
+ await login;
+ await h.app.changeWorkspace('family');
+ pending=deferred();
+ const selection=h.app.submissionController.showProfile(P);
+ const roleChange=h.app.changeWorkspace('coach');
+ pending.resolve(Response.json({items:[stats]}));
+ await selection; await roleChange;
+ assert.equal(h.app.currentView.value,'overview');
+ assert.equal(h.app.getLatestMetric(P,'exit_velo'),null);
 });
 test('late parent statistics responses cannot restore data after logout',async t=>{
  const pending=deferred(),{h,login}=await app(t,{response:()=>pending.promise});

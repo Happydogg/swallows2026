@@ -53,15 +53,19 @@ test('unexpected private fields or unlinked rows in a response are not retained 
   for (const field of PRIVATE_FIELDS) assert.equal(h.app.players.value[0][field], undefined, field);
 });
 
-test('restored and refreshed parent sessions never trigger the legacy loader', async t => {
+test('restored parent session loads once; same-user refresh preserves scoped guardian view', async t => {
   const h = await harness(t);
   h.rows.athlete_guardians = [{ athlete_id: 'child-1', status: 'verified' }];
   h.rows.players = [{ id: 'p-1', athlete_id: 'child-1', preferred_name: 'Maya', jersey: '11' }];
-  for (const event of ['INITIAL_SESSION', 'SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED']) {
-    const before = playerCalls(h).length;
+  h.emit('INITIAL_SESSION', user('parent'));
+  await until(() => h.app.players.value[0]?.id === 'p-1' && !h.app.loading.value);
+  const initialCalls=playerCalls(h).length;
+  for (const event of ['SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED']) {
     h.emit(event, user('parent'));
-    await until(() => playerCalls(h).length > before && !h.app.loading.value);
+    await new Promise(resolve=>setTimeout(resolve, 2));
+    assert.equal(playerCalls(h).length, initialCalls);
     assert.equal(h.app.players.value[0]?.id, 'p-1');
+    assert.equal(h.app.authReady.value, true);
   }
   assertNoLegacyLoad(h);
 });
@@ -126,19 +130,21 @@ test('parent My Players and Clubhouse statistics show the unavailable state, nev
   assert.match(c.statsUnavailableNotice, /parent-safe statistics service/);
 });
 
-test('coach accounts keep the legacy loader and safe roster RPC', async t => {
+test('coach accounts use only membership-scoped roster RPC and no forbidden sessions request', async t => {
   const h = await harness(t);
   h.rows.team_memberships = [{ team_id: 't', role: 'coach', status: 'active' }];
   h.rows.athlete_guardians = [{ athlete_id: 'child-1', status: 'verified' }];
   h.rows.players = [{ id: 'p-1', athlete_id: 'child-1', jersey: '1' }];
+  h.rows.roster = [{ id: 'p-1', team_id: 't', preferred_name: 'Maya', jersey: '1' }];
   h.rows.sessions = [{ id: 's', player_id: 'p-1', exit_velo: 60 }];
   h.app.loginEmail.value = 'coach@example.invalid'; h.app.loginPassword.value = 'synthetic';
   await h.app.signInAndLoad();
   await until(() => !h.app.loading.value);
   assert.equal(h.app.isTeamCoach.value, true);
-  assert.equal(sessionCalls(h).length, 1);
+  assert.equal(sessionCalls(h).length, 0);
   assert.equal(h.calls.some(c => c.rpc === 'sdl_004_coach_roster'), true);
-  assert.equal(h.app.sessions.value.length, 1);
+  assert.equal(h.app.sessions.value.length, 0);
+  assert.equal(h.app.coachRoster.value[0].id,'p-1');
   assert.equal(h.app.submissionController.statsAvailable.value, false, 'Coach rows are not a family statistics source');
 });
 
@@ -183,7 +189,7 @@ test('Fix 4: newly registered unlinked user makes zero players, sessions, or coa
 test('Fix 4: failed membership lookup fails closed with zero player or session queries', async t => {
   const h = await harness(t);
   h.rows.players = [{ id: 'p-1', athlete_id: 'child-1', jersey: '11' }];
-  h.queue('team_memberships', { data: null, error: { message: 'membership lookup failed' } });
+  h.queue('sdl_v5_account_context', { data: null, error: { message: 'membership lookup failed' } });
   h.app.loginEmail.value = 'user@example.invalid';
   h.app.loginPassword.value = 'synthetic';
   await h.app.signInAndLoad();
@@ -195,7 +201,7 @@ test('Fix 4: failed membership lookup fails closed with zero player or session q
   assert.equal(h.app.players.value.length, 0);
 });
 
-test('Fix 4: administrator-only account retains admin role without receiving unrestricted player or session data', async t => {
+test('administrator-only account uses the scoped roster without receiving unrestricted player or session data', async t => {
   const h = await harness(t);
   h.rows.organization_memberships = [{ organization_id: 'org-1', role: 'admin', status: 'active' }];
   h.rows.players = [{ id: 'p-1', athlete_id: 'child-1', jersey: '11' }];
@@ -206,6 +212,7 @@ test('Fix 4: administrator-only account retains admin role without receiving unr
   await until(() => !h.app.loading.value);
   assert.equal(h.app.isOrgAdmin.value, true);
   assert.equal(h.app.isTeamCoach.value, false);
+  assert.equal(h.calls.some(c => c.rpc === 'sdl_v5_authorized_roster' && c.args.p_role === 'club_admin'), true);
   assert.equal(playerCalls(h).length, 0);
   assert.equal(sessionCalls(h).length, 0);
   assert.equal(h.app.players.value.length, 0);

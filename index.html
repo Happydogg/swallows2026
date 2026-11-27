@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SWALLOWS DATALAB</title>
   <link rel="icon" type="image/png" href="./logo.png">
   <script src="https://cdn.tailwindcss.com"></script>
@@ -60,6 +60,32 @@
       cursor: pointer;
     }
 
+    /* SDL-UX-IA-04: screen-only shared visual tokens. No permission or routing rules. */
+    @media screen {
+      .sdl-shell { --sdl-surface: #151f30; --sdl-inset: #0c1423; --sdl-line: #334155; --sdl-muted: #a8b7cb; }
+      .sdl-shell .sdl-panel { background: var(--sdl-surface); border: 1px solid var(--sdl-line); border-radius: 14px; box-shadow: none; }
+      .sdl-shell .sdl-inset { background: var(--sdl-inset); border: 1px solid var(--sdl-line); border-radius: 12px; box-shadow: none; }
+      .sdl-shell .sdl-muted { color: var(--sdl-muted); }
+      .sdl-shell .sdl-tabs { background: var(--sdl-inset); border: 1px solid var(--sdl-line); border-radius: 12px; }
+      .sdl-shell .sdl-tabs button[aria-pressed="true"] { background: #1d4ed8; color: #fff; }
+      .sdl-shell .sdl-section-title { font-size: 1.125rem; font-weight: 700; line-height: 1.5; }
+      .sdl-shell .sdl-primary { min-height: 44px; border-radius: 10px; background: #1d4ed8; color: #fff; }
+      .sdl-shell .sdl-primary:not(:disabled):hover { background: #2563eb; }
+      .sdl-shell .sdl-secondary { min-height: 44px; border-radius: 10px; border: 1px solid #475569; background: #1e293b; color: #e2e8f0; }
+      .sdl-shell .sdl-secondary:not(:disabled):hover { background: #334155; }
+      .sdl-shell .sdl-content :is(button,select,input,textarea,summary):focus-visible,
+      .sdl-shell nav button:focus-visible { outline: 2px solid #67e8f9; outline-offset: 2px; }
+      .sdl-shell .sdl-content :is(input,select,textarea) { max-width: 100%; }
+      .sdl-shell .sdl-content [aria-label="Private player videos"] { overflow-wrap: anywhere; }
+      .sdl-shell .sdl-content [aria-label="Private player videos"] h2 { font-size: 1.25rem; }
+      .sdl-shell .sdl-content [aria-label="Private player videos"] h2,
+      .sdl-shell .sdl-content [aria-label="Private player videos"] h3 { line-height: 1.5; }
+      .sdl-shell .sdl-content [aria-label="Private player videos"] button { min-height: 44px; }
+      @media (max-width: 767px) {
+        .sdl-shell .sdl-content :is(input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),select,textarea) { font-size: 16px; }
+      }
+    }
+
     @media print {
       body {
         background: #ffffff !important;
@@ -69,6 +95,7 @@
       header, .no-print, nav, button, select, label {
         display: none !important;
       }
+      .profile-print-section { display: block !important; }
       .print-card {
         background: #ffffff !important;
         border: 1px solid #cbd5e1 !important;
@@ -89,119 +116,107 @@
     }
   </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8 font-sans">
-  <div id="app" v-cloak class="max-w-6xl mx-auto">
+<body class="bg-slate-900 text-slate-100 min-h-screen p-3 sm:p-4 lg:p-6 font-sans">
+  <div id="app" v-cloak class="max-w-7xl mx-auto">
     
     <!-- SDL-004-005: Authentication gate. No private app UI before verified session. -->
     <div v-if="!authReady" class="p-10 text-center text-slate-300" role="status">Checking secure session…</div>
-    <section v-else-if="!authUser" class="max-w-md mx-auto mt-6 sm:mt-12 bg-slate-800 border border-slate-700 p-5 sm:p-6 rounded-2xl shadow-lg space-y-5 no-print" aria-label="Sign in and guardian onboarding">
-      <div class="flex items-center gap-3">
-        <img src="./logo.png" alt="Swallows Logo" class="w-10 h-10 rounded-xl border border-slate-700 bg-slate-950 object-contain">
-        <div>
-          <h1 class="text-xl sm:text-2xl font-bold text-white">Swallows DataLab</h1>
-          <p class="text-slate-400 text-xs sm:text-sm">Family Clubhouse &amp; Player Performance Portal</p>
-        </div>
-      </div>
-
-      <!-- Mobile-First Authentication Method Switcher -->
-      <nav class="grid grid-cols-2 gap-2 bg-slate-900/90 p-1.5 rounded-xl border border-slate-700" aria-label="Authentication methods">
-        <button type="button" @click="setAuthMethod('email')" :aria-pressed="authMethod === 'email'"
-          class="py-2.5 px-3 rounded-lg text-xs sm:text-sm font-semibold transition"
-          :class="authMethod === 'email' ? 'bg-emerald-600 text-white shadow' : 'text-slate-300 hover:bg-slate-800'">
-          Email &amp; Password
-        </button>
-        <button type="button" @click="setAuthMethod('phone')" :aria-pressed="authMethod === 'phone'"
-          class="py-2.5 px-3 rounded-lg text-xs sm:text-sm font-semibold transition"
-          :class="authMethod === 'phone' ? 'bg-blue-600 text-white shadow' : 'text-slate-300 hover:bg-slate-800'">
-          Phone Sign-In
-        </button>
-        <button type="button" @click="setAuthMethod('otp')" :aria-pressed="authMethod === 'otp'"
-          class="py-2.5 px-3 rounded-lg text-xs sm:text-sm font-semibold transition"
-          :class="authMethod === 'otp' ? 'bg-indigo-600 text-white shadow' : 'text-slate-300 hover:bg-slate-800'">
-          One-Time Code
-        </button>
-        <button type="button" @click="setAuthMethod('invite')" :aria-pressed="authMethod === 'invite'"
-          class="py-2.5 px-3 rounded-lg text-xs sm:text-sm font-semibold transition"
-          :class="authMethod === 'invite' ? 'bg-purple-600 text-white shadow' : 'text-slate-300 hover:bg-slate-800'">
-          Club Invitation
-        </button>
-      </nav>
-
-      <!-- Method 1: Existing Email / Password Login -->
-      <form v-if="authMethod === 'email'" @submit.prevent="signInAndLoad" class="space-y-4">
-        <p class="text-slate-400 text-xs sm:text-sm">Sign in with your verified guardian, coach, or administrator email account.</p>
-        <label class="block text-sm font-medium text-slate-200">Email
-          <input v-model="loginEmail" type="email" inputmode="email" autocomplete="username" required placeholder="parent@example.com" class="mt-1 w-full rounded-lg bg-slate-900 border border-slate-600 p-3 text-base text-white focus:border-emerald-500 outline-none" />
-        </label>
-        <label class="block text-sm font-medium text-slate-200">Password
-          <input v-model="loginPassword" type="password" autocomplete="current-password" required class="mt-1 w-full rounded-lg bg-slate-900 border border-slate-600 p-3 text-base text-white focus:border-emerald-500 outline-none" />
-        </label>
-        <button type="submit" :disabled="authBusy" class="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 p-3.5 rounded-lg font-semibold text-white transition">{{ authBusy ? 'Signing in…' : 'Sign in' }}</button>
-        <button type="button" @click="registerEmail" :disabled="authBusy" class="w-full rounded-lg border border-slate-600 p-3">Create email account for a club invitation</button>
-      </form>
-
-      <!-- Method 2: Phone-Number Login Interface (Prepared) -->
-      <form v-else-if="authMethod === 'phone'" @submit.prevent="requestPhoneOtp" class="space-y-4">
-        <div class="rounded-lg border border-amber-800/60 bg-amber-950/30 p-3 text-xs text-amber-200">
-          SMS and WhatsApp delivery require a configured messaging provider in Supabase Auth. Use Email &amp; Password for active staging accounts.
-        </div>
-        <label class="block text-sm font-medium text-slate-200">Mobile phone number
-          <input v-model="loginPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+852 9000 0000" class="mt-1 w-full rounded-lg bg-slate-900 border border-slate-600 p-3 text-base text-white focus:border-blue-500 outline-none" />
-        </label>
-        <button type="submit" :disabled="authBusy" class="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 p-3.5 rounded-lg font-semibold text-white transition">Send verification code</button>
-      </form>
-
-      <!-- Method 3: One-Time Verification Code Interface (Prepared) -->
-      <form v-else-if="authMethod === 'otp'" @submit.prevent="verifyOtpCode" class="space-y-4">
-        <div class="rounded-lg border border-amber-800/60 bg-amber-950/30 p-3 text-xs text-amber-200">
-          One-time verification code sign-in awaits live OTP provider integration.
-        </div>
-        <label class="block text-sm font-medium text-slate-200">6-digit verification code
-          <input v-model="loginOtpCode" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000" class="mt-1 w-full rounded-lg bg-slate-900 border border-slate-600 p-3 text-center font-mono tracking-widest text-lg text-white focus:border-indigo-500 outline-none" />
-        </label>
-        <button type="submit" :disabled="authBusy" class="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 p-3.5 rounded-lg font-semibold text-white transition">Verify one-time code</button>
-      </form>
-
-      <!-- Method 4: Invitation-Based Guardian Onboarding Interface (Prepared) -->
-      <form v-else-if="authMethod === 'invite'" @submit.prevent="redeemInvitation" class="space-y-4">
-        <div class="rounded-lg border border-slate-600 bg-slate-900/70 p-3 text-xs text-slate-300 space-y-1">
-          <p class="font-semibold text-white">Guardian Invitation Onboarding</p>
-          <p>Parent-to-child links are verified on the server from club-issued invitations. Client-only linking is never permitted.</p>
-        </div>
-        <label class="block text-sm font-medium text-slate-200">Club invitation code
-          <input v-model="inviteCode" type="text" autocomplete="off" maxlength="64" placeholder="Token from your private club invitation link" class="mt-1 w-full rounded-lg bg-slate-900 border border-slate-600 p-3 font-mono text-sm text-white focus:border-purple-500 outline-none" />
-        </label>
-        <label class="block text-sm font-medium text-slate-200">Invited guardian email
-          <input v-model="inviteEmail" type="email" inputmode="email" autocomplete="email" placeholder="parent@example.com" class="mt-1 w-full rounded-lg bg-slate-900 border border-slate-600 p-3 text-sm text-white focus:border-purple-500 outline-none" />
-        </label>
-        <button type="submit" :disabled="authBusy" class="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-50 p-3.5 rounded-lg font-semibold text-white transition">Continue with email authentication</button>
-      </form>
-
-      <p v-if="authNotice" role="status" class="text-amber-300 text-xs sm:text-sm bg-amber-950/40 border border-amber-800/60 rounded-lg p-3">{{ authNotice }}</p>
-      <p v-if="authError" role="alert" class="text-rose-300 text-xs sm:text-sm bg-rose-950/40 border border-rose-800/60 rounded-lg p-3">{{ authError }}</p>
-    </section>
+    <login-landing v-else-if="!authUser" :controller="loginController"></login-landing>
     <template v-else>
-      <section class="mb-4 flex flex-wrap items-center justify-between gap-3 bg-slate-800 border border-slate-700 p-3 rounded-lg no-print">
+      <app-shell :active-tab="activeTab" :mode="workspaceMode" :can-coach="isTeamCoach"
+        :can-family="isVerifiedGuardian" :workspace-options="workspaceOptions" :account-email="authUser.email || ''" :sign-out-busy="authBusy"
+        @navigate="navigateTab" @mode-change="changeWorkspace" @sign-out="signOutAndClear">
+
+      <invite-onboarding v-if="pendingInvitation" :controller="pilotController" :account-email="authUser.email || ''"
+        @dismiss="dismissInvitePrompt"></invite-onboarding>
+
+      <section v-if="workspaceMode === 'coach' && ['home','team','stats'].includes(activeTab) && currentView === 'overview'" class="sdl-panel mb-4 grid gap-3 p-3 sm:grid-cols-2" aria-label="Coach roster scope">
+        <label class="text-sm font-semibold">Club<select :value="coachOrganizationId" @change="changeCoachOrganization($event.target.value)" class="mt-2 block min-h-11 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2"><option value="">All authorized clubs</option><option v-for="org in coachOrganizations" :key="org.id" :value="org.id">{{ org.name }}</option></select></label>
+        <label class="text-sm font-semibold">Team<select :value="coachTeamId" @change="changeCoachTeam($event.target.value)" class="mt-2 block w-full rounded-lg bg-slate-950 p-3"><option value="">All assigned teams</option><option v-for="team in coachTeams" :key="team.id" :value="team.id">{{ team.name }}</option></select></label>
+      </section>
+
+      <coach-home v-if="activeTab === 'home' && workspaceMode === 'coach'"
+        :roster="coachRosterDisplay" :authorized-team-count="coachTeamCount" :loading="coachRosterLoading" :error="coachRosterError" @navigate="navigateTab" @open-profile="selectCoachRosterPlayer" @open-video="openAuthorizedPlayerVideos"></coach-home>
+      <parent-home v-else-if="activeTab === 'home' && workspaceMode === 'family'"
+        :players="familyPlayers" :loading="loading" @navigate="navigateTab" @open-profile="openFamilyPlayerProfile" @open-video="openAuthorizedPlayerVideos"></parent-home>
+      <managed-roster v-else-if="activeTab === 'home' && isManagedWorkspace" :key="workspaceMode + ':' + managedRosterController.organizationId.value + ':' + managedRosterController.teamId.value" :controller="managedRosterController" :home="true"
+        @organization="changeManagedOrganization" @team="changeManagedTeam" @retry="retryManagedRoster" @more="loadMoreManagedRoster" @open-profile="openManagedPlayerProfile" @navigate="navigateTab"></managed-roster>
+      <section v-else-if="activeTab === 'home'" class="rounded-2xl border border-slate-700 bg-slate-800 p-6" aria-label="Account home">
+        <h1 class="text-2xl font-black">Welcome to Swallows DataLab</h1>
+        <p class="mt-2 text-sm text-slate-300">Your membership and permissions determine which team, family and administrative tools are available.</p>
+        <button type="button" @click="navigateTab('me')" class="mt-4 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold">Open account workspace</button>
+      </section>
+      <h1 v-if="activeTab === 'stats' && currentView === 'overview'" class="mb-3 text-2xl font-black text-white sm:text-3xl">Stats</h1>
+      <managed-roster v-if="activeTab === 'stats' && isManagedWorkspace" scope-only :controller="managedRosterController"
+        @organization="changeManagedOrganization" @team="changeManagedTeam" @retry="retryManagedRoster" @more="loadMoreManagedRoster"></managed-roster>
+      <performance-workspace v-if="activeTab === 'stats' && currentView === 'overview' && workspaceMode !== 'member'"
+        organized :auth="loginController" :mode="workspaceMode" :players="performancePlayers" :teams="performanceReviewTeams"
+        :fixed-player-id="isManagedWorkspace ? null : statsBoardController.selectedId.value" @updated="refreshPerformanceHistory">
+        <template #player-context>
+          <authorized-stats-board v-if="workspaceMode === 'coach' || workspaceMode === 'family'"
+            context-only :controller="statsBoardController" @open-profile="selectPlayer"></authorized-stats-board>
+        </template>
+        <template #overview>
+          <authorized-stats-board v-if="workspaceMode === 'coach' || workspaceMode === 'family'"
+            results-only :controller="statsBoardController" @open-profile="selectPlayer"></authorized-stats-board>
+        </template>
+      </performance-workspace>
+      <!-- Retain the existing permissioned family summary as supplementary content,
+           without making the disabled pilot projection the primary Stats experience. -->
+      <details v-if="activeTab === 'stats' && currentView === 'overview' && workspaceMode === 'family' && (submissionController.enabled || statsFamilyCards.length)"
+        class="mb-4 rounded-xl border border-slate-700 p-3">
+        <summary class="min-h-11 cursor-pointer py-3 text-sm font-semibold">Family statistics summary</summary>
+        <stats-hub :mode="workspaceMode" :coach-roster="coachRosterDisplay" :family-cards="statsFamilyCards"
+          :loading="loading" :enabled="submissionController.enabled" :show-synthetic="false"
+          @navigate="navigateTab" @open-player="submissionController.showProfile($event)"></stats-hub>
+      </details>
+      <stats-hub v-if="activeTab === 'stats' && currentView === 'overview' && workspaceMode === 'member'"
+        :mode="workspaceMode" :coach-roster="coachRosterDisplay" :family-cards="statsFamilyCards"
+        :loading="loading" :enabled="submissionController.enabled" :show-synthetic="false"
+        @navigate="navigateTab" @open-player="submissionController.showProfile($event)"></stats-hub>
+      <managed-roster v-if="activeTab === 'team' && currentView === 'overview' && isManagedWorkspace" :key="workspaceMode + ':' + managedRosterController.organizationId.value + ':' + managedRosterController.teamId.value" :controller="managedRosterController"
+        @organization="changeManagedOrganization" @team="changeManagedTeam" @retry="retryManagedRoster" @more="loadMoreManagedRoster" @open-profile="openManagedPlayerProfile" @navigate="navigateTab"></managed-roster>
+
+      <staging-data-browser v-if="activeTab === 'team' && currentView === 'overview' && workspaceMode === 'family'"
+        :players="visibleStagingPlayers" :mode="workspaceMode" :loading="loading || (workspaceMode === 'coach' && coachRosterLoading)"
+        :error="workspaceMode === 'coach' ? coachRosterError : ''" :video-here="mediaOriginAllowed"
+        @navigate="navigateTab" @open-video="openAuthorizedPlayerVideos"></staging-data-browser>
+
+      <section v-if="activeTab === 'videos' && !mediaOriginAllowed" aria-label="Staging video viewer" class="mb-6 rounded-2xl border border-amber-500/40 bg-slate-900 p-5 sm:p-6">
+        <p class="text-xs font-bold uppercase tracking-widest text-amber-300">Private staging video</p>
+        <h2 class="mt-2 text-xl font-black text-white">Open the authorized video viewer</h2>
+        <p class="mt-2 text-sm text-slate-300">This hostname is not an approved private-media origin. Use the authorized staging portal instead. Staging video access always requires your valid account and per-player permission.</p>
+        <a href="https://sdl-staging.pages.dev/" target="_blank" rel="noopener noreferrer"
+          class="mt-4 inline-flex rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-500">Open secure staging video portal</a>
+        <p class="mt-3 text-xs text-slate-400">Sign in there with your same staging account and select Private player videos. No data or media is copied between the two sites.</p>
+      </section>
+
+      <section :class="activeTab === 'me' ? '' : 'hidden'" class="mb-4 flex flex-wrap items-center justify-between gap-3 bg-slate-800 border border-slate-700 p-3 rounded-lg no-print">
         <div class="text-sm">
           <div class="font-semibold">{{ authUser.email }}</div>
-          <div class="text-slate-400">{{ isTeamCoach ? 'Team coach (read-only pilot)' : isVerifiedGuardian ? 'My Players (guardian)' : 'No team or family access' }}</div>
-          <div class="text-xs text-slate-500">Organizations: {{ orgMemberships.length }} · Teams: {{ teamMemberships.length }} · Guardian links: {{ guardianLinks.length }}</div>
+          <div class="text-slate-400">{{ workspaceOptions.map(option=>option.label).join(' · ') || 'No enabled workspace' }}</div>
+          <div class="text-xs text-slate-500">Authorized clubs: {{ ordinaryOrganizations.length }} · Authorized teams: {{ ordinaryTeams.length }} · Verified guardian links: {{ guardianLinks.length }}</div>
         </div>
+        <label class="block text-sm font-semibold text-slate-200">Language
+          <select :value="currentLang" @change="currentLang = $event.target.value; saveLanguage()" class="mt-1 block min-h-11 rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm">
+            <option value="en">English (EN)</option><option value="zh">繁體中文 (ZH)</option><option value="ja">日本語 (JA)</option>
+          </select>
+        </label>
         <button @click="signOutAndClear" :disabled="authBusy" class="bg-slate-700 px-4 py-2 rounded text-sm">Sign out</button>
       </section>
-      <p v-if="authError" role="alert" class="mb-3 text-rose-300 text-sm no-print">{{ authError }}</p>
+      <div v-if="authError" role="alert" class="mb-3 text-rose-300 text-sm no-print">{{ authError }} <button type="button" class="ml-2 underline" @click="reloadMemberships">Refresh account permissions</button></div>
     <!-- Top Header Bar (Hidden during printing) -->
-    <app-header :t="t" :current-lang="currentLang" :current-view="currentView" :is-coach="isCoach"
+    <app-header class="hidden" :t="t" :current-lang="currentLang" :current-view="currentView" :is-coach="isCoach"
       @change-language="currentLang = $event; saveLanguage()"
       @navigate-overview="currentView = 'overview'; if (isVerifiedGuardian && !isTeamCoach) submissionController.changeTab('players')"
       @export-csv="exportTeamCSV" @import-csv="importTeamCSV($event)"
       @add-player="openAddPlayerModal" @lock-coach="lockCoachMode"
       @unlock-coach="unlockCoachMode"></app-header>
 
-    <pilot-workspace :controller="pilotController"></pilot-workspace>
-    <submission-workspace :controller="submissionController" :pilot-controller="pilotController" :t="t"></submission-workspace>
-    <club-enrollment-admin :controller="enrollmentAdminController"></club-enrollment-admin>
-    <private-media-panel :controller="privateMediaController"></private-media-panel>
+    <pilot-workspace :class="activeTab === 'me' && !isManagedWorkspace ? '' : 'hidden'" :controller="pilotController"></pilot-workspace>
+    <club-enrollment-admin :class="activeTab === 'me' && !isManagedWorkspace ? '' : 'hidden'" :controller="enrollmentAdminController"></club-enrollment-admin>
+    <!-- Private staging avatars: all available profiles are server-filtered. -->
+    <avatar-manager :controller="avatarController" :show-list="activeTab === 'me' && workspaceMode === 'admin'" @open-profile="openManagedPlayerProfile"></avatar-manager>
 
     <!-- Loading Indicator -->
     <div v-if="loading" class="p-8 text-center text-slate-400 font-mono text-sm no-print">
@@ -209,9 +224,9 @@
     </div>
 
     <!-- SDL-001 / SDL-004: Verified parents land on My Players above, not the legacy Coach Overview -->
-    <coach-team-roster v-else-if="currentView === 'overview' && isTeamCoach"
-      :roster="coachRoster" :loading="coachRosterLoading" :error="coachRosterError" @open-review="submissionController.enterReview($event)"></coach-team-roster>
-    <team-overview v-else-if="currentView === 'overview' && isCoach"
+    <coach-team-roster v-else-if="currentView === 'overview' && isTeamCoach && workspaceMode === 'coach'" :key="coachOrganizationId + ':' + coachTeamId" :class="activeTab === 'team' ? '' : 'hidden'"
+      :roster="coachRosterDisplay" :show-team-filter="false" :show-review="submissionController.enabled" :loading="coachRosterLoading" :error="coachRosterError" @open-review="submissionController.enterReview($event)" @open-profile="selectCoachRosterPlayer"></coach-team-roster>
+    <team-overview v-else-if="currentView === 'overview' && isCoach && workspaceMode === 'coach'" :class="activeTab === 'team' || activeTab === 'stats' ? '' : 'hidden'"
       :t="t"
       :players="players"
       :get-club-count="getClubCount"
@@ -243,8 +258,8 @@
 
 
     <!-- VIEW 2: Individual Player Profile & Dated Session History -->
-    <player-profile v-if="currentView === 'player' && selectedPlayer"
-      :t="t" :selected-player="selectedPlayer" :is-coach="isCoach"
+    <player-profile v-if="currentView === 'player' && selectedPlayer" :key="workspaceMode + ':' + selectedPlayer.id" :class="activeTab === 'team' ? '' : 'hidden'" :can-edit-photo="canEditPlayerPhoto(selectedPlayer.id)" @edit-photo="avatarManager.choose($event)"
+      :t="t" :selected-player="selectedPlayer" :is-coach="isCoach" :history-loading="profileHistoryLoading" :history-error="profileHistoryError"
       :failed-imgs="failedImgs" :format-img-url="formatImgUrl" :mark-img-failed="markImgFailed"
       :format-legal-name="formatLegalName" :get-player-display-name="getPlayerDisplayName"
       :get-latest-metric="getLatestMetric" :split-positions="splitPositions" :calculate-age="calculateAge"
@@ -258,7 +273,32 @@
       :is-session-expanded="isSessionExpanded" :toggle-session-expand="toggleSessionExpand"
       :get-attack-angle-color="getAttackAngleColor" :open-edit-session-modal="openEditSessionModal"
       :remove-session="removeSession" :delete-drill-video="deleteDrillVideo"
-      @open-submissions="submissionController.changeTab('submissions'); submissionController.selectPlayer($event)" @back="currentView = 'overview'"></player-profile>
+      @open-submissions="submissionController.changeTab('submissions'); submissionController.selectPlayer($event)" @back="leavePlayerProfile">
+      <template #performance>
+        <performance-workspace v-if="activeTab === 'team' && performancePlayers.some(row => row.id === selectedPlayer.id)"
+          :auth="loginController" :mode="workspaceMode" :players="performancePlayers"
+          :fixed-player-id="selectedPlayer.id" @updated="refreshPerformanceHistory"></performance-workspace>
+      </template>
+      <template #private-media>
+        <private-media-panel v-if="activeTab === 'team' && mediaOriginAllowed && privateMediaController.mediaPlayers.value.some(row => row.id === selectedPlayer.id)"
+          :controller="privateMediaController" :profile-player-id="selectedPlayer.id"></private-media-panel>
+        <p v-else class="rounded-xl border border-slate-700 bg-slate-900 p-4 text-sm text-slate-300">
+          Private videos require an authorized player and staging session.
+        </p>
+      </template>
+    </player-profile>
+
+    <!-- The same protected media state is available in the Videos tab. -->
+    <private-media-panel v-if="activeTab === 'videos' && mediaOriginAllowed"
+      :controller="privateMediaController"></private-media-panel>
+
+    <!-- Keep the existing gated workspace mounted and reachable, after the primary roster/library.
+         The details disclosure changes presentation only; it does not enable any operation. -->
+    <details :open="submissionController.enabled ? true : undefined"
+      :class="!isManagedWorkspace && (activeTab === 'team' || activeTab === 'stats' || (activeTab === 'videos' && mediaOriginAllowed)) && currentView !== 'player' ? 'mt-4 rounded-xl border border-slate-700 p-3 no-print' : 'hidden'">
+      <summary class="min-h-11 cursor-pointer py-3 text-sm font-semibold text-slate-300">{{ submissionController.enabled ? 'Submissions and Clubhouse' : 'Submissions and Clubhouse · currently unavailable' }}</summary>
+      <submission-workspace :show-performance-review="activeTab !== 'stats'" :controller="submissionController" :pilot-controller="pilotController" :t="t"></submission-workspace>
+    </details>
 
     <!-- SDL-002: Unified Player Form (Add / Edit) -->
     <player-form-modal
@@ -302,6 +342,7 @@
     <ar-analyzer-modal v-if="activeAnalyzerVideo" :t="t"
       :controller="analyzerController"></ar-analyzer-modal>
 
+      </app-shell>
     </template>
   </div>
 

@@ -17,3 +17,28 @@ Use the signed-in user's Supabase session for public RPCs. The server derives th
 | Audit | `sdl_v5_audit_history(p_scope,p_id,p_before,p_limit)` returns descending event IDs with a maximum of 100. Supported scopes are platform, club, team, own and downloads. Downloads takes a child player ID. New event scope is captured at occurrence. |
 
 Handle authorization denial by clearing the affected view. A stale revision, reused request key, or changed enrollment can return conflict. Refresh the selected resource before retrying. Invalidate cached player data and media state on account, role or player changes. No frontend should consume a database secret, inferred role hierarchy or service-only upload finalization RPC.
+
+## MEDIA-03A clean-start media contract
+
+Media requests require an active v5.1 authorization contract with `rbacVersion: 5` and `mediaRevision: "v5.1-clean-start"`. Existing clients continue to send the user's bearer token. Worker gates control routing. Direct database permissions remain independently governed.
+
+| Request | Gate | Authorization and response |
+|---|---|---|
+| GET /v2/submissions?player_id=UUID | MEDIA_PLAYBACK_ENABLED | `sdl_004_list_submissions`; authorized empty collection returns `200 {"items":[]}`; unauthorized collection returns 403. |
+| GET /v2/clubhouse?team_id=UUID | MEDIA_PLAYBACK_ENABLED | `sdl_004_clubhouse_videos`; active team eligibility and object sharing checked. |
+| GET /v2/submissions/UUID/playback | MEDIA_PLAYBACK_ENABLED | `sdl_v5_authorize_playback` then exact private R2 metadata and object. Full 200 or single-range 206; private/no-store. Chromium derives previews from authorized video bytes in memory. |
+| GET /v2/submissions/upload-eligibility?player_id=UUID | MEDIA_UPLOAD_ENABLED | `sdl_004_submission_can_submit`; an advisory boolean. The POST rechecks permission. |
+| POST /v2/submissions?player_id=UUID&category=pitching\|batting\|throwing | MEDIA_UPLOAD_ENABLED | Permission, bounded MP4 body, UUID idempotency key, and payload hash; caller reservation `sdl_004_reserve_submission`; private R2 put; service-only `sdl_004_finish_submission`. Returns 201 with ID, player ID, category and status. Reuse the request key on uncertain outcomes. |
+| GET /v2/review?team_id=UUID | MEDIA_REVIEW_ENABLED | `sdl_004_review_queue`; scope and playback eligibility checked. |
+| POST /v2/submissions/UUID/review | MEDIA_REVIEW_ENABLED | `sdl_004_review_submission`; independent current reviewer required. |
+| POST /v2/submissions/UUID/publish | MEDIA_PUBLICATION_ENABLED | `sdl_004_publish_submission`; requires a recorded independent single-subject confirmation before publishing. The separate `sdl_v5_confirm_subject` RPC remains subject to the existing direct-API hold. Empty teams unpublish and retain subject evidence. |
+| GET /v2/submissions/UUID/download | MEDIA_DOWNLOAD_ENABLED | `sdl_v5_authorize_download`; existing scoped attachment policy only. Platform-derived attachment authorization requires AAL2. |
+| /v1/authorize, /v1/media and its object paths | Retired | 410. No database, Auth or bucket lookup. |
+
+All five media flags are off in the package. `SUBMISSIONS_ENABLED` still guards the remaining v2 pilot, capability, enrollment and non-media functions. Dedicated media routes are independent of that flag. The general frontend submission workspace retains its separate `SUBMISSION_FEATURES_ENABLED` hold. Worker media flags cannot open a held RPC.
+
+401 denotes expired, invalid or revoked authentication. A 403 is explicit authorization denial. A 503 with `code: "media_disabled"` means the feature gate is closed. Other 503 responses indicate an unavailable dependency, invalid server response or incompatible backend contract. A 404 after authorized playback means metadata or bytes were unavailable. A 416 means the range is unsupported. No browser response includes R2 object keys or privileged credentials.
+
+### Option C amendment for MEDIA-03B
+
+Authorize attachment downloads for verified current team members only when a clean-start video is approved and explicitly published to their independently eligible team, current sharing consent covers that use, the current enrollment and recording/storage authorization are valid, and independently verified single-subject and retention requirements are met. Evaluate the intended download use separately from playback. Keep pending, rejected and merely private clips outside this team grant. Scope requests to the same organization, team and object, recheck each request including ranges, and record authorization with actor, object and the eligible team scope. Ordinary independently scoped rights and the AAL2 requirement for platform-derived downloads remain in place. Prepare positive and negative coverage for membership changes, consent withdrawal, unknown subjects and other teams before authorizing activation in MEDIA-03B. MEDIA-03A has no team attachment grant.

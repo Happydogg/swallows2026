@@ -1,0 +1,85 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {rbacV5} from './helpers/rbacV5.mjs';
+import {uuid,parent,coach,teammate,team,otherTeam,outsider,player,athlete} from './helpers/submissionDatabase.mjs';
+import {adminUser,enrollment} from './helpers/clubWorkflow.mjs';
+
+const patch=readFileSync(new URL('../backend/proposals/sdl004-rbac-v5/media-clean-start.sql',import.meta.url),'utf8');
+
+test('clean-start media isolates legacy rows and all five roles across scopes',async t=>{
+  const f=await rbacV5(t);
+  const {owner,as,upload}=f;
+  const select=id=>`SELECT id FROM public.sdl_004_list_submissions('${id}')`;
+  const decision=(name,id)=>`SELECT public.${name}('${id}') AS allowed`;
+  const canPlay=id=>decision('sdl_v5_authorize_playback',id);
+  const canDownload=id=>decision('sdl_v5_authorize_download',id);
+  await owner(`UPDATE public.sdl_club_enrollments SET recording_storage_authorized=true,recording_permission_ref='synthetic fixture' WHERE id='${enrollment}'`);
+  const old=await upload();
+  const pendingKey=uuid(904), pendingClaim=uuid(905);
+  await as(parent,`SELECT public.sdl_004_reserve_submission('${player}','${pendingKey}','${pendingClaim}','${'c'.repeat(64)}',12,'pitching')`);
+  await f.db.exec('RESET ROLE');
+  await f.db.exec(patch);
+  await f.db.exec('SET ROLE service_role');
+  await assert.rejects(f.db.query(`SELECT public.sdl_004_finish_submission('${pendingKey}','${pendingClaim}','${parent}')`),{code:'PT409'});
+  assert.deepEqual(await as(parent,select(player)),[]);
+  assert.equal((await as(parent,canPlay(old)))[0].allowed,false);
+  await assert.rejects(as(teammate,select(player)),{code:'42501'});
+  await assert.rejects(as(parent,select(uuid(999))),{code:'42501'});
+  await assert.rejects(as(teammate,`SELECT * FROM public.sdl_004_clubhouse_videos('${otherTeam}')`),{code:'42501'});
+  const manager=uuid(900);
+  await f.db.exec(`RESET ROLE;
+    INSERT INTO auth.users(id) VALUES('${manager}');
+    INSERT INTO auth.sessions(id,user_id) VALUES('${manager}','${manager}');
+    INSERT INTO public.profiles(id,status) VALUES('${manager}','active');
+    SELECT sdl_rbac_v5.set_platform_grant('${outsider}',true,'synthetic test');
+    INSERT INTO public.team_memberships(team_id,user_id,role,status) VALUES('${team}','${coach}','manager','active');
+    SELECT set_config('test.aal','aal1',false)`);
+  await as(adminUser,`SELECT public.sdl_v5_set_staff('${team}','${manager}','manager',true,'synthetic manager')`);
+  const fresh=await upload();
+  const coachClip=await upload(coach);
+  const adminClip=await upload(adminUser);
+  const managerClip=await upload(manager);
+  assert.notEqual(managerClip,adminClip);
+  assert.notEqual(old,fresh);
+  assert.notEqual(coachClip,adminClip);
+  assert.equal((await as(outsider,decision('sdl_004_submission_can_submit',player)))[0].allowed,false);
+  for (const actor of [parent,coach,adminUser,manager,outsider]) {
+    assert.equal((await as(actor,canPlay(fresh)))[0].allowed,true);
+    assert.ok((await as(actor,select(player))).some(row=>row.id===fresh));
+  }
+  assert.equal((await as(teammate,canPlay(fresh)))[0].allowed,false);
+  await as(coach,`SELECT public.sdl_004_review_submission('${fresh}','approved','Synthetic review')`);
+  await f.grant();
+  await assert.rejects(f.publish(fresh),{code:'42501'});
+  await as(coach,`SELECT public.sdl_v5_confirm_subject('${fresh}','${athlete}','Synthetic single-subject fixture')`);
+  await f.publish(fresh);
+  assert.equal((await as(teammate,canPlay(fresh)))[0].allowed,true);
+  assert.equal((await as(teammate,canDownload(fresh)))[0].allowed,false,'Option C is deferred');
+  assert.equal((await as(outsider,canDownload(fresh)))[0].allowed,false,'Platform AAL1');
+  await owner("SELECT set_config('test.aal','aal2',false)");
+  assert.equal((await as(outsider,canDownload(fresh)))[0].allowed,true);
+  await f.withdraw();
+  assert.equal((await as(teammate,canPlay(fresh)))[0].allowed,false);
+  await f.publish(fresh,[]);
+  const [safety]=await owner(`SELECT subject_scope,subject_confirmed_by FROM public.sdl_video_submissions WHERE id='${fresh}'`);
+  assert.equal(safety.subject_scope,'single_athlete');
+  assert.equal(safety.subject_confirmed_by,coach);
+  await owner(`UPDATE public.sdl_club_enrollments SET recording_storage_authorized=false WHERE id='${enrollment}'`);
+  assert.equal((await as(parent,canPlay(fresh)))[0].allowed,false);
+  await owner(`UPDATE auth.sessions SET not_after=now() WHERE user_id='${parent}'`);
+  await assert.rejects(as(parent,select(player)),{code:'42501'});
+  await assert.rejects(as(coach,'SELECT object_key FROM public.sdl_media_objects'),{code:'42501'});
+});
+
+test('clean-start SQL preserves held ACLs and forward containment preserves evidence',async t=>{
+  const {db,owner}=await rbacV5(t);
+  await owner('REVOKE EXECUTE ON FUNCTION public.sdl_004_list_submissions(uuid) FROM authenticated');
+  await db.exec(patch);
+  const query="SELECT has_function_privilege('authenticated','public.sdl_004_list_submissions(uuid)','EXECUTE') AS listed";
+  assert.equal((await owner(query))[0].listed,false);
+  const [{count}]=await owner('SELECT count(*) FROM sdl_rbac_v5.events');
+  await db.exec(readFileSync(new URL('../backend/proposals/sdl004-rbac-v5/containment-rehearsal.sql',import.meta.url),'utf8'));
+  assert.equal((await owner(query))[0].listed,false);
+  assert.equal((await owner('SELECT count(*) FROM sdl_rbac_v5.events'))[0].count,count);
+});
