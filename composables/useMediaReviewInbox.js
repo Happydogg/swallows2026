@@ -16,16 +16,18 @@ export function useMediaReviewInbox({auth,scope,activeTab,section,privateMedia,s
   const identity=auth.captureIdentity();if(!auth.isCurrentIdentity(identity))return null;
   const key=scopeKey(currentScope),e=epoch,controller=new AbortController();
   if(kind==='summary'){summaryRequest?.abort();summaryRequest=controller;}else{inboxRequest?.abort();inboxRequest=controller;}
-  const current=()=>epoch===e&&auth.isCurrentIdentity(identity)&&key===scopeKey(scope.value)&&!controller.signal.aborted&&(kind==='summary'?summaryRequest===controller:inboxRequest===controller&&inReview());
-  return {scope:currentScope,signal:controller.signal,current,finish(){if(kind==='summary'&&summaryRequest===controller)summaryRequest=null;if(kind==='inbox'&&inboxRequest===controller)inboxRequest=null;}};
+  const owns=()=>epoch===e&&auth.isCurrentIdentity(identity)&&key===scopeKey(scope.value)&&(kind==='summary'?summaryRequest===controller:inboxRequest===controller&&inReview());
+  let timedOut=false;const timer=setTimeout(()=>{timedOut=true;controller.abort();},30000);
+  const current=()=>owns()&&!controller.signal.aborted;
+  return {scope:currentScope,signal:controller.signal,current,failed:()=>owns()&&(!controller.signal.aborted||timedOut),finish(){clearTimeout(timer);if(kind==='summary'&&summaryRequest===controller)summaryRequest=null;if(kind==='inbox'&&inboxRequest===controller)inboxRequest=null;}};
  }
  async function refreshSummary(){
   if(!available.value||blocked)return;
   const request=op('summary');if(!request)return;
   summaryStatus.value='loading';summaryItems.value=[];
   try{const response=await service.mediaActionSummary(request.scope,{signal:request.signal});
-   if(request.current()){summaryItems.value=response.items;summaryStatus.value='ready';}
-  }catch(e){if(request.current()){if(e.status===401||e.status===403)denied();else summaryStatus.value='unavailable';}}
+   if(request.current()){summaryItems.value=response.items;summaryStatus.value='ready';}else if(request.failed())summaryStatus.value='unavailable';
+  }catch(e){if(request.failed()){if(e.status===401||e.status===403)denied();else summaryStatus.value='unavailable';}}
   finally{request.finish();}
  }
  async function refreshInbox(append=false){
@@ -35,14 +37,14 @@ export function useMediaReviewInbox({auth,scope,activeTab,section,privateMedia,s
   status.value='loading';rows.value=[];teams.value=[];players.value=[];total.value=null;filteredTotal.value=null;next.value=null;
   try{
    const response=await service.reviewInbox(request.scope,{...f,...(cursor?{cursor}:{})},{signal:request.signal});
-   if(!request.current())return;
+   if(!request.current()){if(request.failed())status.value='unavailable';return;}
    const validated=uniqueReviewRows(response.items,request.scope,f);
    if(validated.length!==response.items.length)throw Error('Invalid review inbox rows.');
    rows.value=uniqueReviewRows([...prior,...validated],request.scope,f);
    teams.value=response.teams.filter(t=>t&&typeof t.id==='string'&&typeof t.label==='string');
    players.value=response.players.filter(p=>p&&typeof p.id==='string'&&typeof p.label==='string'&&Array.isArray(p.teamIds));
    total.value=response.pendingTotal;filteredTotal.value=response.filteredTotal;next.value=response.nextCursor;status.value='ready';
-  }catch(e){if(request.current()){if(e.status===401||e.status===403)denied();else status.value='unavailable';}}
+  }catch(e){if(request.failed()){if(e.status===401||e.status===403)denied();else status.value='unavailable';}}
   finally{request.finish();}
  }
  function filter({key,value}){
@@ -66,11 +68,11 @@ export function useMediaReviewInbox({auth,scope,activeTab,section,privateMedia,s
  function retry(){blocked=false;void refreshSummary();if(inReview())void refreshInbox();}
  // Synchronous invalidation, deferred fetch. A change of account context invalidates even an identical scope key.
  watch([()=>auth.accountContext.value,()=>scopeKey(scope.value)],()=>{reset();if(inReview()||privateMedia.inboxReviewMode.value)privateMedia.resetMedia();},{flush:'sync'});
- watch([activeTab,section],()=>{epoch++;clearSummary();clearInbox();filters.value=emptyFilters();if(!inReview()&&privateMedia.inboxReviewMode.value)privateMedia.resetMedia();},{flush:'sync'});
+ watch([activeTab,section],()=>{epoch++;clearSummary();clearInbox();filters.value=emptyFilters();if(blocked){summaryStatus.value='unavailable';status.value='unavailable';notice.value='Review access is unavailable. Refresh account permissions or sign in again.';}if(!inReview()&&privateMedia.inboxReviewMode.value)privateMedia.resetMedia();},{flush:'sync'});
  watch([()=>auth.accountContext.value,()=>scopeKey(scope.value),activeTab,section],()=>{if(!available.value||blocked)return;if(activeTab.value==='home')void refreshSummary();else if(inReview()){void refreshInbox();void refreshSummary();}},{immediate:true,flush:'post'});
  watch(privateMedia.mediaReviewEvent,event=>{
   if(!event||!available.value)return;
-  if(event==='denied'){denied();return;}
+  if(event.type==='denied'){denied();return;}
   opening.value=false;
   void refreshSummary();if(inReview())void refreshInbox();
  },{flush:'post'});
