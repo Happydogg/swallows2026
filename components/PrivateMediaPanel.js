@@ -20,20 +20,11 @@ export const PrivateMediaPanel = {
   },
   setup(props) { return { ...props.controller }; },
   template: `
-<section class="my-5 space-y-5 no-print" aria-label="Private player videos">
-  <div class="relative isolate overflow-hidden rounded-3xl border border-blue-400/30 bg-gradient-to-br from-blue-950 via-slate-900 to-slate-950 p-5 shadow-xl sm:p-7">
-    <div class="pointer-events-none absolute -right-12 -top-16 h-60 w-60 rounded-full bg-blue-500/20 blur-3xl" aria-hidden="true"></div>
-    <div class="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <p class="text-xs font-bold uppercase tracking-widest text-cyan-300">Video Room</p>
-        <h2 class="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">Every rep tells a story.</h2>
-        <p class="mt-2 max-w-2xl text-sm leading-relaxed text-slate-300">Watch private practice clips for the players connected to your account. Permission is checked for every selected athlete.</p>
-      </div>
-      <div class="self-start rounded-xl border border-emerald-500/30 bg-emerald-950/40 px-3 py-2 text-xs font-semibold text-emerald-300">
-        Private staging media
-      </div>
-    </div>
-  </div>
+<section class="mb-4 space-y-4 no-print" aria-label="Private player videos">
+  <header class="flex flex-wrap items-center justify-between gap-2">
+    <div><p class="text-xs font-semibold text-slate-400">Video Room</p><h2 class="text-2xl font-bold text-white">Private videos</h2></div>
+    <span class="rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-300">Private staging media</span>
+  </header>
 
   <div v-if="!profilePlayerId" class="rounded-2xl border border-slate-700 bg-slate-900/90 p-4 sm:p-5">
     <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -51,14 +42,6 @@ export const PrivateMediaPanel = {
         <option v-for="player in mediaPlayers" :key="player.id" :value="player.id">{{ player.label }}</option>
       </select>
     </label>
-    <div v-if="mediaPlayers.length > 1" class="mt-3 flex gap-2 overflow-x-auto pb-2" aria-label="Quick player selection">
-      <button v-for="player in mediaPlayers" :key="player.id" type="button" @click="selectMediaPlayer(player.id)"
-        :aria-pressed="mediaPlayerId === player.id"
-        :class="mediaPlayerId === player.id ? 'border-blue-400 bg-blue-700 text-white' : 'border-slate-600 bg-slate-800 text-slate-300 hover:border-blue-500'"
-        class="shrink-0 rounded-xl border px-4 py-2.5 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">
-        {{ player.label }}
-      </button>
-    </div>
     <p v-if="!mediaPlayers.length" class="mt-4 rounded-xl border border-dashed border-slate-600 p-5 text-sm text-slate-400">No linked or coached players are available. Check your club membership or verified guardian link.</p>
   </div>
 
