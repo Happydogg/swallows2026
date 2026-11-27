@@ -2,6 +2,33 @@
 
 **As of:** 2026-11-27. **Scope:** Current GitHub branch and independently checked staging services; not a production readiness certificate.
 
+## SDL-UX-002 final restructuring status (2026-11-27)
+
+**Latest checkpoint; earlier UX-IA-01–05/candidate and media-blocker snapshots below are historical.**
+
+| Batch | Implementation / staging status | Owner acceptance |
+|---|---|---|
+| UX-IA-01 | Merged and staging-deployed | Accepted: Home/Team/Videos and five-tab placement |
+| UX-IA-02 | Merged and staging-deployed | Accepted: Stats Overview/Record/Review and revision presentation |
+| UX-IA-03 | Merged and staging-deployed | Non-media accepted; private-media behavior tracked separately with SDL-004 |
+| UX-IA-04 | Merged and staging-deployed | Accepted: visual consistency and accessibility presentation |
+| UX-IA-05 | Merged and staging-deployed | Accepted: Me/account and gated administration presentation |
+| UX-IA-06 | [PR #18](https://github.com/Happydogg/swallows2026/pull/18) merged at `bbe5582cc40f20e7b56417670d98162fb35a4dfb`; QA-only | Configured build and 8/8 Vue/performance smoke reported; **physical device/role UAT not completed** |
+
+**Frozen UX implementation:** Five-tab navigation and previously approved player/roster/stats/video/account work should be preserved. Do not add further redesign or product features. Existing Round 2 12/12 and ADMIN-01 5/5 are owner-reported historical acceptance; performance correction shows 54 current vs 60 superseded. Full regression aggregate counts truncated in some Cloudflare logs, so exact full total is not independently reconstructed.
+
+**Current separate integrated baseline:** GitHub `feature/SDL-UX-002-login-redesign` HEAD `2d12a56eb773f22d1fa8e54b3b2d12c14557463d` is **eight commits after** IA-06 merge and includes SDL-004 media changes. Cloudflare Pages verified successful deployments at this HEAD: UX Live `6c0bba9b-dea0-4b5a-aaa3-455959212610`, UX Preview `f4d12dac-ebd6-44fb-9fc9-6403ee0edbb7`. The subsequent media staging workflow, private review and permission checks need independent acceptance; UX-002 restructuring cannot certify them.
+
+**P0/P1 follow-up ownership and gates:**
+- **SDL-UX-002 + owner (P1):** Authenticated real iPhone/Android, tablet and desktop flows; keyboard/focus/zoom/print; all approved roles and dual-role switching; empty, denied and loading states; after-media integration regression. Preserve data/role scope and media cleanup after logout.
+- **SDL-004B-RBAC-05 (P0):** Complete targeted private-media and independent-review authorization, signed JWT/HTTP negative role tests, recovery and private object lifecycle checks. Plan publication/consent/team download separately; no implicit release of held gates.
+- **SDL-UX-003 (parallel P0 prototype):** [Issue #19](https://github.com/Happydogg/swallows2026/issues/19) owns separately committed Action Center/Video Review Inbox synthetic presentation. Integration blocked by new read-contract and shared-file agreement; not part of accepted UX-002 baseline.
+- **SDL-GOV / SDL-000 (P0):** Independent security and privacy signoff, backup/restore, migration ledger reconciliation and formal pilot release decision, with separate owner authorization for production or real-family onboarding.
+
+**Decision:** Freeze completed restructuring; continue scoped defects and acceptance. No production deployment, no feature expansion, no unrestricted media or PR merge authorized by this coordination checkpoint.
+
+---
+
 ## UX IA-01 through IA-05 checkpoint (2026-11-27)
 
 **Latest status (supersedes earlier candidate-only notes below):** Source PRs #13–17 merged; owner accepted IA-01, IA-02 and IA-04; IA-03 non-video functions accepted with private-media blocker open; IA-05 staging deployed, awaiting owner visual review. IA-06 mobile/cross-role QA is the next UX step. These are UX review staging deployments and do not authorize SDL production.
