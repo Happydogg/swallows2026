@@ -324,19 +324,27 @@
       </template>
     </player-profile>
 
-    <!-- The same protected media state is available in the Videos tab. -->
-    <private-media-panel v-if="activeTab === 'videos' && mediaOriginAllowed"
+    <!-- UX-003: Library and Clubhouse are distinct destinations; existing authorization stays in their controllers. -->
+    <section v-if="activeTab === 'videos' && mediaOriginAllowed && !authError" class="mb-4 space-y-2 no-print" aria-label="Videos navigation">
+      <h1 class="text-2xl font-black text-white">Videos</h1>
+      <nav class="sdl-tabs flex flex-wrap gap-2 p-1.5" aria-label="Video sections">
+        <button type="button" @click="changeVideoSection('library')" :aria-pressed="videoSection==='library'" :disabled="videoSectionBusy && videoSection!=='library'" :class="videoSection==='library'?'bg-cyan-900 text-cyan-100':'text-slate-300'" class="min-h-11 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">Library</button>
+        <button v-if="clubhouseMediaTeams.length" type="button" @click="changeVideoSection('clubhouse')" :aria-pressed="videoSection==='clubhouse'" :disabled="videoSectionBusy && videoSection!=='clubhouse'" :class="videoSection==='clubhouse'?'bg-cyan-900 text-cyan-100':'text-slate-300'" class="min-h-11 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">Clubhouse</button>
+      </nav>
+      <p v-if="videoSectionBusy" role="status" class="text-xs text-slate-400">Finish the current media action before switching sections.</p>
+      <p v-else-if="['coach','admin'].includes(workspaceMode) && videoSection==='library'" class="text-xs text-slate-400">Review pending clips inside the authorized player library. The central review inbox is not yet available.</p>
+    </section>
+    <private-media-panel v-if="activeTab === 'videos' && mediaOriginAllowed && videoSection==='library'"
       :controller="privateMediaController"></private-media-panel>
-    <!-- Narrow acceptance controls. SDL-UX-003 owns final library/Clubhouse navigation. -->
-    <media-publication-panel v-if="activeTab === 'videos' && mediaOriginAllowed && !authError && ['coach','admin'].includes(workspaceMode) && privateMediaController.mediaPlayerId.value"
-      :key="authUser.id + ':' + workspaceMode + ':' + privateMediaController.mediaPlayerId.value" :auth="loginController" :controller="privateMediaController"></media-publication-panel>
-    <clubhouse-media-panel v-if="activeTab === 'videos' && mediaOriginAllowed && !authError && clubhouseMediaTeams.length"
+    <media-publication-panel v-if="activeTab === 'videos' && mediaOriginAllowed && !authError && videoSection==='library' && ['coach','admin'].includes(workspaceMode) && privateMediaController.mediaPlayerId.value"
+      ref="publicationPanel" :key="authUser.id + ':' + workspaceMode + ':' + privateMediaController.mediaPlayerId.value" :auth="loginController" :controller="privateMediaController"></media-publication-panel>
+    <clubhouse-media-panel v-if="activeTab === 'videos' && mediaOriginAllowed && !authError && videoSection==='clubhouse' && clubhouseMediaTeams.length"
       :key="authUser.id + ':' + workspaceMode" :auth="loginController" :teams="clubhouseMediaTeams"></clubhouse-media-panel>
 
     <!-- Keep the existing gated workspace mounted and reachable, after the primary roster/library.
          The details disclosure changes presentation only; it does not enable any operation. -->
     <details :open="submissionController.enabled ? true : undefined"
-      :class="!isManagedWorkspace && (activeTab === 'team' || activeTab === 'stats' || (activeTab === 'videos' && mediaOriginAllowed)) && currentView !== 'player' ? 'mt-4 rounded-xl border border-slate-700 p-3 no-print' : 'hidden'">
+      :class="!isManagedWorkspace && (activeTab === 'team' || activeTab === 'stats' || (activeTab === 'videos' && mediaOriginAllowed && videoSection==='library')) && currentView !== 'player' ? 'mt-4 rounded-xl border border-slate-700 p-3 no-print' : 'hidden'">
       <summary class="min-h-11 cursor-pointer py-3 text-sm font-semibold text-slate-300">{{ submissionController.enabled ? 'Submissions and Clubhouse' : 'Submissions and Clubhouse · currently unavailable' }}</summary>
       <submission-workspace :show-performance-review="activeTab !== 'stats'" :controller="submissionController" :pilot-controller="pilotController" :t="t"></submission-workspace>
     </details>
