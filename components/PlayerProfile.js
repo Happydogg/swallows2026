@@ -51,10 +51,22 @@ export const PlayerProfile = {
       if (props.canEditPhoto) emit('edit-photo',props.selectedPlayer.id);
       else if (props.isCoach) props.openEditPlayerModal(props.selectedPlayer);
     };
-    return { demoMatch, editPlayer };
+    const sections = Object.freeze(['Overview','Growth','Stats','Videos','History']);
+    const section = Vue.ref('Overview');
+    const chooseSection = next => {
+      if (!sections.includes(next)) return;
+      section.value = next;
+      if (next === 'Growth' || next === 'Stats') props.setChartMode(next === 'Growth' ? 'growth' : 'velocity');
+    };
+    Vue.watch(()=>props.selectedPlayer?.id,()=>{ section.value='Overview'; },{flush:'sync'});
+    const metric = (key,unit) => {
+      const value=props.getLatestMetric(props.selectedPlayer.id,key);
+      return value===null || value===undefined || value==='' || !Number.isFinite(Number(value)) ? 'Not recorded' : String(value)+' '+unit;
+    };
+    return { demoMatch, editPlayer, sections, section, chooseSection, metric };
   },
   template: `
-<div class="space-y-6">
+<div class="space-y-4" aria-label="Player profile">
 
   <!-- Top Action Navigation Bar -->
   <div class="flex flex-wrap items-center justify-between gap-2 no-print">
@@ -87,6 +99,21 @@ export const PlayerProfile = {
     :calculate-jump-ratio="calculateJumpRatio" :get-jump-ratio-color="getJumpRatioColor"
     :format-height-weight="formatHeightWeight"></player-hero-card>
 
+  <nav aria-label="Player profile sections" class="grid grid-cols-3 gap-1.5 rounded-xl border border-slate-700 bg-slate-950 p-1.5 no-print sm:grid-cols-5">
+    <button v-for="item in sections" :key="item" type="button" :aria-pressed="section===item"
+      @click="chooseSection(item)" :class="section===item ? 'bg-blue-700 text-white' : 'text-slate-300 hover:bg-slate-800'"
+      class="min-h-11 rounded-lg px-2 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">{{ item }}</button>
+  </nav>
+  <section v-if="section==='Overview' && !historyLoading && !historyError" class="space-y-3 no-print" aria-label="Latest recorded results">
+    <h3 class="text-lg font-semibold">Latest recorded results</h3>
+    <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div v-for="m in [{key:'exit_velo',label:t('exitVelo'),unit:'km/h'},{key:'throwing_velo',label:t('throwingVelo'),unit:'km/h'},{key:'height_cm',label:t('heightCm'),unit:'cm'},{key:'weight_kg',label:t('weightKg'),unit:'kg'}]" :key="m.key" class="min-w-0 rounded-xl border border-slate-700 bg-slate-800/50 p-3">
+        <p class="text-xs text-slate-400">{{ m.label }}</p><p class="mt-2 break-words text-lg font-bold">{{ metric(m.key,m.unit) }}</p>
+      </div>
+    </div>
+    <p class="text-sm text-slate-400">Use Growth and Stats to explore recorded results, Videos for permitted clips, and History for dated sessions.</p>
+  </section>
+
   <div v-if="historyLoading" class="rounded-xl border border-sky-700/40 bg-slate-900 p-4 text-sm text-sky-200 no-print" role="status">
     Loading this player's authorized measurement history…
   </div>
@@ -101,11 +128,11 @@ export const PlayerProfile = {
     class="text-xs font-bold uppercase tracking-wider text-emerald-300 no-print">Live authorized measurement history · {{ getPlayerSessions(selectedPlayer.id).length }} sessions</p>
 
   <!-- Synthetic design fallback only when no authorized live measurements exist. -->
-  <demo-growth-lab v-if="demoMatch && !historyLoading && !historyError && getPlayerSessions(selectedPlayer.id).length===0"
+  <demo-growth-lab v-if="(section==='Growth' || section==='Stats') && demoMatch && !historyLoading && !historyError && getPlayerSessions(selectedPlayer.id).length===0"
     :player-name="selectedPlayer.preferred_name" :embedded="true"></demo-growth-lab>
 
   <!-- Interactive Chart (Hidden on Print) -->
-  <div v-if="(!demoMatch || getPlayerSessions(selectedPlayer.id).length>0) && !historyLoading && !historyError" class="bg-slate-800/50 border border-slate-700 rounded-xl p-5 no-print">
+  <div v-if="(section==='Growth' || section==='Stats') && (!demoMatch || getPlayerSessions(selectedPlayer.id).length>0) && !historyLoading && !historyError" class="bg-slate-800/50 border border-slate-700 rounded-xl p-5 no-print">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-slate-700/60 pb-3">
       <div>
         <h3 class="text-base font-bold text-white flex items-center gap-2">
@@ -117,20 +144,7 @@ export const PlayerProfile = {
         </p>
       </div>
 
-      <div class="flex items-center gap-2 bg-slate-900/80 p-1 rounded-lg border border-slate-700 self-start sm:self-auto">
-        <button 
-          @click="setChartMode('velocity')" 
-          :class="chartMode === 'velocity' ? 'bg-blue-600 text-white font-semibold shadow' : 'text-slate-400 hover:text-slate-200'"
-          class="px-2.5 py-1 rounded-md text-xs transition">
-          ⚡ {{ t('chartModeVelocity') }}
-        </button>
-        <button 
-          @click="setChartMode('growth')" 
-          :class="chartMode === 'growth' ? 'bg-purple-600 text-white font-semibold shadow' : 'text-slate-400 hover:text-slate-200'"
-          class="px-2.5 py-1 rounded-md text-xs transition">
-          📏 {{ t('chartModeGrowth') }}
-        </button>
-      </div>
+
     </div>
 
     <div class="flex items-center gap-4 text-xs font-medium mb-3">
@@ -166,10 +180,13 @@ export const PlayerProfile = {
     </div>
   </div>
 
-  <slot name="performance"></slot>
+  <div :class="section==='Stats' ? '' : 'hidden'" class="profile-print-section" aria-label="Profile performance actions">
+    <slot name="performance"></slot>
+  </div>
 
   <!-- SDL-005: A server-authorized private video room replaces legacy card URLs
        in staging. Keep the original video gallery as a fallback when no slot is supplied. -->
+  <section v-if="section==='Videos'" class="no-print" aria-label="Profile videos">
   <slot name="private-media">
   <!-- STAGE 1: Video Analysis & Drill Clips Gallery -->
   <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-5 no-print space-y-4">
@@ -242,21 +259,23 @@ export const PlayerProfile = {
     </div>
   </div>
   </slot>
+  </section>
 
   <!-- Dated Session History Details -->
-  <div class="space-y-3">
+  <div :class="section==='History' ? '' : 'hidden'" class="space-y-3 profile-print-section" aria-label="Profile session history">
     <div class="flex items-center justify-between">
       <h3 class="text-lg font-semibold flex items-center gap-2">
-        <span>{{ t('sessionHistory') }}</span>
+        <span>Official performance history</span>
         <span class="text-xs bg-slate-800 text-slate-400 border border-slate-700 px-2 py-0.5 rounded-full font-mono">
           {{ getPlayerSessions(selectedPlayer.id).length }}
         </span>
       </h3>
-      <span class="text-xs text-slate-500 font-normal no-print hidden sm:inline">All metrics synced to cloud</span>
+      <span class="text-xs text-slate-500 font-normal no-print hidden sm:inline">Current recorded results</span>
     </div>
 
+    <p class="text-xs text-slate-400 no-print">Superseded results remain in measurement and revision history under Stats.</p>
     <!-- Mobile Accordion Cards (< 768px screens) -->
-    <div class="block md:hidden space-y-2.5">
+    <div class="block md:hidden space-y-2.5 no-print">
       <div 
         v-for="session in getPlayerSessions(selectedPlayer.id)" 
         :key="'mob-' + session.id"
@@ -283,8 +302,8 @@ export const PlayerProfile = {
           <div class="flex items-center gap-2">
             <span 
               class="text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider"
-              :class="session.shoulder_check === 'Pass' ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-700/50' : 'bg-rose-950/60 text-rose-400 border border-rose-700/50'">
-              {{ session.shoulder_check === 'Pass' ? 'PASS' : 'WARN' }}
+              :class="session.shoulder_check == null || session.shoulder_check === '' ? 'text-slate-400' : session.shoulder_check === 'Pass' ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-700/50' : 'bg-rose-950/60 text-rose-400 border border-rose-700/50'">
+              {{ session.shoulder_check == null || session.shoulder_check === '' ? 'Not recorded' : session.shoulder_check === 'Pass' ? 'PASS' : 'WARN' }}
             </span>
 
             <span 
@@ -393,7 +412,7 @@ export const PlayerProfile = {
     </div>
 
     <!-- Desktop Multi-Column Session History Table (≥ 768px screens or printing) -->
-    <div class="hidden md:block bg-slate-800/40 border border-slate-700/80 rounded-xl overflow-x-auto print-card">
+    <div class="hidden md:block bg-slate-800/40 border border-slate-700/80 rounded-xl overflow-x-auto print-card profile-print-section">
       <table class="w-full text-left text-sm">
         <thead class="bg-slate-800/80 text-slate-300 text-xs uppercase tracking-wider">
           <tr>
@@ -435,8 +454,8 @@ export const PlayerProfile = {
             <td class="p-3 font-mono">{{ session.sprint_time ? session.sprint_time + 's' : '--' }}</td>
             <td class="p-3 font-mono">{{ session.grip_dom || '--' }} / {{ session.pinch || '--' }} kg</td>
             <td class="p-3">
-              <span :class="session.shoulder_check === 'Pass' ? 'text-emerald-400' : 'text-rose-400'">
-                {{ session.shoulder_check === 'Pass' ? t('pass') : t('adjust') }}
+              <span :class="session.shoulder_check == null || session.shoulder_check === '' ? 'text-slate-400' : session.shoulder_check === 'Pass' ? 'text-emerald-400' : 'text-rose-400'">
+                {{ session.shoulder_check == null || session.shoulder_check === '' ? 'Not recorded' : session.shoulder_check === 'Pass' ? t('pass') : t('adjust') }}
               </span>
             </td>
             <td class="p-3 text-right space-x-2 whitespace-nowrap no-print" v-if="isCoach">
