@@ -32,12 +32,13 @@ export function useMediaReviewInbox({auth,scope,activeTab,section,privateMedia,s
  }
  async function refreshInbox(append=false){
   if(!available.value||!inReview()||blocked||opening.value||privateMedia.mediaReviewing.value||(append&&!next.value))return;
-  const cursor=append?next.value:null,prior=append?rows.value:[],f={...filters.value};
+  const cursor=append?next.value:null,prior=append?rows.value:[],priorTotal=total.value,priorFiltered=filteredTotal.value,f={...filters.value};
   const request=op('inbox');if(!request)return;
   status.value='loading';rows.value=[];teams.value=[];players.value=[];total.value=null;filteredTotal.value=null;next.value=null;
   try{
    const response=await service.reviewInbox(request.scope,{...f,...(cursor?{cursor}:{})},{signal:request.signal});
    if(!request.current()){if(request.failed())status.value='unavailable';return;}
+   if(append&&(response.pendingTotal!==priorTotal||response.filteredTotal!==priorFiltered)){await refreshInbox(false);return;}
    const validated=uniqueReviewRows(response.items,request.scope,f);
    if(validated.length!==response.items.length)throw Error('Invalid review inbox rows.');
    rows.value=uniqueReviewRows([...prior,...validated],request.scope,f);
