@@ -2,12 +2,6 @@
 import { supabaseClient } from './config.js';
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const databaseUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-// PostgreSQL UUIDs include deterministic fixture IDs; request and record IDs retain stricter validation.
-function scopeIdentifier(value) {
-  if(typeof value!=='string'||!databaseUuid.test(value))throw new Error('Invalid performance record identifier.');
-  return value;
-}
 const units = { exit_velo:'km/h', throwing_velo:'km/h', sprint_time:'s', broad_jump:'cm' };
 const statuses = ['pending', 'approved', 'rejected', 'correction_requested'];
 
@@ -56,7 +50,7 @@ export function createPerformanceService({auth,client=supabaseClient}) {
   async function records(args, signal) {
     const rows = await rpc('sdl_004_pilot_performance', args, signal);
     if (!Array.isArray(rows) || rows.length > 100 || rows.some(row => !row ||
-      !uuid.test(row.id ?? '') || !databaseUuid.test(row.player_id ?? '') || !statuses.includes(row.status) ||
+      !uuid.test(row.id ?? '') || !uuid.test(row.player_id ?? '') || !statuses.includes(row.status) ||
       !Number.isSafeInteger(row.revision) || (args.p_player && row.player_id !== args.p_player) ||
       (args.p_status === 'pending' && row.status !== 'pending'))) {
       throw new Error('The performance response did not match the selected scope.');
@@ -89,10 +83,10 @@ export function createPerformanceService({auth,client=supabaseClient}) {
       }
       return data.protocols.map(({id,label,unit})=>({id,label,unit}));
     },
-    history:(player,signal)=>records({p_player:scopeIdentifier(player),p_status:'all'},signal),
-    queue:(team,signal)=>records({p_team:scopeIdentifier(team),p_status:'pending'},signal),
+    history:(player,signal)=>records({p_player:identifier(player),p_status:'all'},signal),
+    queue:(team,signal)=>records({p_team:identifier(team),p_status:'pending'},signal),
     submit:(player,measurement,official,key,signal)=>receipt('sdl_004_pilot_submit_performance',{
-      ...measurement,p_player:scopeIdentifier(player),p_official:official,p_key:identifier(key)
+      ...measurement,p_player:identifier(player),p_official:official,p_key:identifier(key)
     },signal,official ? 'approved' : 'pending'),
     correct:(prior,measurement,key,signal)=>receipt('sdl_v5_correct_official',{
       ...measurement,p_prior:identifier(prior),p_request:identifier(key)

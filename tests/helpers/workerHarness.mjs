@@ -15,13 +15,8 @@ export async function workerHarness(role = 'coach') {
     MEDIA_BUCKET: {
       async put(key, value) { if (h.failPut) throw Error('R2 failed'); h.writes++; h.objects.set(key, value); },
       async delete(key) { h.deletes++; h.objects.delete(key); },
-      async get(key, options) { const value = h.objects.get(key); if (!value) return null;
-        const requested = options?.range?.get('Range');
-        if (!requested) return {body:new Blob([value]).stream(),size:value.byteLength};
-        const [,start,end] = /^bytes=(\d+)-(\d*)$/.exec(requested);
-        const offset=Number(start), limit=end ? Math.min(Number(end)+1,value.byteLength) : value.byteLength;
-        if(offset>=limit) return null;
-        return {body:new Blob([value.slice(offset,limit)]).stream(),size:value.byteLength,range:{offset,length:limit-offset}}; }
+      async get(key) { const value = h.objects.get(key); if (!value) return null;
+        return { body: new Blob([value]).stream(), size: value.byteLength }; }
     }
   };
   const fetchMock = async (url, init = {}) => {
@@ -36,7 +31,7 @@ export async function workerHarness(role = 'coach') {
       if (rpc === 'sdl_004_media_can_access') return Response.json(body.p_player_id === PLAYER &&
         (h.role === 'coach' || (h.role === 'parent' && body.p_action === 'read')));
       if (rpc === 'sdl_004_session_active') return Response.json(!h.expired&&!h.revoked);
-      if (rpc === 'sdl_004_submission_contract') return Response.json({revision:h.revision??'sdl004-club-enrollment-v2',rbacVersion:5,mediaRevision:'v5.1-clean-start',enrollmentAdmin:h.adminContract!==false,clubhouseRoster:h.statisticsContract!==false,clubhouseLeaderboard:h.statisticsContract!==false,parentStatistics:h.statisticsContract!==false,statisticsConsent:h.statisticsContract!==false,pilotWorkflow:h.finalPilot?'sdl004-final-pilot-v1':null});
+      if (rpc === 'sdl_004_submission_contract') return Response.json({revision:h.revision??'sdl004-club-enrollment-v2',enrollmentAdmin:h.adminContract!==false,clubhouseRoster:h.statisticsContract!==false,clubhouseLeaderboard:h.statisticsContract!==false,parentStatistics:h.statisticsContract!==false,statisticsConsent:h.statisticsContract!==false,pilotWorkflow:h.finalPilot?'sdl004-final-pilot-v1':null});
       if(rpc.startsWith('sdl_004_pilot_')&&h.pilotRpc)return h.pilotRpc(rpc,body);
       if(['sdl_004_clubhouse_roster','sdl_004_clubhouse_leaderboard','sdl_004_player_statistics'].includes(rpc)){
         if(h.statisticsStatus)return new Response(null,{status:h.statisticsStatus});
@@ -59,7 +54,7 @@ export async function workerHarness(role = 'coach') {
       if(rpc==='sdl_004_publish_submission')return h.role==='coach'&&h.approved&&h.consent?Response.json(null):new Response(null,{status:403});
       if (rpc === 'sdl_004_submission_is_guardian') return Response.json(h.role === 'parent');
       if (rpc === 'sdl_004_review_submission') return h.role === 'coach'&&!h.selfReview ? Response.json(null) : new Response(null, { status: 403 });
-      if (rpc === 'sdl_004_submission_can_read' || rpc === 'sdl_v5_authorize_playback') return Response.json(h.role === 'parent' || h.role === 'coach' ||
+      if (rpc === 'sdl_004_submission_can_read') return Response.json(h.role === 'parent' || h.role === 'coach' ||
         (h.role === 'teammate' && h.approved && h.consent));
       if (rpc === 'sdl_004_clubhouse_videos') return Response.json(h.approved && h.consent && h.role === 'teammate' ? [{ id: VIDEO, player_id: PLAYER, category: 'pitching' }] : []);
       if (rpc === 'sdl_004_list_submissions') return Response.json(h.role === 'parent' || h.role === 'coach' ? h.records : []);

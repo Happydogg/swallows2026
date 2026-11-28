@@ -2,12 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {workerHarness,PLAYER,OTHER,VIDEO,ORIGIN,bytes} from './helpers/workerHarness.mjs';
 const upload=`/v2/submissions?player_id=${PLAYER}&category=pitching`;
-async function h(role='parent'){const h=await workerHarness(role);Object.assign(h.env,{SUBMISSIONS_ENABLED:'true',MEDIA_UPLOAD_ENABLED:'true',
- MEDIA_REVIEW_ENABLED:'true',MEDIA_PUBLICATION_ENABLED:'true'});return h;}
-test('complete package keeps v2 disabled by default and retires v1 private routes',async()=>{
+async function h(role='parent'){const h=await workerHarness(role);h.env.SUBMISSIONS_ENABLED='true';return h;}
+test('complete package keeps v2 disabled by default while preserving v1 private routes',async()=>{
  const x=await h();delete x.env.SUBMISSIONS_ENABLED;
  assert.equal((await x.packaged.fetch(x.request('/v2/capabilities'),x.env)).status,503);assert.equal(x.calls.length,0);
- x.seed();assert.equal((await x.packaged.fetch(x.request(`/v1/media/${VIDEO}`),x.env)).status,410);
+ x.seed();assert.equal((await x.packaged.fetch(x.request(`/v1/media/${VIDEO}`),x.env)).status,200);
 });
 test('complete package preflight admits idempotency headers and denies other origins',async()=>{
  const x=await h();const r=await x.packaged.fetch(x.request('/v2/submissions',{method:'OPTIONS',auth:false}),x.env);

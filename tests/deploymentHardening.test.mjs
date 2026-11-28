@@ -2,7 +2,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {disabledMediaBindings} from '../backend/worker/mediaGates.mjs';
 import {planPreflight,STAGING_PROJECT} from '../backend/release/run-staging-preflight.mjs';
 import {target,reviewedBaseline,preservedObservability,verifyPreservation,deploymentBaseline,verifyCurrentVersion} from '../backend/worker/deploymentPreservation.mjs';
 const plan=overrides=>planPreflight({confirmation:STAGING_PROJECT,manifest:{project_ref:STAGING_PROJECT,history:{exists:false,versions:[]}},
@@ -38,9 +37,9 @@ test('release fails closed without a reviewed current Worker settings baseline',
 test('existing observability is copied exactly, including disabled traces and sampling',()=>{
  for(const obs of [null,{enabled:false,traces:{enabled:false}},{enabled:true,logs:{enabled:true,headSamplingRate:0.2},traces:{enabled:false}}]){
   const b={...baseline(),observability:obs};assert.deepEqual(preservedObservability(b),obs);
-  verifyPreservation({...target,workersDev:true,previewUrls:false,compatibilityFlags:[],logpush:false,tailConsumers:[],env:{...b.env,SUBMISSIONS_ENABLED:{type:'json',value:'false'},...disabledMediaBindings},...(obs?{observability:obs}:{})},b);
+  verifyPreservation({...target,workersDev:true,previewUrls:false,compatibilityFlags:[],logpush:false,tailConsumers:[],env:{...b.env,SUBMISSIONS_ENABLED:{type:'json',value:'false'}},...(obs?{observability:obs}:{})},b);
  }
- const b=baseline();assert.throws(()=>verifyPreservation({...target,workersDev:true,previewUrls:false,compatibilityFlags:[],logpush:false,tailConsumers:[],env:{...b.env,SUBMISSIONS_ENABLED:{type:'json',value:'false'},...disabledMediaBindings},observability:{enabled:true,traces:{enabled:true}}},b),/Observability drift/);
+ const b=baseline();assert.throws(()=>verifyPreservation({...target,workersDev:true,previewUrls:false,compatibilityFlags:[],logpush:false,tailConsumers:[],env:{...b.env,SUBMISSIONS_ENABLED:{type:'json',value:'false'}},observability:{enabled:true,traces:{enabled:true}}},b),/Observability drift/);
 });
 test('binding drift, embedded secret values, wrong targets and enabled v2 block release',()=>{
  for(const mutate of [b=>{b.env.EXTRA={type:'secret'};},b=>{b.env.SUPABASE_SECRET_KEY.value='forbidden';},b=>{b.env.MEDIA_BUCKET.name='other';},
@@ -58,7 +57,7 @@ test('pinned Cloudflare uploader keeps existing secrets and local config adds no
 });
 
 test('preservation guard rejects enabled previews, managed routes, unknown settings and stale rollback receipts',()=>{
- const b=baseline(),config={...target,workersDev:true,previewUrls:false,compatibilityFlags:[],logpush:false,tailConsumers:[],env:{...b.env,SUBMISSIONS_ENABLED:{type:'json',value:'false'},...disabledMediaBindings},observability:b.observability};
+ const b=baseline(),config={...target,workersDev:true,previewUrls:false,compatibilityFlags:[],logpush:false,tailConsumers:[],env:{...b.env,SUBMISSIONS_ENABLED:{type:'json',value:'false'}},observability:b.observability};
  verifyPreservation(config,b);
  for(const change of [{previewUrls:true},{domains:[]},{triggers:[]},{routes:[]},{logpush:true},{tailConsumers:[{worker:'unexpected'}]},{compatibilityFlags:['nodejs_compat']}])assert.throws(()=>verifyPreservation({...config,...change},b));
  for(const change of [{workerSettings:{...b.workerSettings,previewUrls:true}},{routeHandling:'manage'},{unmanagedRoutesReviewed:false},{rollback:{...b.rollback,versionId:'other'}}])assert.throws(()=>reviewedBaseline({...b,...change}));

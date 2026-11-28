@@ -6,8 +6,8 @@
     "test": "node tests/run.mjs",
     "check:worker": "npm run build --prefix backend/worker && npm run check:package --prefix backend/worker",
     "build:staging": "node backend/release/build-staging-frontend.mjs",
-    "build:ux-preview": "node --test tests/uxPreview.test.mjs",
-    "build:ux-live": "node scripts/run-ux-ui-smoke.mjs && node --experimental-vm-modules --test tests/uxShell.test.mjs tests/authorizedStats.test.mjs tests/productionParity.test.mjs tests/avatarService.test.mjs tests/workerCorsAllowlist.test.mjs tests/coachRosterProfile.test.mjs tests/authLifecycle.test.mjs tests/parentDataScope.test.mjs tests/privateMedia.test.mjs tests/managedRoster.test.mjs tests/managedRosterAdmin.test.mjs tests/stagingFrontend.test.mjs tests/coachBatchUpload.test.mjs && node backend/release/build-staging-frontend.mjs"
+    "build:ux-live": "npm run test:videos && npm run build:staging",
+    "test:videos": "node tests/run-video-tests.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.16",

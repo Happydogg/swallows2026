@@ -111,7 +111,6 @@ export const ClubhouseMediaPanel={
     saveName.value='sdl-practice-video.'+(blob.type==='video/quicktime'?'mov':'mp4');
     saveUrl.value=URL.createObjectURL(blob);
     saveTimer=setTimeout(clearSave,60000);
-    life.notice.value='Authorized file ready. Tap Save video file to save it.';
    });
   }
   // Discard delivered bytes whenever the page is backgrounded. Re-authorize on return.
@@ -128,8 +127,7 @@ export const ClubhouseMediaPanel={
   <button v-if="selected" type="button" @click="refresh" :disabled="busy" class="sdl-secondary px-3 py-2 text-sm">Refresh Clubhouse</button>
   <p v-if="loaded && !items.length" class="text-sm text-slate-400">No shared videos for this team.</p>
   <div v-for="item in items" :key="item.id" class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-700 p-3"><div><p class="font-semibold">{{item.display_name}} · {{item.category}}</p><p class="text-xs text-slate-400">Published {{new Date(item.published_at).toLocaleString()}}</p></div><button type="button" @click="play(item)" :disabled="busy" class="sdl-primary px-4 py-2 text-sm">Play shared video</button><button v-if="item.can_download" type="button" @click="download(item)" :disabled="busy" class="sdl-secondary px-4 py-2 text-sm">Download video</button></div>
-  <div v-if="saveUrl" class="space-y-2 rounded-lg border border-cyan-700 p-3"><p class="text-sm">Authorized file ready. Save within 60 seconds; refreshing or leaving clears this link.</p><a :href="saveUrl" :download="saveName" class="inline-block sdl-primary px-4 py-3 text-sm">Save video file</a><button type="button" @click="clearSave" class="sdl-secondary px-3 py-2 text-sm">Close</button></div>
-  <p v-if="notice" role="status" class="text-sm text-emerald-200">{{notice}}</p>
+  <div v-if="saveUrl" class="space-y-2 rounded-lg border border-cyan-700 p-3"><p role="status" class="text-sm">Authorized file ready. Save within 60 seconds; refreshing or leaving clears this link.</p><a :href="saveUrl" :download="saveName" class="inline-flex min-h-11 items-center sdl-primary px-4 py-3 text-sm">Save video file</a><button type="button" @click="clearSave" class="sdl-secondary min-h-11 px-3 py-2 text-sm">Close</button></div>
   <div v-if="playback" class="space-y-2"><video :key="playback" :src="playback" controls controlslist="nodownload" disablepictureinpicture playsinline preload="metadata" class="w-full rounded-lg bg-black" @error="release"></video><button type="button" @click="release" class="sdl-secondary px-3 py-2 text-sm">Close video</button><p class="text-xs text-slate-400">Access is checked on each new request. Previously delivered bytes cannot be recalled.</p></div>
   <button v-if="next" type="button" @click="more" :disabled="busy" class="sdl-secondary px-3 py-2 text-sm">More videos</button>
   <p v-if="busy" role="status" class="text-sm text-slate-400">Loading Clubhouse…</p><p v-if="error" role="alert" class="text-sm text-rose-200">{{error}}</p>

@@ -1,6 +1,5 @@
 // Prepared staging target only. Never provision a bucket or deploy automatically.
 import { bindings, defineConfig } from 'cf/config';
-import {mediaGates} from './mediaGates.mjs';
 import {deploymentBaseline,preservedObservability} from './deploymentPreservation.mjs';
 const observability=preservedObservability(deploymentBaseline());
 export default defineConfig({
@@ -20,8 +19,7 @@ export default defineConfig({
       SUPABASE_URL: bindings.json('https://wvurolqbjhuckkkjiiiv.supabase.co'),
       SUPABASE_PUBLISHABLE_KEY: bindings.secret(),
       SUPABASE_SECRET_KEY: bindings.secret(),
-      SUBMISSIONS_ENABLED: bindings.json('false'),
-      ...Object.fromEntries(Object.values(mediaGates).map(name => [name, bindings.json('false')]))
+      SUBMISSIONS_ENABLED: bindings.json('false')
     },
     // Local build without a baseline is NOT release-ready. Never opt into tracing.
     ...(observability==null?{}:{observability})

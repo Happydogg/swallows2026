@@ -430,4 +430,14 @@ test('private media review only sends decision, note and explicit subject attest
  await assert.rejects(service.review(VIDEO,'rejected','',false),/Invalid independent review/);
 });
 
-test('inbox opens only exact freshly authorized pending media, even if outside recent gallery',async t=>{const pending={id:VIDEO,playerId:PLAYER,category:'pitching',status:'pending',can_review:true,createdAt:'2026-11-17'};let rows=[pending],plays=0;const {h,c}=await controllerHarness(t,{reviewInbox:async(_scope,filter)=>{assert.equal(filter.mediaId,VIDEO);assert.equal(filter.playerId,PLAYER);return {items:rows};},playback:async()=>{plays++;return new Blob(['synthetic'],{type:'video/mp4'});}});assert.equal(await c.openInboxReview({role:'coach'},pending),false);assert.equal(plays,0);h.setFixtureRoles(['coach']);assert.equal(await c.openInboxReview({role:'coach'},pending),true);assert.equal(plays,1);assert.equal(c.reviewItem.value.id,VIDEO);assert.equal(c.mediaUploadAllowed.value,false);rows=[{...pending,playerId:OTHER}];assert.equal(await c.openInboxReview({role:'coach'},pending),false);assert.equal(plays,1);assert.equal(c.mediaPlaybackUrl.value,'');});
+test('Back to gallery revokes playback while retaining the authorized player and clips', async t => {
+  const { c, revoked } = await controllerHarness(t);
+  await c.selectMediaPlayer(PLAYER);
+  await c.playPrivateMedia(c.mediaItems.value[0]);
+  assert.equal(c.mediaPlaybackUrl.value, 'blob:private-test');
+  c.closePrivatePlayback();
+  assert.deepEqual(revoked, ['blob:private-test']);
+  assert.equal(c.mediaPlaybackUrl.value, '');
+  assert.equal(c.mediaPlayerId.value, PLAYER);
+  assert.equal(c.mediaItems.value[0].id, VIDEO);
+});

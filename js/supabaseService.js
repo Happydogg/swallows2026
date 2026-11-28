@@ -39,14 +39,16 @@ export function verifiedGuardianAthleteIds(guardianLinks = []) {
     .map(link => link.athlete_id))];
 }
 
-export async function fetchVerifiedGuardianPlayers(guardianLinks = []) {
+export async function fetchVerifiedGuardianPlayers(guardianLinks = [], {signal} = {}) {
   const athleteIds = verifiedGuardianAthleteIds(guardianLinks);
   if (!athleteIds.length) return [];
-  const { data, error } = await supabaseClient
+  let request = supabaseClient
     .from('players')
     .select(GUARDIAN_PLAYER_COLUMNS)
     .in('athlete_id', athleteIds)
     .order('jersey', { ascending: true });
+  if (signal && typeof request.abortSignal === 'function') request = request.abortSignal(signal);
+  const {data,error} = await request;
   if (error) throw error;
   const allowed = new Set(athleteIds);
   // Explicit projection: discard any unexpected fields a misconfigured response may contain.

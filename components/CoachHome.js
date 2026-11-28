@@ -1,8 +1,6 @@
 // SDL-UX-002: Coach-first, read-only summary of a server-scoped roster.
 // This dashboard does not invent team averages from roster rows.
-import { PlayerHeroCard } from './PlayerHeroCard.js';
 export const CoachHome = {
-  components:{PlayerHeroCard},
   name: 'CoachHome',
   props: {
     roster: { type: Array, required: true },
@@ -16,7 +14,7 @@ export const CoachHome = {
     const preview = Vue.computed(() => props.roster.slice(0, 3)); // Home preview only; Team owns the complete roster.
     const avatarFor = player => {
       const approved=String(player?.photo_url||'');
-      if (/^https:\/\//.test(approved) || (/^\/assets\/demo-players\/(2[1-9]|3[0-5])\.(svg|jpg)$/.test(approved) || /^\/assets\/demo-players\/(00|07|10|12|6[0-5]|99)\.jpg$/.test(approved))) return approved;
+      if (/^https:\/\//.test(approved) || /^\/assets\/demo-players\/(2[1-9]|3[0-5])\.svg$/.test(approved)) return approved;
       const jersey=String(player?.jersey||'');
       return /^DEMO\s/.test(String(player?.preferred_name||'')) && /^(2[1-9]|3[0-5])$/.test(jersey)
         ? '/assets/demo-players/'+jersey+'.svg' : '';
@@ -48,9 +46,26 @@ export const CoachHome = {
         </div>
         <p v-if="loading" class="text-sm text-slate-400" role="status">Loading authorized players…</p>
         <p v-else-if="!roster.length" class="rounded-xl border border-dashed border-slate-700 p-5 text-sm text-slate-400">No players are available in your verified team roster yet.</p>
-        <div v-else class="grid gap-3">
-<player-hero-card v-for="player in preview" :key="player.team_id+':'+player.id" :player="{...player,photo_url:avatarFor(player)}" variant="compact"><template #actions><div class="grid grid-cols-2 gap-2"><button type="button" @click="$emit('open-profile',player)" class="sdl-primary min-h-11 px-3 py-2 text-sm font-semibold">View profile</button><button type="button" @click="$emit('open-video',player)" class="sdl-secondary min-h-11 px-3 py-2 text-sm font-semibold">Videos</button></div></template></player-hero-card>
-</div>
+        <ul v-else class="divide-y divide-slate-800">
+          <li v-for="player in preview" :key="player.team_id + ':' + player.id" class="flex items-center gap-3 py-3">
+            <button type="button" @click="$emit('open-profile',player)"
+              :aria-label="'Open '+player.preferred_name+' player profile'"
+              class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-blue-950 text-sm font-black text-blue-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">
+              <img v-if="avatarFor(player)" :src="avatarFor(player)" alt="" class="h-full w-full object-cover"/>
+              <span v-else>#{{ player.jersey || '–' }}</span>
+            </button>
+            <div class="min-w-0 flex-1">
+              <button type="button" @click="$emit('open-profile',player)" class="block max-w-full truncate text-left text-sm font-semibold text-cyan-100 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">{{ player.preferred_name }}</button>
+              <p class="truncate text-xs text-slate-400">{{ player.team_name || 'Assigned team' }} · {{ player.position || 'Position pending' }}</p>
+            </div>
+            <div class="flex shrink-0 flex-col items-end gap-2">
+              <span class="text-xs text-slate-400">B {{ player.bats || '–' }} / T {{ player.throws || '–' }}</span>
+              <button type="button" @click="$emit('open-video',player)"
+                :aria-label="'Open private videos for '+(player.preferred_name || 'this player')"
+                class="sdl-secondary px-3 py-2 text-sm font-semibold">▶ Videos</button>
+            </div>
+          </li>
+        </ul>
       </div>
       <div class="sdl-panel space-y-3 p-4 lg:col-span-2">
         <h2 class="sdl-section-title">Quick access</h2>

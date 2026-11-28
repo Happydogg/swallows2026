@@ -2,8 +2,10 @@
 // The database RPC enforces identity, team and organization membership.
 import { supabaseClient } from './config.js';
 
-export async function fetchCoachRoster() {
-  const { data, error } = await supabaseClient.rpc('sdl_004_coach_roster');
+export async function fetchCoachRoster({signal} = {}) {
+  let request = supabaseClient.rpc('sdl_004_coach_roster');
+  if (signal && typeof request.abortSignal === 'function') request = request.abortSignal(signal);
+  const {data,error} = await request;
   if (error) throw error;
   // Only the explicitly allowlisted fields are returned by the server.
   return data || [];

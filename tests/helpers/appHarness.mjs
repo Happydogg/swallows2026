@@ -106,9 +106,9 @@ export async function harness(t, initialUser = null, options = {}) {
   };
   class BrowserURL extends URL{}
   BrowserURL.createObjectURL=()=> 'blob:synthetic';BrowserURL.revokeObjectURL=url=>h.revoked.push(url);
-  const context = vm.createContext({ Vue, AbortController, DOMException, Blob, crypto:webcrypto, window: {
+  const context = vm.createContext({ Vue, AbortController, DOMException, Blob, URLSearchParams, crypto:webcrypto, window: {
     supabase: { createClient: () => db },
-    location:{href:'https://synthetic.invalid/',pathname:'/',search:'',hash:options.invitationHash??''},
+    location:{href:'https://synthetic.invalid/',get origin(){return options.originRef?.value ?? options.origin;},pathname:'/',search:'',hash:options.invitationHash??''},
     history:{replaceState(_a,_b,url){h.replacedUrl=url;}},
     initMediaPipe: async () => {
       h.poseCalls++;
@@ -120,7 +120,7 @@ export async function harness(t, initialUser = null, options = {}) {
   URL: BrowserURL,
   console: { error() {}, warn() {}, log() {} },
   setTimeout, clearTimeout, setInterval, clearInterval, performance, requestAnimationFrame: fn => h.frames.push(fn), cancelAnimationFrame: id => { h.cancelledFrame = id; },
-  alert() {}, fetch(...args) {
+  alert() {}, ...(options.confirm?{confirm:options.confirm}:{}), fetch(...args) {
     if (h.fetchImpl) return h.fetchImpl(...args);
     assert.fail('Network access forbidden in lifecycle tests');
   } });

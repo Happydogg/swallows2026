@@ -1,3 +1,7 @@
+import {VideoLibrary} from '../components/VideoLibrary.js';
+import {CoachBatchUpload} from '../components/CoachBatchUpload.js';
+import {fictionalVideoPortrait} from './fictionalVideoPortrait.js';
+import {useVideoDestinations} from '../composables/useVideoDestinations.js';
 import { PerformanceWorkspace } from '../components/PerformanceWorkspace.js';
 import {createPilotWorkflowService} from './pilotWorkflowService.js';
 import {usePilotWorkspace} from '../composables/usePilotWorkspace.js';
@@ -24,9 +28,11 @@ import { ClubEnrollmentAdmin } from '../components/ClubEnrollmentAdmin.js';
 import { useSubmissionWorkspace } from '../composables/useSubmissionWorkspace.js';
 import { SubmissionWorkspace } from '../components/SubmissionWorkspace.js';
 import { usePrivateMedia } from '../composables/usePrivateMedia.js';
+import {useMediaReviewInbox} from '../composables/useMediaReviewInbox.js';
+import {resolveReviewScope} from './mediaReviewModel.js';
+import {ActionCenter} from '../components/ActionCenter.js';
+import {VideoReviewInbox} from '../components/VideoReviewInbox.js';
 import { PrivateMediaPanel } from '../components/PrivateMediaPanel.js';
-import { VideoReviewInbox } from '../components/VideoReviewInbox.js';
-import { CoachBatchUpload } from '../components/CoachBatchUpload.js';
 import { MediaConsentPanel } from '../components/MediaConsentPanel.js';
 import { MediaPublicationPanel, ClubhouseMediaPanel } from '../components/MediaSharingPanels.js';
 import { useVideos } from '../composables/useVideos.js';
@@ -42,7 +48,7 @@ import { useAuthorizedStatsBoard } from '../composables/useAuthorizedStatsBoard.
 import { StagingDataBrowser } from '../components/StagingDataBrowser.js';
 import { AvatarManager } from '../components/AvatarManager.js';
 import { useAvatarManager } from '../composables/useAvatarManager.js';
-import { publicAvatarOrFallback, fictionalPortraitFor } from './avatarService.js';
+import { publicAvatarOrFallback } from './avatarService.js';
 import { InviteOnboarding } from '../components/InviteOnboarding.js';
 import { AppHeader } from '../components/AppHeader.js';
 import { TeamOverview } from '../components/TeamOverview.js';
@@ -57,8 +63,8 @@ const { createApp, ref, onMounted, onUnmounted, markRaw, computed } = Vue;
 
 createApp({
   components: {
-    PilotWorkspace, PerformanceInbox, LoginLanding, AppShell, CoachHome, ParentHome, StatsHub, AuthorizedStatsBoard, StagingDataBrowser, AvatarManager, InviteOnboarding, AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, VideoReviewInbox, CoachBatchUpload, MediaConsentPanel, MediaPublicationPanel, ClubhouseMediaPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
-    SessionFormModal, UploadVideoModal, ArAnalyzerModal, ManagedRoster, PerformanceWorkspace
+    PilotWorkspace, PerformanceInbox, LoginLanding, AppShell, CoachHome, ParentHome, StatsHub, AuthorizedStatsBoard, StagingDataBrowser, AvatarManager, InviteOnboarding, AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, MediaConsentPanel, MediaPublicationPanel, ClubhouseMediaPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
+    SessionFormModal, UploadVideoModal, ArAnalyzerModal, ManagedRoster, PerformanceWorkspace, ActionCenter, VideoReviewInbox, VideoLibrary, CoachBatchUpload
   },
   setup() {
     const savedLang = localStorage.getItem('swallows_lang');
@@ -70,7 +76,7 @@ createApp({
     const currentView = ref('overview');
     const overviewTab = ref('roster');
     const activeTab = ref('home');
-    const videoPage=ref('landing'),batchPage=ref(null);
+    const publicationPanel = ref(null);
     const requestedWorkspace = ref('auto');
     const searchQuery = ref('');
     const selectedPlayer = ref(null);
@@ -112,7 +118,6 @@ createApp({
       if (!player) return '';
       return avatarManager.photos.value[player.id] || publicAvatarOrFallback(player.photo_url,player);
     };
-    const managedPortraitFor = player => workspaceMode.value === 'admin' ? avatarForPlayer(player) : fictionalPortraitFor(player);
     const coachRosterDisplay = computed(() => coachRoster.value.map(row => ({
       ...row, photo_url: avatarForPlayer(row)
     })));
@@ -141,14 +146,6 @@ createApp({
     const coachTeamCount = computed(() => coachTeams.value.filter(row => !coachTeamId.value || row.id === coachTeamId.value).length);
     const ordinaryOrganizations = computed(() => (auth.accountContext.value?.organizations || []).filter(row => row.roles.some(role => role!=='platform_admin')));
     const ordinaryTeams = computed(() => (auth.accountContext.value?.teams || []).filter(row => row.roles.some(role => role!=='platform_admin')));
-    const clubhouseMediaTeams = computed(() => {
-      if(auth.authError.value || !auth.authUser.value)return [];
-      const role={coach:'coach',admin:'club_admin',manager:'manager',family:'guardian'}[workspaceMode.value];
-      if(!role)return [];
-      return ordinaryTeams.value.filter(row=>row.roles.includes(role) &&
-        (workspaceMode.value==='coach'?(!coachOrganizationId.value||row.organization_id===coachOrganizationId.value)&&(!coachTeamId.value||row.id===coachTeamId.value):
-        isManagedWorkspace.value?(!managedRoster.organizationId.value||row.organization_id===managedRoster.organizationId.value)&&(!managedRoster.teamId.value||row.id===managedRoster.teamId.value):true));
-    });
     const familyPlayers = computed(() => {
       if (!auth.isVerifiedGuardian.value || auth.authError.value) return [];
       const authorized = new Set(auth.guardianLinks.value.filter(link => link.status === 'verified').map(link => link.athlete_id));
@@ -178,7 +175,7 @@ createApp({
         'http://127.0.0.1:5500','http://localhost:5500'].includes(window.location.origin)
     );
     const changeWorkspace = async requested => {
-      if (!workspaceOptions.value.some(option => option.id === requested) || requested === workspaceMode.value) return;
+      if (!workspaceOptions.value.some(option => option.id === requested) || requested === workspaceMode.value || !canLeaveBatch()) return;
       clearWorkspaceState();
       requestedWorkspace.value = requested;
       activeTab.value = 'home';
@@ -216,13 +213,77 @@ createApp({
       getPlayerDisplayName: playerFeature.getPlayerDisplayName
     });
     const arAnalyzer = createArAnalyzerController({ selectedPlayer });
-    const videoRosterDisplay=computed(()=>videoPage.value==='mine'?familyPlayers.value:workspaceMode.value==='coach'?coachRosterDisplay.value:isManagedWorkspace.value?managedRoster.rows.value.map(p=>({...p,photo_url:managedPortraitFor(p)})):familyPlayers.value);
+    const homeReviewScope=computed(()=>resolveReviewScope({
+      context:auth.accountContext.value,userId:auth.authUser.value?.id,ready:auth.authReady.value,
+      denied:!!auth.authError.value||(workspaceMode.value==='admin'&&managedRoster.denied.value),
+      origin:mediaOriginAllowed.value,mode:workspaceMode.value,
+      organizationId:workspaceMode.value==='coach'?coachOrganizationId.value:managedRoster.organizationId.value,
+      teamId:workspaceMode.value==='coach'?coachTeamId.value:managedRoster.teamId.value
+    }));
+    const batchPage=ref(null);
+    const batchAllowed=computed(()=>mediaOriginAllowed.value&&auth.authReady.value&&!auth.authError.value&&
+      workspaceMode.value==='coach'&&auth.isTeamCoach.value&&
+      auth.accountContext.value?.user_id===auth.authUser.value?.id&&coachTeams.value.length>0);
+    const videos = useVideoDestinations({auth,origin:mediaOriginAllowed,activeTab,workspaceMode,homeReviewScope,batchAllowed});
+    const videoCards=[
+      {id:'staff',label:'videoStaff',description:'Browse authorized player videos',icon:'▣'},
+      {id:'mine',label:'videoMine',description:'Your linked children’s video library',icon:'▶'},
+      {id:'shared',label:'videoTeam',description:'Approved shared videos',icon:'▤'},
+      {id:'review',label:'videoReview',description:'Review authorized private submissions',icon:'✓'},
+      {id:'batch',label:'videoBatchUpload',description:'Upload multiple practice videos',icon:'↑'}
+    ];
+    const videoDestinations=computed(()=>videoCards.filter(card=>
+      card.id==='batch'?batchAllowed.value:videos.primaryDestinations.value.includes(card.id)));
+    const videoRoster=computed(()=>(videos.section.value==='mine'?videos.guardianRows.value:videos.staffRows.value)
+      .map(player=>({...player,photo_url:fictionalVideoPortrait(player,publicAvatarOrFallback(player.photo_url,player))})));
+    const videoSection=videos.section;
+    const reviewScope=computed(()=>activeTab.value==='videos'?videos.reviewScope.value:homeReviewScope.value);
+    const isVideoLibrary=computed(()=>videoSection.value==='mine'||videoSection.value==='staff'&&videos.teamView.value==='library');
+    const clubhouseMediaTeams=computed(()=>videoSection.value==='shared'?videos.guardianTeams.value:
+      videoSection.value==='staff'&&videos.teamView.value==='shared'?videos.staffTeams.value:[]);
+    const clubhouseScopeKey=computed(()=>videos.revision.value+':'+videos.scopeSignature.value);
+    const videoModeration=computed(()=>videoSection.value==='staff'&&['coach','club_admin'].includes(videos.staffScope.value?.role));
     const privateMedia = usePrivateMedia({
-      auth, analyzer: arAnalyzer,
-      players: computed(() => workspaceMode.value === 'family' || (activeTab.value==='videos' && videoPage.value==='mine' && workspaceMode.value==='coach') ? familyPlayers.value : []),
-      coachRoster: computed(() => workspaceMode.value === 'coach' && !(activeTab.value==='videos' && videoPage.value==='mine') ? coachRoster.value : []),
-      managedPlayers: computed(() => isManagedWorkspace.value ? managedRoster.rows.value : [])
+      auth, analyzer: arAnalyzer, getReviewScope:()=>activeTab.value==='videos'&&videoSection.value==='review'?reviewScope.value:null,
+      players: computed(() => activeTab.value==='videos'
+        ? (videoSection.value==='mine'?videos.guardianRows.value:[])
+        : (workspaceMode.value==='family'?familyPlayers.value:[])),
+      coachRoster: computed(() => activeTab.value==='videos'
+        ? (videoSection.value==='staff'&&videos.staffScope.value?.role==='coach'?videos.staffRows.value:[])
+        : (workspaceMode.value==='coach'?coachRoster.value:[])),
+      managedPlayers: computed(() => activeTab.value==='videos'
+        ? (videoSection.value==='staff'&&videos.staffScope.value?.role!=='coach'?videos.staffRows.value:[])
+        : (isManagedWorkspace.value?managedRoster.rows.value:[]))
     });
+    Vue.watch([videos.scopeSignature,videos.revision],()=>privateMedia.resetMedia(),{flush:'sync'});
+    Vue.watch(privateMedia.mediaPlayers,list=>{
+      const selected=privateMedia.mediaPlayerId.value;
+      if(activeTab.value==='videos'&&isVideoLibrary.value&&selected&&!list.some(player=>player.id===selected))
+        privateMedia.resetMedia();
+    },{flush:'sync'});
+    const reviewQueue=useMediaReviewInbox({auth,scope:reviewScope,activeTab,section:videoSection,privateMedia});
+    const videoSectionBusy = computed(() => privateMedia.mediaUploading.value || privateMedia.mediaReviewing.value || privateMedia.mediaArchiving.value || publicationPanel.value?.busy===true);
+    const actionCenterStatus=computed(()=>reviewScope.value?(reviewQueue.summaryStatus.value==='idle'?'loading':reviewQueue.summaryStatus.value):'ready');
+    const actionCenterItems=computed(()=>reviewScope.value?(reviewQueue.summaryStatus.value==='ready'?reviewQueue.summaryItems.value:[{kind:'video_review',available:true,count:null,required:false}]):workspaceMode.value==='family'&&auth.isVerifiedGuardian.value&&mediaOriginAllowed.value?[{kind:'media_consent',available:true,required:false,description:'Optional team video sharing preferences'}]:[]);
+    const canLeaveBatch=()=>activeTab.value!=='videos'||videoSection.value!=='batch'||
+      !batchPage.value?.hasPending?.()||window.confirm('Leave Batch Upload? Unconfirmed requests may already have reached the server. The local queue will be cleared.');
+    const openActionCenter=target=>{
+      if(target?.kind==='video_review'&&homeReviewScope.value&&!videoSectionBusy.value){
+        const mode=homeReviewScope.value.role==='coach'?'coach':'admin';
+        if(navigateTab('videos')===false)return;
+        videos.selectReview(mode,true);changeVideoSection('review');
+      }
+      else if(target?.kind==='media_consent'&&workspaceMode.value==='family'&&auth.isVerifiedGuardian.value&&mediaOriginAllowed.value)navigateTab('me');
+    };
+    const canChangeVideoScope=()=>activeTab.value==='videos'&&mediaOriginAllowed.value&&!auth.authError.value&&!videoSectionBusy.value;
+    const changeVideoSection=section=>canChangeVideoScope()&&(section===videoSection.value||canLeaveBatch())&&videos.select(section);
+    const changeVideoStaff=key=>canChangeVideoScope()&&videoSection.value==='staff'&&videos.selectStaff(key);
+    const changeVideoReview=mode=>canChangeVideoScope()&&videoSection.value==='review'&&videos.selectReview(mode);
+    const changeVideoTeamView=view=>{
+      if(!canChangeVideoScope()||videoSection.value!=='staff'||!['library','shared'].includes(view)||
+         (view==='shared'&&!videos.staffTeams.value.length))return false;
+      videos.teamView.value=view;return true;
+    };
     const submissionWorkspace = useSubmissionWorkspace({
       auth,
       players,
@@ -407,16 +468,23 @@ createApp({
       }
       if (activeTab.value==='stats' && statsBoard.selectedId.value===id) void statsBoard.select(id);
     };
-    const openAuthorizedPlayerVideos = player => {
+    const openAuthorizedPlayerVideos = async player => {
       if (!auth.authUser.value || auth.authError.value || !player?.id) return;
       const currentlyScoped = visibleStagingPlayers.value.some(row =>
         row.id === player.id && (workspaceMode.value !== 'coach' || row.team_id === player.team_id));
       if (!currentlyScoped) return;
+      const identity=auth.captureIdentity(),mode=workspaceMode.value;
       if(navigateTab('videos')===false)return;
-      openVideoPage(workspaceMode.value==='family'?'mine':'team');
-      if (mediaOriginAllowed.value && privateMedia.mediaPlayers.value.some(row => row.id === player.id)) {
-        void privateMedia.selectMediaPlayer(player.id);
+      if(!changeVideoSection(mode==='family'?'mine':'staff'))return;
+      if(mode==='coach'){
+        const scope=videos.staffScopes.value.find(entry=>entry.role==='coach'&&entry.teamId===player.team_id);
+        if(!scope||!changeVideoStaff(scope.key))return;
       }
+      const signature=videos.scopeSignature.value;
+      await Vue.nextTick();
+      await videos.load();
+      if(auth.isCurrentIdentity(identity)&&signature===videos.scopeSignature.value&&
+         privateMedia.mediaPlayers.value.some(row=>row.id===player.id))void privateMedia.selectMediaPlayer(player.id);
     };
     const selectCoachRosterPlayer = player => {
       if (!auth.isTeamCoach.value || workspaceMode.value !== 'coach' || auth.authError.value) return;
@@ -451,7 +519,7 @@ createApp({
       if (!managed) return;
       clearProfileHistory();
       drillVideos.value=[];
-      playerFeature.selectPlayer({...managed,photo_url:managedPortraitFor(managed)});
+      playerFeature.selectPlayer({...managed,photo_url:workspaceMode.value==='admin'?avatarForPlayer(managed):''});
       if (mediaOriginAllowed.value) void privateMedia.selectMediaPlayer(managed.id);
       activeTab.value='team';
     };
@@ -474,7 +542,8 @@ createApp({
     };
     const clearWorkspaceState = ({keepManagedScope=false,keepCoachScope=false}={}) => {
       workspaceRevision++;
-      videoPage.value='landing';
+      videos.reset();
+      reviewQueue.reset();
       if (keepManagedScope) managedRoster.clear(); else managedRoster.reset();
       if (!keepCoachScope) { coachOrganizationId.value=''; coachTeamId.value=''; }
       players.value = [];
@@ -511,33 +580,10 @@ createApp({
       videoFeature.newDrillVideo.value = { ...emptyVideoForm };
       for (const id of Object.keys(playerFeature.failedImgs)) delete playerFeature.failedImgs[id];
     };
-    const videoDestinations=computed(()=>{
-      if(auth.authError.value||!auth.authUser.value||!mediaOriginAllowed.value)return [];
-      const coachMode=workspaceMode.value==='coach'&&auth.isTeamCoach.value;
-      const adminMode=workspaceMode.value==='admin'&&auth.isOrgAdmin.value;
-      const managerMode=workspaceMode.value==='manager'&&auth.isTeamManager.value;
-      const guardian=auth.isVerifiedGuardian.value&&['coach','family'].includes(workspaceMode.value);
-      return [
-        ...((coachMode||adminMode||managerMode)?[{id:'team',label:'My Team Videos',description:'Browse authorized player videos',icon:'▣'}]:[]),
-        ...(guardian?[{id:'mine',label:'My Videos',description:'Your linked children’s video library',icon:'▶'}]:[]),
-        ...(guardian&&!coachMode?[{id:'shared',label:'Team Videos',description:'Approved shared videos',icon:'▤'}]:[]),
-        ...((coachMode||adminMode)?[{id:'review',label:'Review Videos',description:'Review authorized private submissions',icon:'✓'}]:[]),
-        ...(coachMode?[{id:'batch',label:'Batch Upload',description:'Upload multiple practice videos',icon:'↑'}]:[])
-      ];
-    });
-    const videoReviewScope=computed(()=>workspaceMode.value==='coach'&&auth.isTeamCoach.value?{role:'coach',organizationId:coachOrganizationId.value,scopeTeamId:coachTeamId.value}:workspaceMode.value==='admin'&&auth.isOrgAdmin.value?{role:'club_admin',organizationId:managedRoster.organizationId.value,scopeTeamId:managedRoster.teamId.value}:null);
-    const canLeaveBatch=()=>videoPage.value!=='batch'||!batchPage.value?.hasPending?.()||window.confirm('Leave Batch Upload? Unconfirmed requests may already have reached the server. The local queue will be cleared.');
-    const openVideoPage=id=>{
-      if(id!=='landing'&&!videoDestinations.value.some(d=>d.id===id))return;
-      if(!canLeaveBatch())return;
-      privateMedia.resetMedia();videoPage.value=id;
-      if(id==='review')submissionWorkspace.changeTab('review');
-      else if(id==='mine')submissionWorkspace.changeTab('submissions');
-    };
     const navigateTab = tab => {
-      if (!['home', 'team', 'stats', 'videos', 'me'].includes(tab)||!canLeaveBatch()) return false;
-      if(activeTab.value==='videos')privateMedia.resetMedia();
-      videoPage.value='landing';
+      if (!['home', 'team', 'stats', 'videos', 'me'].includes(tab) || !canLeaveBatch()) return false;
+      if(privateMedia.inboxReviewMode.value&&privateMedia.mediaReviewing.value)return false;
+      if(privateMedia.inboxReviewMode.value)privateMedia.resetMedia();
       clearProfileHistory();
       activeTab.value = tab;
       currentView.value = 'overview';
@@ -546,7 +592,10 @@ createApp({
         submissionWorkspace.changeTab(workspaceMode.value === 'coach' ? 'review' : 'players');
         overviewTab.value = 'leaderboard';
       }
-      if (tab === 'videos') submissionWorkspace.changeTab('submissions');
+      if (tab === 'videos') {
+        videos.reset();
+        submissionWorkspace.changeTab('submissions');
+      }
       if (tab === 'team' && workspaceMode.value === 'coach') overviewTab.value = 'roster';
     };
     Vue.watch(currentView, view => { if (view === 'player') activeTab.value = 'team'; });
@@ -560,10 +609,10 @@ createApp({
     const signInAndLoad = () => auth.signIn();
     const signOutAndClear = () => {initialInvitation='';return auth.signOut();};
     onMounted(() => auth.initializeAuth());
-    onUnmounted(() => { auth.disposeAuth(); submissionWorkspace.dispose(); enrollmentAdmin.dispose();pilotWorkspace.dispose(); });
+    onUnmounted(() => { videos.reset();reviewQueue.reset();privateMedia.resetMedia();auth.disposeAuth(); submissionWorkspace.dispose(); enrollmentAdmin.dispose();pilotWorkspace.dispose(); });
 
     return {
-      currentLang, t, saveLanguage, loading, isSaving, currentView, overviewTab, activeTab, workspaceMode, familyPlayers, visibleStagingPlayers, coachRosterDisplay, mediaOriginAllowed, videoPage, videoDestinations, openVideoPage, batchPage, videoRosterDisplay, videoReviewScope, statsFamilyCards: submissionWorkspace.cards, navigateTab, changeWorkspace, pendingInvitation, dismissInvitePrompt, searchQuery,
+      currentLang, t, saveLanguage, loading, isSaving, currentView, overviewTab, activeTab, workspaceMode, familyPlayers, visibleStagingPlayers, coachRosterDisplay, mediaOriginAllowed, statsFamilyCards: submissionWorkspace.cards, navigateTab, changeWorkspace, pendingInvitation, dismissInvitePrompt, searchQuery,
       selectedPlayer, players, sessions, profileHistoryLoading, profileHistoryError, drillVideos, coachRoster, coachRosterLoading, coachRosterError, selectCoachRosterPlayer, openAuthorizedPlayerVideos, openFamilyPlayerProfile, openManagedPlayerProfile, leavePlayerProfile, canEditPlayerPhoto: avatarManager.canEdit, avatarManager,
       formatImgUrl, triggerPrintReport,
       ...auth, signInAndLoad, signOutAndClear,
@@ -579,13 +628,15 @@ createApp({
        pilotController:markRaw(pilotWorkspace),
       submissionController: markRaw(submissionWorkspace),
       enrollmentAdminController: markRaw(enrollmentAdmin),
-      privateMediaController: markRaw(privateMedia),
+      privateMediaController: markRaw(privateMedia), videoSection, videoSectionBusy, changeVideoSection, publicationPanel, isVideoLibrary, videoModeration,
+      videos:markRaw(videos),videoDestinations,videoRoster,batchPage,batchAllowed,changeVideoStaff,changeVideoReview,changeVideoTeamView,
+      reviewScope,reviewQueue:markRaw(reviewQueue),actionCenterItems,actionCenterStatus,openActionCenter,
       statsBoardController: markRaw(statsBoard), performancePlayers, performanceReviewTeams, refreshPerformanceHistory,
        avatarController: markRaw(avatarManager),
-      managedRosterController: markRaw(managedRoster), managedPortraitFor, workspaceOptions, isManagedWorkspace,
+      managedRosterController: markRaw(managedRoster), workspaceOptions, isManagedWorkspace,
       changeManagedOrganization, changeManagedTeam, retryManagedRoster, loadMoreManagedRoster,
       coachOrganizations, coachTeams, coachOrganizationId, coachTeamId, coachTeamCount,
-      changeCoachOrganization, changeCoachTeam, ordinaryOrganizations, ordinaryTeams, clubhouseMediaTeams,
+      changeCoachOrganization, changeCoachTeam, ordinaryOrganizations, ordinaryTeams, clubhouseMediaTeams, clubhouseScopeKey,
       analyzerController: markRaw(arAnalyzer)
     };
   }
