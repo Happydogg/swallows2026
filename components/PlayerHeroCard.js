@@ -47,7 +47,7 @@ export const PlayerHeroCard = {
     };
   },
   template: `
-<article class="overflow-hidden rounded-2xl border border-sky-500/30 bg-slate-950 shadow-lg" aria-label="Athlete hero card">
+<article class="sdl-panel overflow-hidden rounded-2xl border border-sky-500/30 bg-slate-950 shadow-lg" :class="variant==='profile'?'print-card':''" aria-label="Athlete hero card">
   <div class="relative isolate overflow-hidden bg-gradient-to-br from-blue-950 via-slate-900 to-slate-950" :class="variant==='compact'?'min-h-[190px] sm:min-h-[220px]':'min-h-[240px] sm:min-h-[280px] lg:min-h-[320px]'">
     <img v-if="player.photo_url && !player.photo_url.startsWith('sdl-private-avatar:') && !photoFailed && !failedImgs[player.id]" :src="formatImgUrl(player.photo_url)" :alt="getPlayerDisplayName(player)" @error="photoFailed=true;markImgFailed(player.id)" referrerpolicy="no-referrer" class="absolute inset-y-0 right-0 h-full w-[58%] object-cover object-center">
     <div v-else class="absolute inset-y-0 right-0 flex w-[58%] items-center justify-center bg-blue-950 text-5xl font-black text-sky-400/50" aria-hidden="true">#{{player.jersey||'–'}}</div>
