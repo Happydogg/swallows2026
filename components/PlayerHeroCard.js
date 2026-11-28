@@ -33,7 +33,7 @@ export const PlayerHeroCard = {
     Vue.watch(()=>[props.player.id,props.player.photo_url],()=>{photoFailed.value=false;});
     return {
       photoFailed,
-      t: call('t', key => key),
+      t: call('t', key => ({throws:'Throws',bats:'Bats',batSpec:'Bat specification',notSpecified:'Not specified'}[key]||key)),
       formatImgUrl: call('formatImgUrl', value => value),
       markImgFailed: call('markImgFailed', () => {}),
       getPlayerDisplayName: call('getPlayerDisplayName', player => player?.preferred_name || 'Player'),

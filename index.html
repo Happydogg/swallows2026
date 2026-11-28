@@ -337,9 +337,9 @@
       :controller="privateMediaController" :roster="videoRosterDisplay" :destination="videoPage"></private-media-panel>
     <video-review-inbox v-if="activeTab==='videos' && mediaOriginAllowed && videoPage==='review' && videoReviewScope && !authError" :key="authUser.id+':'+workspaceMode" :auth="loginController" :scope="videoReviewScope" :controller="privateMediaController"></video-review-inbox>
     <!-- Narrow acceptance controls. SDL-UX-003 owns final library/Clubhouse navigation. -->
-    <media-publication-panel v-if="activeTab === 'videos' && mediaOriginAllowed && videoPage==='team' && !authError && ['coach','admin'].includes(workspaceMode) && privateMediaController.mediaPlayerId.value"
+    <media-publication-panel v-if="activeTab === 'videos' && mediaOriginAllowed && videoPage==='team' && !authError && ['coach','admin'].includes(workspaceMode) && privateMediaController.mediaPlayerId.value && !privateMediaController.mediaPlaybackUrl.value && !privateMediaController.mediaPlaybackLoading.value"
       :key="authUser.id + ':' + workspaceMode + ':' + privateMediaController.mediaPlayerId.value" :auth="loginController" :controller="privateMediaController"></media-publication-panel>
-    <clubhouse-media-panel v-if="activeTab === 'videos' && mediaOriginAllowed && ['team','shared'].includes(videoPage) && !authError && clubhouseMediaTeams.length"
+    <clubhouse-media-panel v-if="activeTab === 'videos' && mediaOriginAllowed && ['team','shared'].includes(videoPage) && !authError && clubhouseMediaTeams.length && !privateMediaController.mediaPlaybackUrl.value && !privateMediaController.mediaPlaybackLoading.value"
       :key="authUser.id + ':' + workspaceMode" :auth="loginController" :teams="clubhouseMediaTeams"></clubhouse-media-panel>
 
     <!-- Keep the existing gated workspace mounted and reachable, after the primary roster/library.

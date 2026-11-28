@@ -45,7 +45,7 @@ export const PrivateMediaPanel = {
   template: `
 <section class="mb-4 space-y-4 no-print" aria-label="Private player videos">
   <header class="flex flex-wrap items-center justify-between gap-2">
-    <div><p class="text-xs font-semibold text-slate-400">Video Room</p><h2 class="text-2xl font-bold text-white">Private videos</h2></div>
+    <div><p class="text-xs font-semibold text-slate-400">Video Room</p><h2 class="text-2xl font-bold text-white">{{profilePlayerId?'Private videos':destination==='mine'?'My Videos':'My Team Videos'}}</h2></div>
     <span class="rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-300">Private staging media</span>
   </header>
 
@@ -56,7 +56,6 @@ export const PrivateMediaPanel = {
  <p v-if="!visible.length" class="text-sm text-slate-400">No matching authorized players.</p>
 </template>
 <template v-if="!profilePlayerId && selected && !mediaPlaybackUrl && !mediaPlaybackLoading"><button @click="switchPlayer" :disabled="busy" class="min-h-11 text-sm font-bold text-cyan-300 disabled:opacity-50">‹ Switch Player</button><player-hero-card :player="selected" variant="video"><template v-if="mediaUploadAllowed && !mediaLoading" #actions><button @click="openUpload" :disabled="busy" class="min-h-12 w-full rounded-xl bg-blue-600 px-4 py-3 font-bold text-white disabled:opacity-50">+ Upload Video</button></template></player-hero-card></template>
-<!-- Existing scoped selection is now through pick instead of selectMediaPlayer($event.target.value). -->
   <p v-if="mediaError" role="alert" class="rounded-xl border border-rose-700/70 bg-rose-950/30 p-4 text-sm text-rose-200">{{ mediaError }}</p>
   <p v-if="mediaNotice" role="status" class="rounded-xl border border-emerald-700/50 bg-emerald-950/30 p-4 text-sm text-emerald-200">{{ mediaNotice }}</p>
   <div v-if="mediaLoading" class="flex items-center gap-3 rounded-2xl border border-slate-700 bg-slate-900 p-5 text-sm text-slate-300" role="status">
@@ -77,8 +76,8 @@ export const PrivateMediaPanel = {
       <div v-if="!mediaPlaybackUrl && !mediaPlaybackLoading" class="flex flex-wrap gap-2" aria-label="Activity filters"><button v-for="kind in ['All','Batting','Pitching','Throwing']" :key="kind" @click="category=kind" :aria-pressed="category===kind" :class="category===kind?'bg-blue-600':'bg-slate-800'" class="rounded-xl px-3 py-2 text-sm font-bold">{{kind}}</button></div>
       <div v-if="!mediaPlaybackUrl && !mediaPlaybackLoading && !gallery.length" class="rounded-xl border border-dashed border-slate-600 bg-slate-950/60 p-6 text-center">
         <p class="text-2xl" aria-hidden="true">🎞️</p>
-        <p class="mt-2 text-sm font-bold text-white">No private clips found</p>
-        <p class="mt-1 text-xs text-slate-400">Select another player or check again after a private video has been uploaded.</p>
+        <p class="mt-2 text-sm font-bold text-white">{{mediaItems.length?'No matching clips':'No private clips found'}}</p>
+        <p class="mt-1 text-xs text-slate-400">{{mediaItems.length?'Choose another activity filter.':'Select another player or upload an authorized private video.'}}</p>
       </div>
       <ul v-else-if="!mediaPlaybackUrl && !mediaPlaybackLoading" class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4" aria-label="Authorized private video library">
         <li v-for="(item, index) in gallery" :key="item.id" v-media-visible="item"

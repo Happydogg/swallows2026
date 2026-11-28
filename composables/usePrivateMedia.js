@@ -227,7 +227,7 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
   // still authorizes playback and every review mutation independently.
   async function openInboxReview(scope,item,teamId=''){
     resetMedia();
-    if(!['coach','club_admin'].includes(scope?.role)||!item?.id||!item?.playerId)return false;
+    if(!['coach','club_admin'].includes(scope?.role)||!item?.id||!item?.playerId||(scope.role==='coach'?!auth.isTeamCoach.value:!auth.isOrgAdmin.value))return false;
     const op=operation();mediaLoading.value=true;
     try{
       const result=await service.reviewInbox(scope,{mediaId:item.id,playerId:item.playerId,...(teamId?{teamId}:{})},{signal:op.signal});
