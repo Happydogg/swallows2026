@@ -25,6 +25,7 @@ import { useSubmissionWorkspace } from '../composables/useSubmissionWorkspace.js
 import { SubmissionWorkspace } from '../components/SubmissionWorkspace.js';
 import { usePrivateMedia } from '../composables/usePrivateMedia.js';
 import { PrivateMediaPanel } from '../components/PrivateMediaPanel.js';
+import { VideoReviewInbox } from '../components/VideoReviewInbox.js';
 import { CoachBatchUpload } from '../components/CoachBatchUpload.js';
 import { MediaConsentPanel } from '../components/MediaConsentPanel.js';
 import { MediaPublicationPanel, ClubhouseMediaPanel } from '../components/MediaSharingPanels.js';
@@ -56,7 +57,7 @@ const { createApp, ref, onMounted, onUnmounted, markRaw, computed } = Vue;
 
 createApp({
   components: {
-    PilotWorkspace, PerformanceInbox, LoginLanding, AppShell, CoachHome, ParentHome, StatsHub, AuthorizedStatsBoard, StagingDataBrowser, AvatarManager, InviteOnboarding, AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, CoachBatchUpload, MediaConsentPanel, MediaPublicationPanel, ClubhouseMediaPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
+    PilotWorkspace, PerformanceInbox, LoginLanding, AppShell, CoachHome, ParentHome, StatsHub, AuthorizedStatsBoard, StagingDataBrowser, AvatarManager, InviteOnboarding, AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, VideoReviewInbox, CoachBatchUpload, MediaConsentPanel, MediaPublicationPanel, ClubhouseMediaPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
     SessionFormModal, UploadVideoModal, ArAnalyzerModal, ManagedRoster, PerformanceWorkspace
   },
   setup() {
@@ -214,6 +215,7 @@ createApp({
       getPlayerDisplayName: playerFeature.getPlayerDisplayName
     });
     const arAnalyzer = createArAnalyzerController({ selectedPlayer });
+    const videoRosterDisplay=computed(()=>videoPage.value==='mine'?familyPlayers.value:workspaceMode.value==='coach'?coachRosterDisplay.value:isManagedWorkspace.value?managedRoster.rows.value.map(p=>({...p,photo_url:workspaceMode.value==='admin'?avatarForPlayer(p):''})):familyPlayers.value);
     const privateMedia = usePrivateMedia({
       auth, analyzer: arAnalyzer,
       players: computed(() => workspaceMode.value === 'family' || (activeTab.value==='videos' && videoPage.value==='mine' && workspaceMode.value==='coach') ? familyPlayers.value : []),
@@ -522,6 +524,7 @@ createApp({
         ...(coachMode?[{id:'batch',label:'Batch Upload',description:'Upload multiple practice videos',icon:'↑'}]:[])
       ];
     });
+    const videoReviewScope=computed(()=>workspaceMode.value==='coach'&&auth.isTeamCoach.value?{role:'coach',organizationId:coachOrganizationId.value,scopeTeamId:coachTeamId.value}:workspaceMode.value==='admin'&&auth.isOrgAdmin.value?{role:'club_admin',organizationId:managedRoster.organizationId.value,scopeTeamId:managedRoster.teamId.value}:null);
     const canLeaveBatch=()=>videoPage.value!=='batch'||!batchPage.value?.hasPending?.()||window.confirm('Leave Batch Upload? Unconfirmed requests may already have reached the server. The local queue will be cleared.');
     const openVideoPage=id=>{
       if(id!=='landing'&&!videoDestinations.value.some(d=>d.id===id))return;
@@ -532,6 +535,7 @@ createApp({
     };
     const navigateTab = tab => {
       if (!['home', 'team', 'stats', 'videos', 'me'].includes(tab)||!canLeaveBatch()) return false;
+      if(activeTab.value==='videos')privateMedia.resetMedia();
       videoPage.value='landing';
       clearProfileHistory();
       activeTab.value = tab;
@@ -558,7 +562,7 @@ createApp({
     onUnmounted(() => { auth.disposeAuth(); submissionWorkspace.dispose(); enrollmentAdmin.dispose();pilotWorkspace.dispose(); });
 
     return {
-      currentLang, t, saveLanguage, loading, isSaving, currentView, overviewTab, activeTab, workspaceMode, familyPlayers, visibleStagingPlayers, coachRosterDisplay, mediaOriginAllowed, videoPage, videoDestinations, openVideoPage, batchPage, statsFamilyCards: submissionWorkspace.cards, navigateTab, changeWorkspace, pendingInvitation, dismissInvitePrompt, searchQuery,
+      currentLang, t, saveLanguage, loading, isSaving, currentView, overviewTab, activeTab, workspaceMode, familyPlayers, visibleStagingPlayers, coachRosterDisplay, mediaOriginAllowed, videoPage, videoDestinations, openVideoPage, batchPage, videoRosterDisplay, videoReviewScope, statsFamilyCards: submissionWorkspace.cards, navigateTab, changeWorkspace, pendingInvitation, dismissInvitePrompt, searchQuery,
       selectedPlayer, players, sessions, profileHistoryLoading, profileHistoryError, drillVideos, coachRoster, coachRosterLoading, coachRosterError, selectCoachRosterPlayer, openAuthorizedPlayerVideos, openFamilyPlayerProfile, openManagedPlayerProfile, leavePlayerProfile, canEditPlayerPhoto: avatarManager.canEdit, avatarManager,
       formatImgUrl, triggerPrintReport,
       ...auth, signInAndLoad, signOutAndClear,

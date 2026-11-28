@@ -29,7 +29,13 @@ test('Coach Home has a bounded preview; Team retains the entire authorized roste
  assert.doesNotMatch(detail,/roster\.slice\(/);
  assert.match(detail,/return props.roster.filter/);
  assert.match(home,/<button type="button" @click="\$emit\('open-profile',player\)"/);
- assert.match(home,/<img v-if="avatarFor\(player\)"/);
+ // The image now belongs to the shared hero component, not CoachHome.
+ const hero=read('components/PlayerHeroCard.js');
+ assert.match(home,/import \{ PlayerHeroCard \} from '\.\/PlayerHeroCard\.js'/);
+ assert.match(home,/<player-hero-card v-for="player in preview" :key="player\.team_id\+':'\+player\.id" :player="\{\.\.\.player,photo_url:avatarFor\(player\)\}"/);
+ assert.match(home,/<template #actions>[\s\S]*?@click="\$emit\('open-profile',player\)"[\s\S]*?@click="\$emit\('open-video',player\)"/);
+ assert.match(hero,/<img v-if="player\.photo_url && !player\.photo_url\.startsWith\('sdl-private-avatar:'\) && !photoFailed && !failedImgs\[player\.id\]" :src="formatImgUrl\(player\.photo_url\)"/);
+ assert.match(hero,/<slot name="actions"><\/slot>/);
  assert.match(index,/<coach-home[\s\S]*?@open-profile="selectCoachRosterPlayer"/);
  assert.match(detail,/<article v-for="player in displayedRoster"/);
  assert.match(detail, /@click="\$emit\('open-profile',player\)"/);

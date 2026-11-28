@@ -1,6 +1,8 @@
 // SDL-UX-009: Live, read-only charts from server-authorized player history.
 // No invented norms, threshold assessments, or direct Supabase calls.
+import { PlayerHeroCard } from './PlayerHeroCard.js';
 export const AuthorizedStatsBoard = {
+  components:{PlayerHeroCard},
   name:'AuthorizedStatsBoard',
   emits:['open-profile'],
   props:{controller:{type:Object,required:true},contextOnly:Boolean,resultsOnly:Boolean},
@@ -58,15 +60,7 @@ export const AuthorizedStatsBoard = {
           <option v-for="p in players" :key="p.id" :value="p.id">#{{ p.jersey || '–' }} · {{ p.preferred_name || 'Player' }}</option>
         </select>
       </label>
-      <div v-if="selected && !resultsOnly" class="flex flex-wrap items-center gap-3 py-1">
-        <img v-if="selected.photo_url && !selected.photo_url.startsWith('sdl-private-avatar:')"
-          :src="selected.photo_url" alt="" class="h-14 w-14 rounded-xl object-cover">
-        <div>
-          <p class="font-bold text-white">{{ selected.preferred_name }}</p>
-          <p class="text-xs text-slate-400">#{{ selected.jersey || '–' }} · {{ sessions.length }} recorded session{{ sessions.length===1?'':'s' }}</p>
-        </div>
-        <button type="button" @click="$emit('open-profile',selected)" class="sdl-secondary ml-auto px-3 py-2 text-sm font-semibold">View profile</button>
-      </div>
+<player-hero-card v-if="selected && !resultsOnly" :player="selected" variant="compact"><template #actions><div class="flex flex-wrap items-center justify-between gap-2"><p class="text-sm text-slate-300">{{ sessions.length }} recorded session{{sessions.length===1?'':'s'}}</p><button type="button" @click="$emit('open-profile',selected)" class="sdl-secondary px-3 py-2 text-sm font-semibold">View profile</button></div></template></player-hero-card>
       <template v-if="!contextOnly">
       <p v-if="busy" class="rounded-xl bg-slate-950 p-4 text-sm text-slate-300" role="status">
         Checking access and loading permitted measurements…

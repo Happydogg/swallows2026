@@ -18,7 +18,7 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
   const mediaNotice = ref('');
   const mediaFile = ref(null);
   const uploadCategory = ref('');
-  let uploadRequest;
+  let uploadRequest, inboxReviewContext=false;
   const mediaPlaybackUrl = ref('');
   const mediaPlaybackId = ref('');
   const mediaReviewing=ref(false),reviewSingleSubject=ref(false),reviewVideoNote=ref('');
@@ -132,7 +132,7 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
     mediaProgress.value = 0;
     mediaFile.value = null;
     uploadCategory.value = '';
-    uploadRequest = undefined;
+    uploadRequest = undefined;inboxReviewContext=false;
     mediaError.value = '';
     mediaUploadError.value = '';
     mediaNotice.value = '';
@@ -223,6 +223,24 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
     } catch (error) { op.failed(error); }
     finally { if (op.ownsState()) mediaUploading.value = false; op.finish(); }
   }
+  // Open only a freshly re-authorized, exact pending inbox item. The Worker
+  // still authorizes playback and every review mutation independently.
+  async function openInboxReview(scope,item,teamId=''){
+    resetMedia();
+    if(!['coach','club_admin'].includes(scope?.role)||!item?.id||!item?.playerId||(scope.role==='coach'?!auth.isTeamCoach.value:!auth.isOrgAdmin.value))return false;
+    const op=operation();mediaLoading.value=true;
+    try{
+      const result=await service.reviewInbox(scope,{mediaId:item.id,playerId:item.playerId,...(teamId?{teamId}:{})},{signal:op.signal});
+      if(!op.current())return false;
+      const exact=result.items.find(r=>r.id===item.id&&r.playerId===item.playerId&&r.status==='pending'&&r.can_review===true&&['batting','pitching','throwing'].includes(r.category));
+      if(!exact){mediaError.value='This submission is no longer available for review. Refresh the inbox.';return false;}
+      inboxReviewContext=true;mediaPlayerId.value=exact.playerId;mediaItems.value=[{id:exact.id,player_id:exact.playerId,category:exact.category,status:'pending',created_at:exact.createdAt,can_review:true}];
+      mediaReadAllowed.value=true;
+      await playPrivateMedia(mediaItems.value[0]);
+      return op.current()&&mediaPlaybackId.value===exact.id&&!!mediaPlaybackUrl.value;
+    }catch(error){op.failed(error);return false;}
+    finally{if(op.ownsState())mediaLoading.value=false;op.finish();}
+  }
   async function reviewPrivateMedia(decision) {
     const item=reviewItem.value;
     if(!item||!mediaPlaybackUrl.value||mediaReviewing.value||mediaArchiving.value||mediaUploading.value||mediaPlaybackLoading.value)return;
@@ -235,8 +253,9 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
       await service.review(item.id,decision,note,single,{signal:op.signal});
       if(!op.current())return;
       mediaNotice.value=decision==='approved'?'Video approved privately. Not published.':'Video rejected. Playback blocked.';
-      await refreshMedia();
-    }catch(error){op.failed(error);}
+      if(inboxReviewContext){releasePlayback();mediaItems.value=[];mediaPlayerId.value='';mediaReadAllowed.value=false;inboxReviewContext=false;}else await refreshMedia();
+      return true;
+    }catch(error){op.failed(error);return false;}
     finally{if(op.ownsState())mediaReviewing.value=false;op.finish();}
   }
   async function archivePrivateMedia(item) {
@@ -297,7 +316,7 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
   return { mediaPlayers, mediaPlayerId, mediaItems, mediaReadAllowed, mediaUploadAllowed, mediaLoading,
     mediaUploading, mediaArchiving, mediaReviewing, reviewSingleSubject, reviewVideoNote, reviewItem, reviewPrivateMedia, mediaProgress, mediaError, mediaUploadError, mediaNotice, mediaFile, uploadCategory, mediaPlaybackUrl, mediaPlaybackId,
     mediaPlaybackLoading, analysisCategory, analysisFps, mediaThumbnails, mediaThumbnailBusy, mediaThumbnailFailed,
-    submissionsEnabled, ensureMediaThumbnail, retryMediaThumbnail,
+    submissionsEnabled, ensureMediaThumbnail, retryMediaThumbnail, openInboxReview,
     selectMediaPlayer, refreshMedia, selectMediaFile, uploadPrivateMedia, archivePrivateMedia, playPrivateMedia,
-    analyzePrivateMedia, reportPlaybackError, resetMedia };
+    analyzePrivateMedia, reportPlaybackError, resetMedia, closePrivatePlayback:()=>{releasePlayback();mediaPlaybackLoading.value=false;} };
 }
