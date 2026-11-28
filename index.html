@@ -334,7 +334,7 @@
     <button v-if="activeTab==='videos' && mediaOriginAllowed && videoPage!=='landing'" @click="openVideoPage('landing')" class="mb-4 min-h-11 rounded-lg px-3 text-blue-300">← Videos</button>
     <coach-batch-upload v-if="activeTab==='videos' && mediaOriginAllowed && videoPage==='batch' && isTeamCoach && workspaceMode==='coach' && !authError" ref="batchPage" :auth="loginController" :roster="coachRosterDisplay"></coach-batch-upload>
     <private-media-panel v-if="activeTab === 'videos' && mediaOriginAllowed && ['team','mine','review'].includes(videoPage)"
-      :controller="privateMediaController"></private-media-panel>
+      :controller="privateMediaController" :roster="videoRosterDisplay" :destination="videoPage"></private-media-panel>
     <!-- Narrow acceptance controls. SDL-UX-003 owns final library/Clubhouse navigation. -->
     <media-publication-panel v-if="activeTab === 'videos' && mediaOriginAllowed && videoPage==='team' && !authError && ['coach','admin'].includes(workspaceMode) && privateMediaController.mediaPlayerId.value"
       :key="authUser.id + ':' + workspaceMode + ':' + privateMediaController.mediaPlayerId.value" :auth="loginController" :controller="privateMediaController"></media-publication-panel>

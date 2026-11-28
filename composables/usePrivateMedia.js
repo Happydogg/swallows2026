@@ -299,5 +299,5 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
     mediaPlaybackLoading, analysisCategory, analysisFps, mediaThumbnails, mediaThumbnailBusy, mediaThumbnailFailed,
     submissionsEnabled, ensureMediaThumbnail, retryMediaThumbnail,
     selectMediaPlayer, refreshMedia, selectMediaFile, uploadPrivateMedia, archivePrivateMedia, playPrivateMedia,
-    analyzePrivateMedia, reportPlaybackError, resetMedia };
+    analyzePrivateMedia, reportPlaybackError, resetMedia, closePrivatePlayback:()=>{releasePlayback();mediaPlaybackLoading.value=false;} };
 }

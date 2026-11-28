@@ -214,6 +214,7 @@ createApp({
       getPlayerDisplayName: playerFeature.getPlayerDisplayName
     });
     const arAnalyzer = createArAnalyzerController({ selectedPlayer });
+    const videoRosterDisplay=computed(()=>videoPage.value==='mine'?familyPlayers.value:workspaceMode.value==='coach'?coachRosterDisplay.value:isManagedWorkspace.value?managedRoster.rows.value.map(p=>({...p,photo_url:workspaceMode.value==='admin'?avatarForPlayer(p):''})):familyPlayers.value);
     const privateMedia = usePrivateMedia({
       auth, analyzer: arAnalyzer,
       players: computed(() => workspaceMode.value === 'family' || (activeTab.value==='videos' && videoPage.value==='mine' && workspaceMode.value==='coach') ? familyPlayers.value : []),
@@ -532,6 +533,7 @@ createApp({
     };
     const navigateTab = tab => {
       if (!['home', 'team', 'stats', 'videos', 'me'].includes(tab)||!canLeaveBatch()) return false;
+      if(activeTab.value==='videos')privateMedia.resetMedia();
       videoPage.value='landing';
       clearProfileHistory();
       activeTab.value = tab;
@@ -558,7 +560,7 @@ createApp({
     onUnmounted(() => { auth.disposeAuth(); submissionWorkspace.dispose(); enrollmentAdmin.dispose();pilotWorkspace.dispose(); });
 
     return {
-      currentLang, t, saveLanguage, loading, isSaving, currentView, overviewTab, activeTab, workspaceMode, familyPlayers, visibleStagingPlayers, coachRosterDisplay, mediaOriginAllowed, videoPage, videoDestinations, openVideoPage, batchPage, statsFamilyCards: submissionWorkspace.cards, navigateTab, changeWorkspace, pendingInvitation, dismissInvitePrompt, searchQuery,
+      currentLang, t, saveLanguage, loading, isSaving, currentView, overviewTab, activeTab, workspaceMode, familyPlayers, visibleStagingPlayers, coachRosterDisplay, mediaOriginAllowed, videoPage, videoDestinations, openVideoPage, batchPage, videoRosterDisplay, statsFamilyCards: submissionWorkspace.cards, navigateTab, changeWorkspace, pendingInvitation, dismissInvitePrompt, searchQuery,
       selectedPlayer, players, sessions, profileHistoryLoading, profileHistoryError, drillVideos, coachRoster, coachRosterLoading, coachRosterError, selectCoachRosterPlayer, openAuthorizedPlayerVideos, openFamilyPlayerProfile, openManagedPlayerProfile, leavePlayerProfile, canEditPlayerPhoto: avatarManager.canEdit, avatarManager,
       formatImgUrl, triggerPrintReport,
       ...auth, signInAndLoad, signOutAndClear,
