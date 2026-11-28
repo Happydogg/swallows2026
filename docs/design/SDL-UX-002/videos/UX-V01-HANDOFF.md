@@ -13,7 +13,7 @@ Previously, Library, Clubhouse and Review followed the global workspace selectio
 | Team Manager | My Team Videos |
 | Club Admin | My Team Videos, Review Videos |
 | Platform Admin alone | No operational Videos destination |
-| Coach and Guardian | My Videos, My Team Videos, Review Videos. The candidate puts guardian Team Videos inside My Videos as a secondary control. |
+| Coach and Guardian | My Videos, My Team Videos, Review Videos. The approved secondary Team Videos link appears inside My Videos. |
 | Manager and Coach | My Team Videos, Review Videos under Coach authority |
 | Manager and Guardian | My Videos, Team Videos when eligible, My Team Videos |
 
@@ -49,6 +49,6 @@ Node 24.22.1, npm 11.9.0.
 
 ## Owner decision and rollback
 
-Please confirm the secondary guardian Team Videos control inside My Videos for Coach–Guardian accounts before promotion. This layout keeps the frozen three primary destinations and retains access to guardian-only teams. A fourth primary destination needs an explicit design decision. Athlete-identifying metadata for shared media remains deferred to the approved backend workstream. Physical-device and authenticated staging acceptance remain pending.
+The owner confirmed the secondary guardian Team Videos link inside My Videos for Coach–Guardian accounts. This placement keeps the three frozen primary destinations and preserves access to independently eligible guardian-only teams. Athlete-identifying metadata for shared media remains deferred to the approved backend workstream. Physical-device and authenticated staging acceptance remain pending.
 
 Rollback before promotion is to leave the draft unmerged. A future source rollback reverts this branch's change and leaves the accepted staging baseline intact. The frontend candidate has no Worker, SQL, consent policy, permission, secret, storage or gate changes. Any staging activation needs separate owner approval.
