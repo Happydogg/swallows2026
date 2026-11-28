@@ -15,6 +15,43 @@
 | SDL-D-20261121-09 | Present the **same private, permission-enforced video room inside Player Profile** and retain Videos tab; never present the disabled legacy empty gallery in place of actual R2 clips. | Implemented, automated-tested, deployed to UX Live | `PlayerProfile.js` named slot and `index.html`; real coach/parent UAT pending |
 | SDL-D-20261121-10 | Select player history through the active role’s approved scope and invalidate pending profile results on navigation or identity changes. | Implemented and locally tested | Full suite 405/405. Signed-in staging acceptance pending. |
 
+## SDL-000 Videos UX freeze decision collision notice (2026-11-28)
+
+The [owner-approved Videos UX freeze v1.0](https://github.com/Happydogg/swallows2026/blob/docs/SDL-UX-002-videos-freeze/docs/design/SDL-UX-002/videos/README.md) and [documentation commit `8a8da95`](https://github.com/Happydogg/swallows2026/commit/8a8da9548d6b2a75524b5beca5efe3ac1a0c6afd) have been verified and accepted as a **design closure record**. The source branch `docs/SDL-UX-002-videos-freeze` independently introduced the following decision IDs, which **conflict with previously assigned UX-003 P0/P1 IDs in this coordination mirror**:
+
+| Source decision ID on Videos design branch | Videos design subject | Existing conflicting SDL-000 use | Disposition |
+|---|---|---|---|
+| `SDL-D-20261128-01` | Freeze Videos v1.0, role-aware galleries, Watch/Analyze, cross-team Review | Receive UX-003 PR #21 as P0/P1 source candidate | **Conflict OPEN**, original source decisions preserved |
+| `SDL-D-20261128-02` | Staff/admin review navigation restricted to verified capabilities | Loopback synthetic preview preparation, not approval | **Conflict OPEN**, Team Manager authority pending SDL-004B |
+| `SDL-D-20261128-03` | Reserve comments/reactions/capture for later; document freeze only | Locally reported 530/530 corrections and CI evidence distinction | **Conflict OPEN**, no new feature authorization |
+
+**Do not overwrite, silently reassign or reuse any of these IDs in an authoritative decision ledger.** At the next independent Master Directory/Decision Register reconciliation, verify all dated identifiers and obtain explicit governance approval for a unique final mapping, preserving the original ID, source branch, commit and replacement cross-reference. The independent Master Directory is not available from the current searched Project/Library sources, so no direct canonical update is claimed.
+
+**Design completion classification:** Approved/frozen (owner-reported approval documented, GitHub source verified). **Implementation/testing/deployment:** pending for this newly approved redesign. Previously deployed UX-003 application work remains a separate historical milestone. No permission, branch merge or production changes authorized.
+
+---
+
+## SDL-000 P0/P1 UX fix checkpoint (2026-11-28)
+
+**Documentation of reviewed source and reported local tests, not approval to deploy or change authorization.**
+
+| ID | Decision / rationale | Classification | Evidence / outstanding gate |
+|---|---|---|---|
+| SDL-D-20261128-01 | Receive [draft PR #21](https://github.com/Happydogg/swallows2026/pull/21) as a **source remediation candidate** for UX-QA-02/03 and focused dispositions of UX-QA-04/05; keep approved UX-002 staging baseline `4590f86c` unchanged. Code commit `8f8c9813`; handoff-only remote tip `f4b45210`. | **Implemented/source reviewed; UAT pending** | [Handoff](https://github.com/Happydogg/swallows2026/blob/f4b452105fd23c5e37a09bf41b32742da83e370f/docs/design/SDL-UX-003/P0P1-QA-HANDOFF.md); only `MediaConsentPanel.js`, `MediaSharingPanels.js` runtime changes; three focused test files and one handoff; no Worker, DB, grant, media-service/gate edits. |
+| SDL-D-20261128-02 | Accept UX-QA-01 isolated `127.0.0.1:5500` proposal as **preparation**, not target activation or physical mobile acceptance. Hosted origin/redirect/Worker/bindings and synthetic data must be checked before explicit owner approval; a phone's loopback is its own device. | **Prepared / approval pending (P0)** | [P0 readiness plan](https://github.com/Happydogg/swallows2026/blob/f4b452105fd23c5e37a09bf41b32742da83e370f/docs/design/SDL-UX-003/P0P1-QA-HANDOFF.md); no authenticated approved candidate deployment, merge, production release or real-family scope. |
+| SDL-D-20261128-03 | Record Codex **local-reported** 530/530 full and 73/73 focused UX-003 checks, Vue 8/8 and UX build 178/178 for `8f8c9813`. Do not re-label older independently verified CI 516/516 at `0120c6b` as proof for the new candidate. | **Local tested (reported), independent CI not confirmed** | [PR #21](https://github.com/Happydogg/swallows2026/pull/21); no PR-tip CI statuses/workflows observed; Worker local package warning remains a separate release-preservation hold. |
+
+## SDL-000 current UX integration QA decisions (2026-11-27)
+
+These record this owner-supplied independent QA handoff and verified CI findings. **Recording QA is not a new owner approval to merge, deploy, alter permissions or accept production risk.** Earlier decision entries below remain historical.
+
+| ID | Decision / rationale | Classification | Evidence / release consequence |
+|---|---|---|---|
+| SDL-D-20261127-20 | Accept SDL-UX-002 independent **read-only source-review checkpoint** against existing UX baseline `4590f86c` and isolated UX-003 candidate `0120c6b` (10 commits ahead, 22 changed paths). Do not equate no identified frontend bypass with full security verification. | **Reviewed / accepted for validation**, not authenticated candidate UAT or merged release | [Source compare](https://github.com/Happydogg/swallows2026/compare/4590f86c458cacc461f45a8e62aeeda470e8646e...0120c6b74b048478e52e83c39bef011dcd2d02b3); [Issue #19](https://github.com/Happydogg/swallows2026/issues/19); owner handoff; accepted five-tab, official corrections and media contracts retained by source inspection. |
+| SDL-D-20261127-21 | Record SDL-UX-003 full automated regression at exact candidate SHA `0120c6b74b048478e52e83c39bef011dcd2d02b3` as **Tested: PASS**. Worker local package PASS does not waive the deployed-settings/bindings preservation gate. | **Automated tested; combined staging not verified** | [GitHub Actions job](https://github.com/Happydogg/swallows2026/actions/runs/46025411813/job/140595434819): `npm test` 516/516, UX-003 included 59/59, Vue 8/8, UX build 178/178, 91 static files; zero failed/skipped; prior three legacy mismatches corrected in two test files only. |
+| SDL-D-20261127-22 | Register `UX-QA-01..07` by original severity; prioritize approved authenticated test environment and same-player consent/download lifecycle corrections, with behavior checks for review navigation, count concurrency and small-screen clutter. | **Defect/acceptance backlog OPEN; owner review and QA required** | [Issue #19](https://github.com/Happydogg/swallows2026/issues/19); `SDL_ROADMAP_STATUS.md` QA table. `UX-QA-02/03/06` source-grounded; `UX-QA-04/05/07` remain behavioral hypotheses or acceptance checks. |
+| SDL-D-20261127-23 | Continue **synthetic-only staging development planning** under RBAC-05 conditional acceptance while reserving the combined UX merge/deploy decision to SDL-000 + owner; no production signoff. | **Conditional scope; separate deployment approval required** | [RBAC-05 conditional handoff](https://github.com/Happydogg/swallows2026/issues/19#issuecomment-7222808064): owner signed-browser 74/74 applicable and rollback-only SQL pass, with network negative/revocation/device-save gates deferred. Preserve existing consent, shared-download contract and held legacy permissions. |
+
 ## Decisions and holds recorded 2026-11-27
 
 The following add to, and do not replace, the historical entries above. **Reported execution status is not independently verified security acceptance.**
@@ -43,5 +80,9 @@ The following add to, and do not replace, the historical entries above. **Report
 
 | SDL-D-20261127-15 | Proceed with owner-approved UX-only staging restructuring; IA-01, IA-02 and IA-04 accepted, IA-03 nonvideo accepted, IA-05 deployed pending owner visual review, IA-06 QA next. | Implemented/deployed to UX review environments, partial owner acceptance; NOT full role/mobile/security acceptance. | [Issue #12 handoff](https://github.com/Happydogg/swallows2026/issues/12#issuecomment-7215859630); PRs #13–17 merged, #17 at `9437a44`; Cloudflare live and preview deploy IDs verified successful. |
 | SDL-D-20261127-16 | Keep IA-03 private-video incompatibility in SDL-004 backend/media authority workstream; UI must distinguish service unavailability from confirmed denial, without broadening permissions. | Outstanding defect and security release hold | [Issue #12 IA-03 blocker](https://github.com/Happydogg/swallows2026/issues/12#issuecomment-7215287808); legacy `sdl_004_media_can_access` restricted fail-closed; exact deployed transport and user authorization still need testing. |
+
+| SDL-D-20261127-17 | Close UX-002 **restructuring implementation** scope after IA-01–06, freeze further redesign and retain workstream for regression/device acceptance and defects only. | **Approved coordination disposition; IA-01–05 owner-accepted with IA-03 media excepted; IA-06 automated-tested; real-device acceptance pending.** | [Issue #12](https://github.com/Happydogg/swallows2026/issues/12), PR #18 merge `bbe5582c`; UX branch current `2d12a56e`, 8 later media commits. |
+| SDL-D-20261127-18 | Treat latest deployed UX source and original IA-06 QA checkpoint separately; require post-media frontend regression and independent media/security UAT before final acceptance. | **Test/release hold, not a new feature approval.** | Cloudflare UX Live `6c0bba9b` and Preview `f4d12dac` successful at `2d12a56e`; media mutations and test gates owned by SDL-004B-RBAC-05. |
+| SDL-D-20261127-19 | Maintain UX-003 Action Center and Video Review Inbox as a separate P0 synthetic/prototype workstream until shared-file ownership, deployed read contracts and integration are approved. | **Active parallel prototype, live integration blocked.** | [Issue #19](https://github.com/Happydogg/swallows2026/issues/19), branch `task/sdl-ux-003-action-center`; no part of UX-002 acceptance baseline. |
 
 **Non-decisions:** No permission to merge `main`, deploy production, auto-delete seeded enrollments, weaken player RLS or publish private media. A successful unit test is not a final owner acceptance test.
