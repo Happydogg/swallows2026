@@ -1,7 +1,7 @@
 // Scoped Club Admin / Team Manager roster. All writes require a separate server RPC.
 export const ManagedRoster = {
   name: 'ManagedRoster',
-  props: { controller: { type: Object, required: true }, home: Boolean, scopeOnly: Boolean },
+  props: { controller: { type: Object, required: true }, home: Boolean, scopeOnly: Boolean, portraitFor: { type: Function, default: null } },
   emits: ['organization', 'team', 'retry', 'more', 'open-profile', 'navigate'],
   setup(props) {
     const search = Vue.ref('');
@@ -123,7 +123,7 @@ export const ManagedRoster = {
           <article v-for="row in visible" :key="row.id" class="sdl-panel space-y-3 p-4">
             <button type="button" @click="$emit('open-profile',row)"
               class="flex w-full gap-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">
-              <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-blue-950 font-bold text-cyan-300">#{{ row.jersey || '–' }}</span>
+              <img v-if="portraitFor && portraitFor(row)" :src="portraitFor(row)" alt="" referrerpolicy="no-referrer" class="h-12 w-12 shrink-0 rounded-lg object-cover"><span v-else class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-blue-950 font-bold text-cyan-300">#{{ row.jersey || '–' }}</span>
               <span class="min-w-0"><span class="block font-bold">{{ row.preferred_name || 'Player' }}</span><span class="block text-xs text-slate-400">{{ row.team_name || 'Club roster' }}</span><span class="block text-sm text-slate-300">{{ row.position || 'Position not set' }} · Throws {{ row.throws || '–' }} · Bats {{ row.bats || '–' }}</span></span>
             </button>
             <div class="border-t border-slate-700 pt-3">

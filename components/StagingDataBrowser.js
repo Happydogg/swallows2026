@@ -53,7 +53,7 @@ export const StagingDataBrowser = {
         <article v-for="player in visiblePlayers" :key="(player.team_id || 'family') + ':' + player.id"
           class="rounded-2xl border border-slate-700 bg-slate-800/70 p-4">
           <div class="flex gap-3">
-            <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-blue-950 font-black text-cyan-200">#{{ player.jersey || '–' }}</div>
+            <img v-if="player.photo_url && !player.photo_url.startsWith('sdl-private-avatar:')" :src="player.photo_url" alt="" referrerpolicy="no-referrer" class="h-14 w-14 shrink-0 rounded-xl object-cover"><div v-else class="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-blue-950 font-black text-cyan-200">#{{ player.jersey || '–' }}</div>
             <div class="min-w-0 flex-1">
               <h3 class="truncate text-base font-bold text-white">{{ player.preferred_name || 'Unnamed athlete' }}</h3>
               <p v-if="player.team_name" class="mt-1 truncate text-xs text-slate-400">{{ player.team_name }}</p>

@@ -15,7 +15,7 @@ export const CoachTeamRoster = {
     });
     const avatarFor = player => {
       const approved=String(player?.photo_url||'');
-      if (/^https:\/\//.test(approved) || /^\/assets\/demo-players\/(2[1-9]|3[0-5])\.(svg|jpg)$/.test(approved)) return approved;
+      if (/^https:\/\//.test(approved) || (/^\/assets\/demo-players\/(2[1-9]|3[0-5])\.(svg|jpg)$/.test(approved) || /^\/assets\/demo-players\/(00|07|10|12|6[0-5]|99)\.jpg$/.test(approved))) return approved;
       const jersey=String(player?.jersey||'');
       return /^DEMO\s/.test(String(player?.preferred_name||'')) && /^(2[1-9]|3[0-5])$/.test(jersey)
         ? '/assets/demo-players/'+jersey+'.svg' : '';
