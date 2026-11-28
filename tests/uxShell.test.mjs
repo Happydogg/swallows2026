@@ -128,14 +128,14 @@ test('new preview host does not claim private Worker CORS eligibility', async t 
 test('media fallback links to original staging host for unapproved origins',()=>{
   assert.match(index,/href="https:\/\/sdl-staging\.pages\.dev\/"/);
   assert.match(index,/v-if="activeTab === 'videos' && !mediaOriginAllowed"/);
-  assert.ok(index.includes("v-if=\"activeTab === 'videos' && mediaOriginAllowed && ['team','mine','review'].includes(videoPage)\""));
+  assert.ok(index.includes("v-if=\"activeTab === 'videos' && mediaOriginAllowed && ['team','mine'].includes(videoPage)\""));
   assert.ok(index.includes("activeTab === 'team' && mediaOriginAllowed && privateMediaController.mediaPlayers.value.some"));
 });
 
 test('approved live UX hostname enables the existing private-media panel without changing Worker calls', () => {
   assert.ok(appSource.includes('https://sdl-ux-live.pages.dev'));
   assert.match(appSource,/mediaOriginAllowed = computed/);
-  assert.ok(index.includes("v-if=\"activeTab === 'videos' && mediaOriginAllowed && ['team','mine','review'].includes(videoPage)\""));
+  assert.ok(index.includes("v-if=\"activeTab === 'videos' && mediaOriginAllowed && ['team','mine'].includes(videoPage)\""));
   assert.ok(index.includes("activeTab === 'team' && mediaOriginAllowed && privateMediaController.mediaPlayers.value.some"));
   assert.match(index,/<private-media-panel/);
   assert.match(index,/v-if="activeTab === 'videos' && !mediaOriginAllowed"/);
@@ -169,7 +169,7 @@ test('athlete hero preserves legacy history and coach-only identity fields', () 
 
 test('redesigned private video controls still use authorized existing controller', () => {
   const source=fs.readFileSync(new URL('../components/PrivateMediaPanel.js', import.meta.url),'utf8');
-  for(const action of ['selectMediaPlayer($event.target.value)','refreshMedia','uploadPrivateMedia','playPrivateMedia(item)','analyzePrivateMedia','reportPlaybackError']){
+  for(const action of ['c.selectMediaPlayer(id)','refreshMedia','uploadPrivateMedia','c.playPrivateMedia(item)','analyzePrivateMedia','reportPlaybackError']){
     assert.ok(source.includes(action),action);
   }
   assert.match(source, /<video :key="mediaPlaybackUrl" :src="mediaPlaybackUrl" controls playsinline/);
@@ -362,3 +362,5 @@ test('UX-IA-05 groups account preferences and gated tools without changing role 
 test('batch upload is a separate coach-only authorized destination',()=>{assert.match(index,/aria-label="Video destinations"/);assert.match(index,/<coach-batch-upload v-if="activeTab==='videos' && mediaOriginAllowed && videoPage==='batch' && isTeamCoach && workspaceMode==='coach' && !authError"/);assert.match(appSource,/coachMode\?\[\{id:'batch'/);});
 
 test('photo-first roster and hero use scoped existing media controller',()=>{const media=fs.readFileSync(new URL('../components/PrivateMediaPanel.js',import.meta.url),'utf8');const hero=fs.readFileSync(new URL('../components/PlayerHeroCard.js',import.meta.url),'utf8');assert.ok(hero.includes('w-[58%]'));assert.match(media,/Search name or jersey number/);assert.match(media,/grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6/);assert.match(media,/c\.mediaPlayers\.value\.map/);assert.match(media,/mediaUploadAllowed && !mediaLoading/);assert.match(media,/Switch Player/);assert.match(media,/Latest video/);assert.match(media,/Back to gallery/);assert.match(index,/:roster="videoRosterDisplay" :destination="videoPage"/);assert.match(index,/<coach-batch-upload/);});
+
+test('review destination uses cross-team inbox with exact reauthorization and no analysis controls',()=>{const review=fs.readFileSync(new URL('../components/VideoReviewInbox.js',import.meta.url),'utf8');assert.match(index,/<video-review-inbox/);assert.match(review,/reviewInbox\(props.scope/);assert.match(review,/openInboxReview/);assert.match(review,/Next Video/);assert.doesNotMatch(review,/analyzePrivateMedia/);});
