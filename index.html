@@ -328,31 +328,60 @@
     <!-- UX-003: Library and Clubhouse are distinct destinations; existing authorization stays in their controllers. -->
     <section v-if="activeTab === 'videos' && mediaOriginAllowed && !authError" class="mb-4 space-y-2 no-print" aria-label="Videos navigation">
       <h1 class="text-2xl font-black text-white">Videos</h1>
-      <nav class="sdl-tabs flex flex-wrap gap-2 p-1.5" aria-label="Video sections">
-        <button type="button" @click="changeVideoSection('library')" :aria-pressed="videoSection==='library'" :disabled="videoSectionBusy && videoSection!=='library'" :class="videoSection==='library'?'bg-cyan-900 text-cyan-100':'text-slate-300'" class="min-h-11 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">Library</button>
-        <button v-if="reviewScope" type="button" @click="changeVideoSection('review')" :aria-pressed="videoSection==='review'" :disabled="videoSectionBusy && videoSection!=='review'" :class="videoSection==='review'?'bg-cyan-900 text-cyan-100':'text-slate-300'" class="min-h-11 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">Review</button>
-        <button v-if="clubhouseMediaTeams.length" type="button" @click="changeVideoSection('clubhouse')" :aria-pressed="videoSection==='clubhouse'" :disabled="videoSectionBusy && videoSection!=='clubhouse'" :class="videoSection==='clubhouse'?'bg-cyan-900 text-cyan-100':'text-slate-300'" class="min-h-11 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">Clubhouse</button>
+      <nav class="sdl-tabs flex flex-wrap gap-2 p-1.5" :aria-label="t('videoSections')">
+        <button v-for="destination in videos.primaryDestinations.value" :key="destination" type="button"
+          @click="changeVideoSection(destination)" :aria-pressed="videoSection===destination"
+          :disabled="videoSectionBusy && videoSection!==destination"
+          :class="videoSection===destination?'bg-cyan-900 text-cyan-100':'text-slate-300'"
+          class="min-h-11 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{{t({mine:'videoMine',shared:'videoTeam',staff:'videoStaff',review:'videoReview'}[destination])}}</button>
       </nav>
-      <p v-if="videoSection==='review' && reviewScope" class="text-xs text-slate-300">Review scope matches Home. Change club or team scope on Home; inbox filters only narrow that scope.</p>
+      <button v-if="videos.secondaryShared.value && (videoSection==='mine' || videoSection==='shared')"
+        type="button" :aria-pressed="videoSection==='shared'" :disabled="videoSectionBusy"
+        class="sdl-secondary min-h-11 px-4 py-2" @click="changeVideoSection('shared')">{{t('videoTeam')}}</button>
+      <template v-if="videoSection==='staff'">
+        <label v-if="videos.staffScopes.value.length>1" class="block max-w-lg text-sm">{{t('videoStaffScope')}}
+          <select class="block min-h-11 w-full rounded-lg bg-slate-950 p-2 text-base" :disabled="videoSectionBusy"
+            :value="videos.staffScope.value?.key || ''" @change="changeVideoStaff($event.target.value)">
+            <option value="" disabled>{{t('videoChooseScope')}}</option>
+            <option v-for="scope in videos.staffScopes.value" :key="scope.key" :value="scope.key">{{scope.club}} · {{scope.teamName || t('videoClubRoster')}} · {{t({coach:'videoRoleCoach',manager:'videoRoleManager',club_admin:'videoRoleAdmin'}[scope.role])}}</option>
+          </select>
+        </label>
+        <div v-if="videos.staffTeams.value.length" class="flex flex-wrap gap-2">
+          <button type="button" @click="changeVideoTeamView('library')" :aria-pressed="videos.teamView.value==='library'" :disabled="videoSectionBusy" class="sdl-secondary min-h-11 px-4">{{t('videoPrivateLibrary')}}</button>
+          <button type="button" @click="changeVideoTeamView('shared')" :aria-pressed="videos.teamView.value==='shared'" :disabled="videoSectionBusy" class="sdl-secondary min-h-11 px-4">{{t('videoShared')}}</button>
+        </div>
+      </template>
+      <label v-if="videoSection==='review' && videos.scopes.value.length>1" class="block max-w-lg text-sm">{{t('videoReviewScope')}}
+        <select class="block min-h-11 w-full rounded-lg bg-slate-950 p-2 text-base" :disabled="videoSectionBusy"
+          :value="videos.reviewMode.value" @change="changeVideoReview($event.target.value)">
+          <option v-for="entry in videos.scopes.value" :key="entry.mode" :value="entry.mode">{{t(entry.mode==='coach'?'videoRoleCoach':'videoRoleAdmin')}}</option>
+        </select>
+      </label>
+      <button v-if="videoSection==='review' && videos.homeScoped.value" type="button" :disabled="videoSectionBusy"
+        @click="changeVideoReview(videos.reviewMode.value)" class="sdl-secondary min-h-11 px-4">{{t('videoAllReviewTeams')}}</button>
       <p v-if="videoSectionBusy" role="status" class="text-xs text-slate-400">Finish the current media action before switching sections.</p>
-      <p v-else-if="reviewScope && videoSection==='library'" class="text-xs text-slate-400">Open Review for the centralized pending inbox, or review clips inside the authorized player library.</p>
+      <p v-if="videos.busy.value && isVideoLibrary" role="status" class="text-sm text-slate-300">{{t('videoLoadingPlayers')}}</p>
+      <div v-if="videos.error.value && isVideoLibrary" role="alert" class="text-sm text-rose-300">
+        {{t('videoRosterUnavailable')}} <button type="button" class="min-h-11 underline" @click="videos.load()">{{t('videoRetry')}}</button>
+      </div>
+      <button v-if="videos.next.value && isVideoLibrary" type="button" :disabled="videos.busy.value||videoSectionBusy" @click="videos.load(true)" class="sdl-secondary min-h-11 px-4">{{t('videoMorePlayers')}}</button>
     </section>
-    <private-media-panel v-if="activeTab === 'videos' && mediaOriginAllowed && videoSection==='library'"
-      :controller="privateMediaController"></private-media-panel>
+    <private-media-panel v-if="activeTab === 'videos' && mediaOriginAllowed && isVideoLibrary && (videoSection==='mine'||videos.staffScope.value)"
+      :restrict-moderation="!videoModeration" :controller="privateMediaController"></private-media-panel>
     <template v-if="activeTab === 'videos' && mediaOriginAllowed && !authError && videoSection==='review' && reviewScope">
       <video-review-inbox :available="reviewQueue.available.value" :scope="reviewScope" :status="reviewQueue.status.value" :rows="reviewQueue.rows.value" :filters="reviewQueue.filters.value" :teams="reviewQueue.teams.value" :players="reviewQueue.players.value" :total="reviewQueue.total.value" :filtered-total="reviewQueue.filteredTotal.value" :has-more="!!reviewQueue.next.value" :busy="reviewQueue.opening.value || privateMediaController.mediaReviewing.value" @filter="reviewQueue.filter" @refresh="reviewQueue.retry" @more="reviewQueue.refreshInbox(true)" @open="reviewQueue.open"></video-review-inbox>
       <p v-if="reviewQueue.notice.value" role="status" class="my-3 text-sm text-amber-200">{{reviewQueue.notice.value}}</p>
       <private-media-panel review-only :controller="privateMediaController" @close-review="closeInboxReview"></private-media-panel>
     </template>
-    <media-publication-panel v-if="activeTab === 'videos' && mediaOriginAllowed && !authError && videoSection==='library' && ['coach','admin'].includes(workspaceMode) && privateMediaController.mediaPlayerId.value"
-      ref="publicationPanel" :key="authUser.id + ':' + workspaceMode + ':' + privateMediaController.mediaPlayerId.value" :auth="loginController" :controller="privateMediaController"></media-publication-panel>
-    <clubhouse-media-panel v-if="activeTab === 'videos' && mediaOriginAllowed && !authError && videoSection==='clubhouse' && clubhouseMediaTeams.length"
+    <media-publication-panel v-if="activeTab === 'videos' && mediaOriginAllowed && !authError && isVideoLibrary && videoModeration && privateMediaController.mediaPlayerId.value"
+      ref="publicationPanel" :key="clubhouseScopeKey + ':' + privateMediaController.mediaPlayerId.value" :auth="loginController" :controller="privateMediaController"></media-publication-panel>
+    <clubhouse-media-panel v-if="activeTab === 'videos' && mediaOriginAllowed && !authError && clubhouseMediaTeams.length"
       :key="clubhouseScopeKey" :auth="loginController" :teams="clubhouseMediaTeams"></clubhouse-media-panel>
 
     <!-- Keep the existing gated workspace mounted and reachable, after the primary roster/library.
          The details disclosure changes presentation only; it does not enable any operation. -->
     <details :open="submissionController.enabled ? true : undefined"
-      :class="!isManagedWorkspace && (activeTab === 'team' || activeTab === 'stats' || (activeTab === 'videos' && mediaOriginAllowed && videoSection==='library')) && currentView !== 'player' ? 'mt-4 rounded-xl border border-slate-700 p-3 no-print' : 'hidden'">
+      :class="!isManagedWorkspace && (activeTab === 'team' || activeTab === 'stats' || (activeTab === 'videos' && mediaOriginAllowed && isVideoLibrary)) && currentView !== 'player' ? 'mt-4 rounded-xl border border-slate-700 p-3 no-print' : 'hidden'">
       <summary class="min-h-11 cursor-pointer py-3 text-sm font-semibold text-slate-300">{{ submissionController.enabled ? 'Submissions and Clubhouse' : 'Submissions and Clubhouse · currently unavailable' }}</summary>
       <submission-workspace :show-performance-review="activeTab !== 'stats'" :controller="submissionController" :pilot-controller="pilotController" :t="t"></submission-workspace>
     </details>
