@@ -10,11 +10,12 @@ export function buildStagingFrontend(root=repo){
  const files=[];
  const copy=(relative)=>{const source=path.join(root,relative),stat=fs.lstatSync(source);if(stat.isSymbolicLink())throw Error('Symlinks are not allowed in frontend export');
   if(stat.isDirectory()){for(const entry of fs.readdirSync(source))copy(path.join(relative,entry));return;}
-  if(!/\.(js|html|png)$/.test(relative) && !(/^assets[\\/]demo-players[\\/]\d{2}\.svg$/.test(relative)))throw Error('Unexpected frontend asset type: '+relative);
+  if(!/\.(js|html|png)$/.test(relative) && !(/^assets[\\/]demo-players[\\/]\d{2}\.svg$/.test(relative)) && !(/^assets[\\/]demo-players[\\/](2[1-9]|3[0-5])\.jpg$/.test(relative)))throw Error('Unexpected frontend asset type: '+relative);
   if(/\.(js|html)$/.test(relative)){
    const text=fs.readFileSync(source,'utf8');if(/sb_secret_|SUPABASE_SERVICE_ROLE_KEY|-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(text))throw Error('Privileged credential pattern in frontend source');
    for(const match of text.matchAll(/(?:from\s*|import\s*)['"](\.[^'"]+)['"]/g)){const dependency=path.resolve(path.dirname(source),match[1]);if(!dependency.startsWith(root+path.sep)||!fs.existsSync(dependency))throw Error('Missing or external local ES module');}
   }
+  if(/\.jpg$/.test(relative)){const bytes=fs.readFileSync(source);if(bytes.length>1048576||bytes.length<4||bytes[0]!==255||bytes[1]!==216||bytes[bytes.length-2]!==255||bytes[bytes.length-1]!==217)throw Error('Invalid demo JPEG');}
   if(/\.svg$/.test(relative)){
    const svg=fs.readFileSync(source,'utf8');
    if(!svg.includes('Fictional baseball player avatar')||!svg.includes('>DEMO</text>')||/<script\b|<foreignObject\b|\bon(?:load|error|click)\s*=|(?:href|src)\s*=\s*['"](?:https?:|data:)/i.test(svg))throw Error('Unsafe demo avatar asset');

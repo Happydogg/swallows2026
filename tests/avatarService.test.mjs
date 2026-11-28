@@ -95,3 +95,5 @@ test('desktop sidebar and legacy production modules remain visible in source',()
   assert.ok(app.includes('auth.isCurrentIdentity(identity)'));
   assert.ok(index.includes(':can-edit-photo="canEditPlayerPhoto(selectedPlayer.id)"'));
 });
+
+test('only matching existing synthetic avatar references are replaced by approved JPEGs',async()=>{const api=await loadService(mockClient().client);const p={jersey:'21',preferred_name:'DEMO Athlete'};assert.equal(api.publicAvatarOrFallback('https://sdl-ux-live.pages.dev/assets/demo-players/21.svg',p),'/assets/demo-players/21.jpg');assert.equal(api.publicAvatarOrFallback('/assets/demo-players/21.svg',p),'/assets/demo-players/21.jpg');assert.equal(api.publicAvatarOrFallback('https://example.invalid/custom.jpg',p),'https://example.invalid/custom.jpg');assert.equal(api.publicAvatarOrFallback('https://sdl-ux-live.pages.dev/assets/demo-players/21.svg',{...p,preferred_name:'Other'}),'https://sdl-ux-live.pages.dev/assets/demo-players/21.svg');});

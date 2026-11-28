@@ -14,7 +14,7 @@ export const CoachHome = {
     const preview = Vue.computed(() => props.roster.slice(0, 3)); // Home preview only; Team owns the complete roster.
     const avatarFor = player => {
       const approved=String(player?.photo_url||'');
-      if (/^https:\/\//.test(approved) || /^\/assets\/demo-players\/(2[1-9]|3[0-5])\.svg$/.test(approved)) return approved;
+      if (/^https:\/\//.test(approved) || /^\/assets\/demo-players\/(2[1-9]|3[0-5])\.(svg|jpg)$/.test(approved)) return approved;
       const jersey=String(player?.jersey||'');
       return /^DEMO\s/.test(String(player?.preferred_name||'')) && /^(2[1-9]|3[0-5])$/.test(jersey)
         ? '/assets/demo-players/'+jersey+'.svg' : '';

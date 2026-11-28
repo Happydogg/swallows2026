@@ -10,6 +10,7 @@ test('Pages static export contains only frontend assets, root ES modules, safe h
     const src=path.join(r.directory,'assets','demo-players',n+'.svg');
     assert.equal(fs.existsSync(src),true,'missing demo portrait #'+n);
     assert.match(fs.readFileSync(src,'utf8'),/>DEMO<\/text>/);
+    const jpg=fs.readFileSync(path.join(r.directory,'assets','demo-players',n+'.jpg'));assert.equal(jpg[0],255);assert.equal(jpg[1],216);
   }
   const config=path.join(tmp,'js/config.js');fs.writeFileSync(config,fs.readFileSync(config,'utf8').replace('SUBMISSION_FEATURES_ENABLED = false','SUBMISSION_FEATURES_ENABLED = true'));assert.throws(()=>buildStagingFrontend(tmp),/disabled frontend gate/);
  }finally{fs.rmSync(tmp,{recursive:true,force:true});}

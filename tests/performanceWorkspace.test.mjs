@@ -175,3 +175,20 @@ test('organized Stats layout preserves selected athlete and routes only eligible
   assert.equal(state.rows.value.length,0);
   assert.equal(h.calls.filter(c=>['sdl_v5_correct_official',submitRpc,'sdl_004_pilot_review_performance'].includes(c.rpc)).length,0);
 });
+
+// SDL-005 pilot deterministic IDs are PostgreSQL UUID values, not necessarily RFC-versioned.
+test('deterministic player IDs reach scoped performance RPC; malformed IDs and mismatched rows fail closed',async t=>{
+  const {h,workspace,playerId,fill}=await fixture(t);
+  const demo='12345678-1234-e123-6123-123456789abc';
+  h.rows[historyRpc]=[{...row,player_id:demo}];
+  playerId.value=demo;
+  await until(()=>workspace.ready.value);
+  assert.equal(h.calls.filter(c=>c.rpc===historyRpc).at(-1).args.p_player,demo);
+  h.rows[submitRpc]={id:measurementId,status:'approved',revision:1};
+  fill();await workspace.save();
+  assert.equal(h.calls.filter(c=>c.rpc===submitRpc).at(-1).args.p_player,demo);
+  h.rows[historyRpc]=[row];await workspace.refresh();
+  assert.match(workspace.error.value,/did not match/);
+  playerId.value='../bad';await until(()=>/Invalid performance record identifier/.test(workspace.error.value));
+  assert.equal(workspace.ready.value,false);
+});
