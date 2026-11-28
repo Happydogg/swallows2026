@@ -9,9 +9,9 @@ const staffRoles=['coach','manager','club_admin'];
 const reviewModes=['coach','admin'];
 const roleKey=mode=>mode==='admin'?'club_admin':mode;
 
-export function useVideoDestinations({auth,origin,activeTab,workspaceMode,homeReviewScope}){
+export function useVideoDestinations({auth,origin,activeTab,workspaceMode,homeReviewScope,batchAllowed}){
  const {ref,computed,watch}=Vue;
- const requested=ref(''),staffChoice=ref(''),teamView=ref('library'),selectedReviewMode=ref('');
+ const requested=ref('landing'),staffChoice=ref(''),teamView=ref('library'),selectedReviewMode=ref('');
  const retainHomeScope=ref(false),guardianRows=ref([]),staffRows=ref([]),next=ref(null);
  const busy=ref(false),error=ref(''),revision=ref(0);
  const context=computed(()=>{
@@ -63,8 +63,11 @@ export function useVideoDestinations({auth,origin,activeTab,workspaceMode,homeRe
   ...(links.value.length?['mine']:[]),...(guardianTeams.value.length?['shared']:[]),
   ...(staffScopes.value.length?['staff']:[]),...(reviewScope.value?['review']:[])
  ]);
- const section=computed(()=>destinations.value.includes(requested.value)?requested.value:
-  workspaceMode.value!=='family'&&staffScopes.value.length?'staff':destinations.value[0]||'');
+ const section=computed(()=>{
+  const id=requested.value;
+  if(destinations.value.includes(id))return id;
+  return id==='batch'&&context.value&&batchAllowed.value?'batch':'landing';
+ });
  // The frozen three primary Coach–Guardian controls stay intact. This same
  // guardian-scoped destination remains reachable as a secondary control.
  const secondaryShared=computed(()=>guardianTeams.value.length>0&&links.value.length>0&&
@@ -118,14 +121,14 @@ export function useVideoDestinations({auth,origin,activeTab,workspaceMode,homeRe
   inFlight=readRoster(append);return inFlight;
  }
  function reset(){
-  clearRows();requested.value='';staffChoice.value='';teamView.value='library';
+  clearRows();requested.value='landing';staffChoice.value='';teamView.value='library';
   retainHomeScope.value=false;selectedReviewMode.value='';revision.value++;
  }
  watch([context,linkIds],reset,{flush:'sync'});
  watch(scopeSignature,clearRows,{flush:'sync'});
  watch([scopeSignature,revision],()=>{if(scopeSignature.value)void load();},{flush:'post'});
  function select(id){
-  if(!destinations.value.includes(id))return false;
+  if(id!=='landing'&&!destinations.value.includes(id)&&!(id==='batch'&&context.value&&batchAllowed.value))return false;
   requested.value=id;return true;
  }
  function selectStaff(key){

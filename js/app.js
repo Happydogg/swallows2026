@@ -1,3 +1,6 @@
+import {VideoLibrary} from '../components/VideoLibrary.js';
+import {CoachBatchUpload} from '../components/CoachBatchUpload.js';
+import {fictionalVideoPortrait} from './fictionalVideoPortrait.js';
 import {useVideoDestinations} from '../composables/useVideoDestinations.js';
 import { PerformanceWorkspace } from '../components/PerformanceWorkspace.js';
 import {createPilotWorkflowService} from './pilotWorkflowService.js';
@@ -61,7 +64,7 @@ const { createApp, ref, onMounted, onUnmounted, markRaw, computed } = Vue;
 createApp({
   components: {
     PilotWorkspace, PerformanceInbox, LoginLanding, AppShell, CoachHome, ParentHome, StatsHub, AuthorizedStatsBoard, StagingDataBrowser, AvatarManager, InviteOnboarding, AppHeader, TeamOverview, CoachTeamRoster, PlayerFormModal, PlayerProfile, PrivateMediaPanel, MediaConsentPanel, MediaPublicationPanel, ClubhouseMediaPanel, SubmissionWorkspace, ClubEnrollmentAdmin,
-    SessionFormModal, UploadVideoModal, ArAnalyzerModal, ManagedRoster, PerformanceWorkspace, ActionCenter, VideoReviewInbox
+    SessionFormModal, UploadVideoModal, ArAnalyzerModal, ManagedRoster, PerformanceWorkspace, ActionCenter, VideoReviewInbox, VideoLibrary, CoachBatchUpload
   },
   setup() {
     const savedLang = localStorage.getItem('swallows_lang');
@@ -172,7 +175,7 @@ createApp({
         'http://127.0.0.1:5500','http://localhost:5500'].includes(window.location.origin)
     );
     const changeWorkspace = async requested => {
-      if (!workspaceOptions.value.some(option => option.id === requested) || requested === workspaceMode.value) return;
+      if (!workspaceOptions.value.some(option => option.id === requested) || requested === workspaceMode.value || !canLeaveBatch()) return;
       clearWorkspaceState();
       requestedWorkspace.value = requested;
       activeTab.value = 'home';
@@ -217,7 +220,22 @@ createApp({
       organizationId:workspaceMode.value==='coach'?coachOrganizationId.value:managedRoster.organizationId.value,
       teamId:workspaceMode.value==='coach'?coachTeamId.value:managedRoster.teamId.value
     }));
-    const videos = useVideoDestinations({auth,origin:mediaOriginAllowed,activeTab,workspaceMode,homeReviewScope});
+    const batchPage=ref(null);
+    const batchAllowed=computed(()=>mediaOriginAllowed.value&&auth.authReady.value&&!auth.authError.value&&
+      workspaceMode.value==='coach'&&auth.isTeamCoach.value&&
+      auth.accountContext.value?.user_id===auth.authUser.value?.id&&coachTeams.value.length>0);
+    const videos = useVideoDestinations({auth,origin:mediaOriginAllowed,activeTab,workspaceMode,homeReviewScope,batchAllowed});
+    const videoCards=[
+      {id:'staff',label:'videoStaff',description:'Browse authorized player videos',icon:'▣'},
+      {id:'mine',label:'videoMine',description:'Your linked children’s video library',icon:'▶'},
+      {id:'shared',label:'videoTeam',description:'Approved shared videos',icon:'▤'},
+      {id:'review',label:'videoReview',description:'Review authorized private submissions',icon:'✓'},
+      {id:'batch',label:'videoBatchUpload',description:'Upload multiple practice videos',icon:'↑'}
+    ];
+    const videoDestinations=computed(()=>videoCards.filter(card=>
+      card.id==='batch'?batchAllowed.value:videos.primaryDestinations.value.includes(card.id)));
+    const videoRoster=computed(()=>(videos.section.value==='mine'?videos.guardianRows.value:videos.staffRows.value)
+      .map(player=>({...player,photo_url:fictionalVideoPortrait(player,publicAvatarOrFallback(player.photo_url,player))})));
     const videoSection=videos.section;
     const reviewScope=computed(()=>activeTab.value==='videos'?videos.reviewScope.value:homeReviewScope.value);
     const isVideoLibrary=computed(()=>videoSection.value==='mine'||videoSection.value==='staff'&&videos.teamView.value==='library');
@@ -247,16 +265,18 @@ createApp({
     const videoSectionBusy = computed(() => privateMedia.mediaUploading.value || privateMedia.mediaReviewing.value || privateMedia.mediaArchiving.value || publicationPanel.value?.busy===true);
     const actionCenterStatus=computed(()=>reviewScope.value?(reviewQueue.summaryStatus.value==='idle'?'loading':reviewQueue.summaryStatus.value):'ready');
     const actionCenterItems=computed(()=>reviewScope.value?(reviewQueue.summaryStatus.value==='ready'?reviewQueue.summaryItems.value:[{kind:'video_review',available:true,count:null,required:false}]):workspaceMode.value==='family'&&auth.isVerifiedGuardian.value&&mediaOriginAllowed.value?[{kind:'media_consent',available:true,required:false,description:'Optional team video sharing preferences'}]:[]);
-    const closeInboxReview=()=>{if(!privateMedia.mediaReviewing.value)privateMedia.resetMedia();};
+    const canLeaveBatch=()=>activeTab.value!=='videos'||videoSection.value!=='batch'||
+      !batchPage.value?.hasPending?.()||window.confirm('Leave Batch Upload? Unconfirmed requests may already have reached the server. The local queue will be cleared.');
     const openActionCenter=target=>{
       if(target?.kind==='video_review'&&homeReviewScope.value&&!videoSectionBusy.value){
         const mode=homeReviewScope.value.role==='coach'?'coach':'admin';
-        navigateTab('videos');videos.selectReview(mode,true);changeVideoSection('review');
+        if(navigateTab('videos')===false)return;
+        videos.selectReview(mode,true);changeVideoSection('review');
       }
       else if(target?.kind==='media_consent'&&workspaceMode.value==='family'&&auth.isVerifiedGuardian.value&&mediaOriginAllowed.value)navigateTab('me');
     };
     const canChangeVideoScope=()=>activeTab.value==='videos'&&mediaOriginAllowed.value&&!auth.authError.value&&!videoSectionBusy.value;
-    const changeVideoSection=section=>canChangeVideoScope()&&videos.select(section);
+    const changeVideoSection=section=>canChangeVideoScope()&&(section===videoSection.value||canLeaveBatch())&&videos.select(section);
     const changeVideoStaff=key=>canChangeVideoScope()&&videoSection.value==='staff'&&videos.selectStaff(key);
     const changeVideoReview=mode=>canChangeVideoScope()&&videoSection.value==='review'&&videos.selectReview(mode);
     const changeVideoTeamView=view=>{
@@ -454,7 +474,7 @@ createApp({
         row.id === player.id && (workspaceMode.value !== 'coach' || row.team_id === player.team_id));
       if (!currentlyScoped) return;
       const identity=auth.captureIdentity(),mode=workspaceMode.value;
-      navigateTab('videos');
+      if(navigateTab('videos')===false)return;
       if(!changeVideoSection(mode==='family'?'mine':'staff'))return;
       if(mode==='coach'){
         const scope=videos.staffScopes.value.find(entry=>entry.role==='coach'&&entry.teamId===player.team_id);
@@ -561,8 +581,8 @@ createApp({
       for (const id of Object.keys(playerFeature.failedImgs)) delete playerFeature.failedImgs[id];
     };
     const navigateTab = tab => {
-      if (!['home', 'team', 'stats', 'videos', 'me'].includes(tab)) return;
-      if(privateMedia.inboxReviewMode.value&&privateMedia.mediaReviewing.value)return;
+      if (!['home', 'team', 'stats', 'videos', 'me'].includes(tab) || !canLeaveBatch()) return false;
+      if(privateMedia.inboxReviewMode.value&&privateMedia.mediaReviewing.value)return false;
       if(privateMedia.inboxReviewMode.value)privateMedia.resetMedia();
       clearProfileHistory();
       activeTab.value = tab;
@@ -609,8 +629,8 @@ createApp({
       submissionController: markRaw(submissionWorkspace),
       enrollmentAdminController: markRaw(enrollmentAdmin),
       privateMediaController: markRaw(privateMedia), videoSection, videoSectionBusy, changeVideoSection, publicationPanel, isVideoLibrary, videoModeration,
-      videos:markRaw(videos),changeVideoStaff,changeVideoReview,changeVideoTeamView,
-      reviewScope,reviewQueue:markRaw(reviewQueue),actionCenterItems,actionCenterStatus,openActionCenter,closeInboxReview,
+      videos:markRaw(videos),videoDestinations,videoRoster,batchPage,batchAllowed,changeVideoStaff,changeVideoReview,changeVideoTeamView,
+      reviewScope,reviewQueue:markRaw(reviewQueue),actionCenterItems,actionCenterStatus,openActionCenter,
       statsBoardController: markRaw(statsBoard), performancePlayers, performanceReviewTeams, refreshPerformanceHistory,
        avatarController: markRaw(avatarManager),
       managedRosterController: markRaw(managedRoster), workspaceOptions, isManagedWorkspace,

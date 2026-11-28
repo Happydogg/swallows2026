@@ -13,24 +13,48 @@ export const VideoReviewInbox={
     rows:{type:Array,default:()=>[]},filters:{type:Object,default:()=>({})},
     teams:{type:Array,default:()=>[]},players:{type:Array,default:()=>[]},
     scope:{type:Object,default:null},total:{type:Number,default:null},filteredTotal:{type:Number,default:null},hasMore:{type:Boolean,default:false},busy:{type:Boolean,default:false},
-    thumbnails:{type:Object,default:()=>({})}},
-  emits:['filter','refresh','more','open'],
+    controller:{type:Object,default:null},selected:{type:Object,default:null},thumbnails:{type:Object,default:()=>({})}},
+  emits:['filter','refresh','more','open','close','next'],
   setup(props,{emit}){
     const visible=Vue.computed(()=>visibleReviewRows(props.rows,props.filters,props.available,props.status,props.scope));
     const playerOptions=Vue.computed(()=>props.players.filter(p=>!props.filters.teamId||p.teamIds?.includes(props.filters.teamId)));
     const safeTotal=Vue.computed(()=>props.available&&props.status==='ready'&&Number.isSafeInteger(props.total)&&props.total>=0?props.total:null);
     function open(row){if(!props.busy&&visible.value.some(x=>x.id===row.id))emit('open',{id:row.id,playerId:row.playerId,teamId:row.teamId});}
-    return {visible,playerOptions,safeTotal,categories,localThumbnail,open};
+    const playback=Vue.computed(()=>props.controller?.mediaPlaybackUrl.value || '');
+    const canDecide=Vue.computed(()=>!!(playback.value&&props.controller?.reviewItem.value));
+    return {visible,playerOptions,safeTotal,categories,localThumbnail,open,playback,canDecide};
   },
   template:`
-    <section v-if="available" class="sdl-panel space-y-4 p-4" aria-label="Video Review inbox">
+    <section v-if="available" class="space-y-4" aria-label="Review Videos">
       <header class="flex flex-wrap items-center justify-between gap-2">
-        <div><h2 class="text-lg font-black text-white">Video Review</h2>
-          <p v-if="safeTotal!==null" role="status" class="text-sm text-slate-300">{{safeTotal}} pending in authorized scope</p><p v-if="safeTotal!==null&&filteredTotal!==null" class="text-xs text-slate-400">{{filteredTotal}} matching · {{visible.length}} loaded</p>
+        <div><h2 class="text-2xl font-bold">Review Videos</h2>
+          <p role="status" class="text-sm text-slate-400">{{safeTotal===null?'Pending count unavailable':safeTotal+' pending'}} · Content suitability only</p><p v-if="safeTotal!==null&&filteredTotal!==null" class="text-xs text-slate-400">{{filteredTotal}} matching · {{visible.length}} loaded</p>
         </div>
-        <button type="button" :disabled="status==='loading'||busy" @click="$emit('refresh')" class="min-h-11 rounded-lg border border-slate-600 px-3 text-sm text-white disabled:opacity-50">Refresh</button>
+        <button v-if="!selected" type="button" :disabled="status==='loading'||busy" @click="$emit('refresh')" class="min-h-11 rounded-lg border border-slate-600 px-3 text-sm text-white disabled:opacity-50">Refresh</button>
       </header>
-      <p v-if="status==='loading'" role="status" class="text-sm text-slate-300">Loading review inbox…</p>
+      <p v-if="controller?.mediaError.value" role="alert" class="rounded-lg bg-rose-950 p-3 text-sm text-rose-200">{{controller.mediaError.value}}</p>
+      <p v-if="controller?.mediaNotice.value" role="status" class="text-sm text-emerald-200">{{controller.mediaNotice.value}}</p>
+      <template v-if="selected && controller">
+        <button type="button" @click="$emit('close')" :disabled="busy" class="min-h-11 text-cyan-300">‹ Back to queue</button>
+        <div class="rounded-xl border border-slate-700 bg-slate-900 p-3">
+          <p class="font-bold">{{controller.inboxReviewPlayerLabel.value}}</p>
+          <p class="text-xs text-slate-400">{{selected.teamLabel}} · {{selected.category}}</p>
+          <video v-if="playback" :key="playback" :src="playback" @error="controller.reportPlaybackError"
+            controls playsinline preload="metadata" class="mt-3 aspect-video w-full rounded-lg bg-black object-contain"></video>
+        </div>
+        <template v-if="canDecide">
+          <label class="flex items-start gap-2 text-sm"><input type="checkbox" v-model="controller.reviewSingleSubject.value" :disabled="busy">I confirm only the selected athlete is identifiable in the entire clip.</label>
+          <label class="block text-sm">Rejection reason (required to reject)<textarea v-model="controller.reviewVideoNote.value" maxlength="1000" :disabled="busy" rows="2" class="mt-1 w-full rounded-xl bg-slate-900 p-3"></textarea></label>
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" @click="controller.reviewPrivateMedia('approved')" :disabled="busy" class="min-h-12 rounded-xl bg-emerald-700 font-bold">Approve</button>
+            <button type="button" @click="controller.reviewPrivateMedia('rejected')" :disabled="busy||!controller.reviewVideoNote.value.trim()" class="min-h-12 rounded-xl border border-rose-700 text-rose-200 font-bold disabled:opacity-40">Reject</button>
+          </div>
+          <p class="text-xs text-slate-400">Approval remains private. It does not publish or share the video.</p>
+        </template>
+        <p v-if="status==='unavailable'" role="status" class="text-sm text-amber-200">The next page is unavailable. Return to the queue to refresh.</p>
+        <button type="button" @click="$emit('next')" :disabled="busy||status!=='ready'" class="min-h-12 w-full rounded-xl bg-slate-800 font-bold">Next Video →</button>
+      </template>
+      <p v-else-if="status==='loading'" role="status" class="text-sm text-slate-300">Loading review inbox…</p>
       <p v-else-if="status==='unavailable'" role="status" class="text-sm text-amber-200">Review inbox unavailable. No pending count is available.</p>
       <template v-else-if="status==='ready'">
         <div class="grid gap-3 sm:grid-cols-3">
@@ -39,18 +63,19 @@ export const VideoReviewInbox={
           <label class="min-w-0 text-xs text-slate-300">Category<select :disabled="busy" :value="filters.category||''" @change="$emit('filter',{key:'category',value:$event.target.value})" class="mt-1 min-h-11 w-full rounded-lg border border-slate-600 bg-slate-900 px-2 text-sm text-white"><option value="">All categories</option><option v-for="category in categories" :key="category" :value="category">{{category}}</option></select></label>
         </div>
         <p v-if="!visible.length" role="status" class="text-sm text-slate-300">{{safeTotal===0?'No videos awaiting your review.':'No matching videos. Try changing filters.'}}</p>
-        <article v-for="row in visible" :key="row.id" class="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800 p-3">
-          <div class="flex h-16 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-900">
-            <img v-if="localThumbnail(thumbnails[row.id])" :src="localThumbnail(thumbnails[row.id])" alt="" loading="lazy" class="h-full w-full object-cover">
-            <span v-else class="px-1 text-center text-xs text-slate-300">No preview</span>
-          </div>
-          <div class="min-w-0 flex-1 break-words">
-            <h3 class="text-sm font-bold text-white">{{row.playerLabel}}</h3>
-            <p class="text-xs text-slate-300">{{row.teamLabel}} · {{row.category}}</p>
-            <p class="text-xs font-semibold text-amber-200">Pending independent review</p>
-          </div>
-          <button type="button" @click="open(row)" :disabled="busy" class="min-h-11 shrink-0 rounded-lg border border-cyan-700 bg-cyan-950 px-3 text-sm font-bold text-cyan-100" :aria-label="'Open review for '+row.playerLabel">Open</button>
-        </article>
+        <button v-for="row in visible" :key="row.id" type="button" @click="open(row)" :disabled="busy"
+          class="flex w-full items-center gap-3 rounded-xl border border-slate-700 bg-slate-900 p-4 text-left"
+          :aria-label="'Open review for '+row.playerLabel">
+          <span class="grid h-12 w-16 shrink-0 place-content-center overflow-hidden rounded-lg bg-slate-800" aria-hidden="true">
+            <img v-if="localThumbnail(thumbnails[row.id])" :src="localThumbnail(thumbnails[row.id])" alt="" loading="lazy">
+            <span v-else>▶</span>
+          </span>
+          <span class="min-w-0 flex-1 break-words">
+            <span class="block font-bold">{{row.playerLabel}}</span>
+            <span class="block text-xs text-slate-400">{{row.teamLabel}} · {{row.category}} · {{row.createdAt?new Date(row.createdAt).toLocaleDateString():''}}</span>
+          </span>
+          <span aria-hidden="true">›</span>
+        </button>
         <button v-if="hasMore" type="button" @click="$emit('more')" :disabled="busy" class="min-h-11 w-full rounded-lg border border-slate-600 text-sm text-white">Load more</button>
       </template>
     </section>`

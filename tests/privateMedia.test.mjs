@@ -429,3 +429,15 @@ test('private media review only sends decision, note and explicit subject attest
  assert.deepEqual(body,{decision:'approved',note:'',single_subject:true});
  await assert.rejects(service.review(VIDEO,'rejected','',false),/Invalid independent review/);
 });
+
+test('Back to gallery revokes playback while retaining the authorized player and clips', async t => {
+  const { c, revoked } = await controllerHarness(t);
+  await c.selectMediaPlayer(PLAYER);
+  await c.playPrivateMedia(c.mediaItems.value[0]);
+  assert.equal(c.mediaPlaybackUrl.value, 'blob:private-test');
+  c.closePrivatePlayback();
+  assert.deepEqual(revoked, ['blob:private-test']);
+  assert.equal(c.mediaPlaybackUrl.value, '');
+  assert.equal(c.mediaPlayerId.value, PLAYER);
+  assert.equal(c.mediaItems.value[0].id, VIDEO);
+});

@@ -9,7 +9,8 @@ const runtime = process.env.SDL004_VUE_RUNTIME;
 test('Vue 3 compiler and renderer preserve shell, private media, player and analyzer bindings', { skip: !runtime }, async t => {
   const Vue = await import(pathToFileURL(runtime).href);
   const { compile } = createRequire(runtime)('@vue/compiler-dom');
-  const h = await harness(t, user('parent'));
+  const origin=Vue.ref(undefined);
+  const h = await harness(t, user('parent'), {originRef:origin});
   const makeRender = template => {
     const render = new Function('Vue', compile(template, { hoistStatic: false }).code)(Vue);
     render._rc = true; // Match Vue's runtime compiler handling of with(_ctx).
@@ -49,12 +50,12 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   app.config.warnHandler = message => warnings.push(message);
   app.config.errorHandler = error => errors.push(error);
   const host = node('root'); app.mount(host); t.after(() => app.unmount());
+  const elements=n=>[n,...n.children.flatMap(elements)];
   const flatten = n => `${n.text} ${n.children.map(flatten).join(' ')}`;
-  // Video Room now mounts only when the Videos tab is visible, and private
-  // media remains hidden behind the approved-origin gate.
+  // An unapproved origin cannot mount the Videos landing or the private library.
   h.app.activeTab.value='videos';
   await Vue.nextTick();
-  assert.match(flatten(host),/Video Room|Open the authorized video viewer/);
+  assert.ok(!elements(host).some(n=>n.props['aria-label']==='Video destinations'));
   h.app.activeTab.value='home';
   await Vue.nextTick();
   // The private player selector must exist in the scoped component, but
@@ -64,7 +65,6 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   submissions.changeTab('submissions');await Vue.nextTick();assert.match(flatten(host),/Submit for coach review/);
   submissions.clubEnrollments.value=[{id:'test-enrollment',generation:'gen',organization_name:'Test club',status:'active',consent_active:false,history:[]}];
   await Vue.nextTick();
-  const elements=n=>[n,...n.children.flatMap(elements)];
   const label=elements(host).find(n=>n.type==='label'&&flatten(n).includes('consent to authorized coaches'));
   assert.ok(label,'Standing club consent policy renders');
   const checkbox=label.children.find(n=>n.type==='input');assert.equal(checkbox.props['onUpdate:modelValue'] instanceof Function,true);
@@ -322,7 +322,7 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   navButton(mobileNav,'Stats').props.onClick();await Vue.nextTick();
   assert.ok(sectionButton('Overview'));assert.ok(sectionButton('Record'));assert.equal(sectionButton('Review'),undefined);
   navButton(mobileNav,'Videos').props.onClick();await Vue.nextTick();
-  assert.match(flatten(host),/Video Room|Open the authorized video viewer/);
+  assert.ok(!elements(host).some(n=>n.props['aria-label']==='Video destinations'));
   assert.doesNotMatch(flatten(host),/Upload private clip|Delete video/);
   navButton(mobileNav,'Me').props.onClick();await Vue.nextTick();
   assert.match(flatten(meArea()),/Team Manager · Active/);
@@ -330,19 +330,84 @@ test('Vue 3 compiler and renderer preserve shell, private media, player and anal
   assert.match(String(enrollmentTools().props.class),/hidden/);
   await h.app.signOutAndClear();await Vue.nextTick();
   assert.doesNotMatch(flatten(host),/Manager Scoped Player|Synthetic Roster Player/);
+  const coachTeamId='33333333-3333-4333-8333-333333333333';
   h.loginUser=user('coach-fixture');
   h.rows.sdl_v5_account_context={version:1,user_id:'coach-fixture',roles:['coach'],
     direct_memberships:{organizations:[],teams:[],guardian_links:0},
     organizations:[{id:'club-a',name:'Synthetic Club A',roles:['coach']}],
-    teams:[{id:'team-a1',organization_id:'club-a',name:'Synthetic Team A1',roles:['coach']}],
+    teams:[{id:coachTeamId,organization_id:'club-a',name:'Synthetic Team A1',roles:['coach']}],
     platform:{view:false,export:false,sensitive_write:false}};
-  h.rows.roster=[{id:'11111111-1111-4111-8111-111111111111',team_id:'team-a1',preferred_name:'Coach Scoped Player',jersey:'12'}];
+  h.rows.roster=[{id:'11111111-1111-4111-8111-111111111111',team_id:coachTeamId,preferred_name:'Coach Scoped Player',jersey:'12'}];
   await h.app.signInAndLoad();await Vue.nextTick();
   assert.match(flatten(host),/Team overview/);
   navButton(primaryNav,'Stats').props.onClick();await Vue.nextTick();
   assert.ok(sectionButton('Review'));
   navButton(mobileNav,'Me').props.onClick();await Vue.nextTick();
   assert.match(flatten(meArea()),/Coach · Active/);
+  origin.value='https://sdl-ux-live.pages.dev';
+  const playerId=h.rows.roster[0].id;
+  const clipId='22222222-2222-4222-8222-222222222222';
+  const reviewId='44444444-4444-4444-8444-444444444444';
+  const pendingReview={id:reviewId,playerId,playerLabel:'Coach Scoped Player',teamId:coachTeamId,
+    teamLabel:'Synthetic Team A1',teamIds:[coachTeamId],category:'pitching',status:'pending',can_review:true};
+  const ready={revision:'review-inbox-v1',status:'ready',complete:true};
+  h.fetchImpl=async(url,options)=>{
+    assert.equal(options.method || 'GET','GET');
+    const path=new URL(url).pathname;
+    if(path==='/v2/submissions/upload-eligibility')return Response.json({allowed:false});
+    if(path==='/v2/submissions')return Response.json({items:[
+      {id:clipId,player_id:playerId,category:'pitching',status:'approved'}
+    ]});
+    if(path==='/v2/media/action-summary')return Response.json({...ready,items:[{kind:'video_review',available:true,count:1}]});
+    if(path==='/v2/media/review-inbox')return Response.json({...ready,pendingTotal:1,filteredTotal:1,
+      items:[pendingReview],teams:[{id:coachTeamId,label:'Synthetic Team A1'}],players:[],nextCursor:null});
+    if(path==='/v2/media/clubhouse')return Response.json({items:[
+      {id:clipId,category:'pitching',display_name:'Player',published_at:'2026-11-28T00:00:00Z',can_download:false}
+    ],next_cursor:null});
+    if(['/v2/submissions/'+clipId+'/playback','/v2/submissions/'+reviewId+'/playback',
+      '/v2/media/'+clipId+'/shared-playback'].includes(path))return new Response('synthetic clip',{
+      headers:{'content-type':'video/mp4','content-length':'14'}
+    });
+    return new Response(null,{status:403});
+  };
+  const videoButton=(text)=>elements(host).find(n=>n.type==='button'&&flatten(n).includes(text));
+  navButton(mobileNav,'Videos').props.onClick();await Vue.nextTick();
+  assert.ok(videoButton('Batch Upload'));
+  videoButton('My Team Videos').props.onClick();
+  const rosterButton=()=>elements(host)
+    .filter(n=>n.props['aria-label']==='Authorized video roster')
+    .flatMap(elements)
+    .find(n=>n.type==='button'&&flatten(n).includes('Coach Scoped Player'));
+  await until(()=>!!rosterButton());
+  rosterButton().props.onClick();
+  await until(()=>!!videoButton('Play privately'));
+  videoButton('Play privately').props.onClick();
+  await until(()=>!!videoButton('Back to gallery'));
+  assert.ok(videoButton('Fullscreen'));
+  videoButton('Analyze').props.onClick();await Vue.nextTick();
+  assert.match(flatten(host),/Original recording FPS/);
+  videoButton('Back to gallery').props.onClick();await Vue.nextTick();
+  assert.ok(videoButton('Play privately'));
+  assert.ok(h.revoked.includes('blob:synthetic'));
+  videoButton('Shared videos').props.onClick();
+  await until(()=>!!videoButton('Play shared video'));
+  assert.equal(videoButton('Download video'),undefined);
+  videoButton('Play shared video').props.onClick();
+  await until(()=>!!videoButton('Close video'));
+  videoButton('Close video').props.onClick();
+  videoButton('← Videos').props.onClick();await Vue.nextTick();
+  videoButton('Review Videos').props.onClick();
+  const reviewRow=()=>elements(host).find(n=>n.props['aria-label']==='Open review for Coach Scoped Player');
+  await until(()=>!!reviewRow());
+  reviewRow().props.onClick();
+  await until(()=>!!videoButton('Next Video'));
+  assert.match(flatten(host),/Rejection reason/);
+  videoButton('Next Video').props.onClick();
+  await until(()=>!!reviewRow());
+  assert.match(flatten(host),/Skipped videos remain pending/);
+  videoButton('← Videos').props.onClick();await Vue.nextTick();
+  videoButton('Batch Upload').props.onClick();await Vue.nextTick();
+  assert.match(flatten(host),/Maximum 40 MiB per file/);
   await h.app.signOutAndClear();await Vue.nextTick();
   assert.doesNotMatch(flatten(host),/Coach Scoped Player|Manager Scoped Player/);
   assert.equal(errors.length, 0, errors.map(String).join('\n'));

@@ -346,6 +346,9 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
       is_private: true
     });
   }
+  function closePrivatePlayback() {
+    if (!inboxReviewMode.value && !mediaReviewing.value && !mediaPlaybackLoading.value) releasePlayback();
+  }
   function reportPlaybackError() {
     releasePlayback();
     mediaError.value = 'This browser could not decode the video. For wider compatibility, use H.264 (iPhone Camera > Formats > Most Compatible).';
@@ -356,5 +359,5 @@ export function usePrivateMedia({ auth, players, coachRoster, managedPlayers = {
     mediaPlaybackLoading, analysisCategory, analysisFps, mediaThumbnails, mediaThumbnailBusy, mediaThumbnailFailed,
     submissionsEnabled, ensureMediaThumbnail, retryMediaThumbnail,
     selectMediaPlayer, refreshMedia, selectMediaFile, uploadPrivateMedia, archivePrivateMedia, playPrivateMedia,
-    analyzePrivateMedia, reportPlaybackError, resetMedia };
+    analyzePrivateMedia, closePrivatePlayback, reportPlaybackError, resetMedia };
 }

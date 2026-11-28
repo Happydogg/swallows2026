@@ -325,16 +325,17 @@
       </template>
     </player-profile>
 
-    <!-- UX-003: Library and Clubhouse are distinct destinations; existing authorization stays in their controllers. -->
-    <section v-if="activeTab === 'videos' && mediaOriginAllowed && !authError" class="mb-4 space-y-2 no-print" aria-label="Videos navigation">
+    <section v-if="activeTab==='videos' && mediaOriginAllowed && videoSection==='landing' && !authError" aria-label="Video destinations" class="space-y-3 mb-4">
       <h1 class="text-2xl font-black text-white">Videos</h1>
-      <nav class="sdl-tabs flex flex-wrap gap-2 p-1.5" :aria-label="t('videoSections')">
-        <button v-for="destination in videos.primaryDestinations.value" :key="destination" type="button"
-          @click="changeVideoSection(destination)" :aria-pressed="videoSection===destination"
-          :disabled="videoSectionBusy && videoSection!==destination"
-          :class="videoSection===destination?'bg-cyan-900 text-cyan-100':'text-slate-300'"
-          class="min-h-11 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{{t({mine:'videoMine',shared:'videoTeam',staff:'videoStaff',review:'videoReview'}[destination])}}</button>
-      </nav>
+      <button v-for="d in videoDestinations" :key="d.id" type="button" @click="changeVideoSection(d.id)" class="flex min-h-20 w-full items-center gap-4 rounded-2xl border border-slate-700 bg-slate-900 p-4 text-left">
+        <span aria-hidden="true" class="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-blue-950 text-xl text-blue-200">{{d.icon}}</span><span class="flex-1"><span class="block text-lg font-bold text-white">{{t(d.label)}}</span><span class="block text-xs text-slate-400">{{d.description}}</span></span><span aria-hidden="true" class="text-slate-400">›</span>
+      </button><p v-if="!videoDestinations.length" class="text-sm text-slate-400">No authorized video destination.</p>
+    </section>
+    <button v-if="activeTab==='videos' && mediaOriginAllowed && videoSection!=='landing' && !authError" type="button" @click="changeVideoSection('landing')" :disabled="videoSectionBusy" class="mb-4 min-h-11 rounded-lg px-3 text-blue-300">← Videos</button>
+    <coach-batch-upload v-if="activeTab==='videos' && videoSection==='batch' && batchAllowed"
+      ref="batchPage" :key="videos.revision.value" :auth="loginController" :roster="coachRoster"></coach-batch-upload>
+    <section v-if="activeTab === 'videos' && mediaOriginAllowed && !authError && !['landing','batch'].includes(videoSection)"
+      class="mb-4 space-y-2 no-print" :aria-label="t('videoSections')">
       <button v-if="videos.secondaryShared.value && (videoSection==='mine' || videoSection==='shared')"
         type="button" :aria-pressed="videoSection==='shared'" :disabled="videoSectionBusy"
         class="sdl-secondary min-h-11 px-4 py-2" @click="changeVideoSection('shared')">{{t('videoTeam')}}</button>
@@ -366,12 +367,14 @@
       </div>
       <button v-if="videos.next.value && isVideoLibrary" type="button" :disabled="videos.busy.value||videoSectionBusy" @click="videos.load(true)" class="sdl-secondary min-h-11 px-4">{{t('videoMorePlayers')}}</button>
     </section>
-    <private-media-panel v-if="activeTab === 'videos' && mediaOriginAllowed && isVideoLibrary && (videoSection==='mine'||videos.staffScope.value)"
-      :restrict-moderation="!videoModeration" :controller="privateMediaController"></private-media-panel>
+    <video-library v-if="activeTab === 'videos' && mediaOriginAllowed && isVideoLibrary && (videoSection==='mine'||videos.staffScope.value)"
+      :key="clubhouseScopeKey" :restrict-moderation="!videoModeration" :controller="privateMediaController"
+      :roster="videoRoster" :destination="videoSection"></video-library>
     <template v-if="activeTab === 'videos' && mediaOriginAllowed && !authError && videoSection==='review' && reviewScope">
-      <video-review-inbox :available="reviewQueue.available.value" :scope="reviewScope" :status="reviewQueue.status.value" :rows="reviewQueue.rows.value" :filters="reviewQueue.filters.value" :teams="reviewQueue.teams.value" :players="reviewQueue.players.value" :total="reviewQueue.total.value" :filtered-total="reviewQueue.filteredTotal.value" :has-more="!!reviewQueue.next.value" :busy="reviewQueue.opening.value || privateMediaController.mediaReviewing.value" @filter="reviewQueue.filter" @refresh="reviewQueue.retry" @more="reviewQueue.refreshInbox(true)" @open="reviewQueue.open"></video-review-inbox>
+      <video-review-inbox :available="reviewQueue.available.value" :scope="reviewScope" :status="reviewQueue.status.value" :rows="reviewQueue.rows.value" :filters="reviewQueue.filters.value" :teams="reviewQueue.teams.value" :players="reviewQueue.players.value" :total="reviewQueue.total.value" :filtered-total="reviewQueue.filteredTotal.value" :has-more="!!reviewQueue.next.value" :busy="reviewQueue.opening.value || privateMediaController.mediaReviewing.value" @filter="reviewQueue.filter" @refresh="reviewQueue.retry" @more="reviewQueue.refreshInbox(true)" @open="reviewQueue.open"
+        :controller="privateMediaController" :selected="reviewQueue.selected.value"
+        @close="reviewQueue.close" @next="reviewQueue.nextVideo"></video-review-inbox>
       <p v-if="reviewQueue.notice.value" role="status" class="my-3 text-sm text-amber-200">{{reviewQueue.notice.value}}</p>
-      <private-media-panel review-only :controller="privateMediaController" @close-review="closeInboxReview"></private-media-panel>
     </template>
     <media-publication-panel v-if="activeTab === 'videos' && mediaOriginAllowed && !authError && isVideoLibrary && videoModeration && privateMediaController.mediaPlayerId.value"
       ref="publicationPanel" :key="clubhouseScopeKey + ':' + privateMediaController.mediaPlayerId.value" :auth="loginController" :controller="privateMediaController"></media-publication-panel>

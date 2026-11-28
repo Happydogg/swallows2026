@@ -55,6 +55,13 @@ const cases=[
 for(const [roles,expected] of cases)test('Videos destinations for '+roles.join('+'),async t=>{
  const {h,requests}=await fixture(t,roles);
  assert.deepEqual(Array.from(h.app.videos.primaryDestinations.value),expected);
+ assert.equal(h.app.videoSection.value,'landing');
+ assert.equal(h.app.videoDestinations.value.some(card=>card.id==='batch'),roles.includes('coach'));
+ assert.equal(h.app.changeVideoSection('batch'),roles.includes('coach'));
+ if(roles.includes('coach')){
+  assert.equal(h.app.videoSection.value,'batch');
+  assert.equal(h.app.changeVideoSection('landing'),true);
+ }
  if(!expected.includes('review')){
   assert.equal(h.app.changeVideoSection('review'),false);
   await h.app.reviewQueue.refreshInbox();
@@ -71,6 +78,7 @@ for(const [roles,expected] of cases)test('Videos destinations for '+roles.join('
 test('staff team changes reset bytes and leave the independently verified family scope intact',async t=>{
  const {h,requests,setListResponse}=await fixture(t,['coach','guardian'],true);
  const {videos,privateMediaController:media}=h.app;
+ assert.equal(h.app.changeVideoSection('staff'),true);
  assert.equal(videos.staffScope.value,null,'multiple staff teams need a choice');
  const scopes=videos.staffScopes.value;
  const scopeA=scopes.find(scope=>scope.teamId===staffTeam);
@@ -104,6 +112,8 @@ test('manager workspace reaches Review only through a verified Coach role',async
  // Only the Videos choice changes. The global manager workspace stays selected.
  h.app.navigateTab('videos');
  assert.equal(h.app.workspaceMode.value,'manager');
+ assert.equal(h.app.changeVideoSection('batch'),false);
+ assert.equal(h.app.changeVideoSection('staff'),true);
  const managerScope=h.app.videos.staffScopes.value.find(scope=>scope.role==='manager');
  assert.equal(h.app.changeVideoStaff(managerScope.key),true);
  await until(()=>h.calls.some(req=>req.rpc==='sdl_v5_authorized_roster'&&req.args.p_role==='manager'));
@@ -121,6 +131,7 @@ test('manager workspace reaches Review only through a verified Coach role',async
 test('verified context replacement and logout clear player scope, permissions and pending data',async t=>{
  const {h,requests,setListResponse}=await fixture(t,['guardian']);
  const media=h.app.privateMediaController,late=deferred();
+ assert.equal(h.app.changeVideoSection('mine'),true);
  await until(()=>media.mediaPlayers.value.some(p=>p.id===child));
  setListResponse(()=>late.promise);
  const opening=media.selectMediaPlayer(child);
@@ -144,6 +155,7 @@ test('verified context replacement and logout clear player scope, permissions an
 test('an authorized destination does not convert a private read denial into playback or upload',async t=>{
  const {h,setListResponse}=await fixture(t,['coach']);
  const media=h.app.privateMediaController;
+ assert.equal(h.app.changeVideoSection('staff'),true);
  await until(()=>media.mediaPlayers.value.some(p=>p.id===staffPlayer));
  setListResponse(()=>Response.json({},{status:403}));
  await media.selectMediaPlayer(staffPlayer);

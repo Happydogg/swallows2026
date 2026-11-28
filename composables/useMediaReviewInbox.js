@@ -3,12 +3,12 @@ import {scopeKey,uniqueReviewRows,reviewCategories} from '../js/mediaReviewModel
 const {ref,computed,watch}=Vue;
 const emptyFilters=()=>({teamId:'',playerId:'',category:''});
 export function useMediaReviewInbox({auth,scope,activeTab,section,privateMedia,service=createPrivateMediaService({auth})}){
- const summaryStatus=ref('idle'),summaryItems=ref([]),status=ref('idle'),rows=ref([]),teams=ref([]),players=ref([]),filters=ref(emptyFilters()),total=ref(null),filteredTotal=ref(null),next=ref(null),opening=ref(false),notice=ref('');
+ const summaryStatus=ref('idle'),summaryItems=ref([]),status=ref('idle'),rows=ref([]),teams=ref([]),players=ref([]),filters=ref(emptyFilters()),total=ref(null),filteredTotal=ref(null),next=ref(null),opening=ref(false),notice=ref(''),selected=ref(null);
  let epoch=0,summaryRequest=null,inboxRequest=null,blocked=false;
  const available=computed(()=>!!scope.value);
  const inReview=()=>activeTab.value==='videos'&&section.value==='review';
  function clearSummary(){summaryRequest?.abort();summaryRequest=null;summaryStatus.value='idle';summaryItems.value=[];}
- function clearInbox(){inboxRequest?.abort();inboxRequest=null;status.value='idle';rows.value=[];teams.value=[];players.value=[];total.value=null;filteredTotal.value=null;next.value=null;opening.value=false;notice.value='';}
+ function clearInbox(){inboxRequest?.abort();inboxRequest=null;status.value='idle';rows.value=[];teams.value=[];players.value=[];total.value=null;filteredTotal.value=null;next.value=null;opening.value=false;notice.value='';selected.value=null;}
  function reset(){epoch++;blocked=false;clearSummary();clearInbox();filters.value=emptyFilters();}
  function denied(){epoch++;blocked=true;clearSummary();clearInbox();filters.value=emptyFilters();summaryStatus.value='unavailable';status.value='unavailable';notice.value='Review access is unavailable. Refresh account permissions or sign in again.';privateMedia.resetMedia();}
  function op(kind){
@@ -60,13 +60,35 @@ export function useMediaReviewInbox({auth,scope,activeTab,section,privateMedia,s
   if(!current)return;
   const e=epoch,key=scopeKey(scope.value),identity=auth.captureIdentity();
   opening.value=true;notice.value='';
+  selected.value=null;
   const result=await privateMedia.openInboxReview(current,filters.value.teamId||'');
   if(epoch!==e||!inReview()||key!==scopeKey(scope.value)||!auth.isCurrentIdentity(identity))return;
   opening.value=false;
   if(result?.status===401||result?.status===403){denied();return;}
-  if(!result?.opened){notice.value='This video could not be opened. The queue has been refreshed.';await Promise.all([refreshInbox(),refreshSummary()]);}
+  if(result?.opened){selected.value=current;return;}
+  notice.value='This video could not be opened. The queue has been refreshed.';
+  await Promise.all([refreshInbox(),refreshSummary()]);
  }
- function retry(){if(opening.value||privateMedia.mediaReviewing.value)return;blocked=false;if(inReview())privateMedia.resetMedia();void refreshSummary();if(inReview())void refreshInbox();}
+ function close(){
+  if(opening.value||privateMedia.mediaReviewing.value)return;
+  privateMedia.resetMedia();selected.value=null;
+ }
+ async function nextVideo(){
+  if(!selected.value||opening.value||status.value!=='ready'||privateMedia.mediaReviewing.value)return;
+  const selectedId=selected.value.id;
+  const index=rows.value.findIndex(row=>row.id===selectedId);
+  const nextRow=index>=0?rows.value[index+1]:null;
+  if(nextRow){await open(nextRow);return;}
+  const currentEpoch=epoch,previous=new Set(rows.value.map(row=>row.id));
+  if(next.value){
+   await refreshInbox(true);
+   if(currentEpoch!==epoch||selected.value?.id!==selectedId||status.value!=='ready')return;
+   const newRow=rows.value.find(row=>!previous.has(row.id));
+   if(newRow){await open(newRow);return;}
+  }
+  close();notice.value='End of loaded queue. Skipped videos remain pending.';
+ }
+ function retry(){if(opening.value||privateMedia.mediaReviewing.value)return;blocked=false;if(inReview())close();void refreshSummary();if(inReview())void refreshInbox();}
  // Synchronous invalidation, deferred fetch. A change of account context invalidates even an identical scope key.
  watch([()=>auth.accountContext.value,()=>scopeKey(scope.value)],()=>{reset();if(inReview()||privateMedia.inboxReviewMode.value)privateMedia.resetMedia();},{flush:'sync'});
  watch([activeTab,section],()=>{epoch++;clearSummary();clearInbox();filters.value=emptyFilters();if(blocked){summaryStatus.value='unavailable';status.value='unavailable';notice.value='Review access is unavailable. Refresh account permissions or sign in again.';}if(!inReview()&&privateMedia.inboxReviewMode.value)privateMedia.resetMedia();},{flush:'sync'});
@@ -75,7 +97,15 @@ export function useMediaReviewInbox({auth,scope,activeTab,section,privateMedia,s
   if(!event||!available.value)return;
   if(event.type==='denied'){denied();return;}
   opening.value=false;
-  void refreshSummary();if(inReview())void refreshInbox();
+  const advance=event.type==='changed'&&!!selected.value;
+  selected.value=null;
+  void refreshSummary();
+  if(inReview()){
+   const currentEpoch=epoch;
+   void refreshInbox().then(()=>{
+    if(advance&&currentEpoch===epoch&&inReview()&&status.value==='ready'&&rows.value.length)void open(rows.value[0]);
+   });
+  }
  },{flush:'sync'});
- return {available,summaryStatus,summaryItems,status,rows,teams,players,filters,total,filteredTotal,next,opening,notice,reset,refreshSummary,refreshInbox,filter,open,retry};
+ return {available,summaryStatus,summaryItems,status,rows,teams,players,filters,total,filteredTotal,next,opening,notice,reset,refreshSummary,refreshInbox,filter,open,retry,selected,close,nextVideo};
 }

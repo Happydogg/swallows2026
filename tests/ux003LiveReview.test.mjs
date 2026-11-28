@@ -230,3 +230,46 @@ test('an earlier successful count is cleared on denial or unavailability without
   assert.deepEqual(a.q.rows.value,[]);
  }
 });
+
+test('Next Video skips without a decision and opens the next authorized row across pages', async () => {
+ const second={...row,id:'second'};
+ const a=queue({reviewInbox:async(_scope,filters)=>
+  filters.cursor?response([second],2,2):response([row],2,2,'next-page')});
+ await a.q.refreshInbox();
+ await a.q.open(row);
+ assert.equal(a.q.selected.value.id,row.id);
+ await a.q.nextVideo();
+ assert.equal(a.q.selected.value.id,second.id);
+ assert.deepEqual(a.calls.filter(call=>call[0]==='open').map(call=>call[1].id),[row.id,second.id]);
+ await a.q.nextVideo();
+ assert.equal(a.q.selected.value,null);
+ assert.match(a.q.notice.value,/Skipped videos remain pending/);
+});
+
+test('Next Video cannot open a paginated result after the scope changes', async () => {
+ const laterPage=later();
+ const a=queue({reviewInbox:async(_scope,filters)=>
+  filters.cursor?laterPage.promise:response([row],2,2,'next-page')});
+ await a.q.refreshInbox();
+ await a.q.open(row);
+ const pending=a.q.nextVideo();
+ a.scopeChanged(admin);
+ laterPage.resolve(response([{...row,id:'second'}],2,2));
+ await pending;
+ assert.equal(a.q.selected.value,null);
+ assert.equal(a.calls.filter(call=>call[0]==='open').length,1);
+});
+
+test('returning to the queue while Next Video loads does not reopen playback', async () => {
+ const laterPage=later();
+ const a=queue({reviewInbox:async(_scope,filters)=>
+  filters.cursor?laterPage.promise:response([row],2,2,'next-page')});
+ await a.q.refreshInbox();
+ await a.q.open(row);
+ const pending=a.q.nextVideo();
+ a.q.close();
+ laterPage.resolve(response([{...row,id:'second'}],2,2));
+ await pending;
+ assert.equal(a.q.selected.value,null);
+ assert.equal(a.calls.filter(call=>call[0]==='open').length,1);
+});
