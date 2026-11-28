@@ -128,14 +128,14 @@ test('new preview host does not claim private Worker CORS eligibility', async t 
 test('media fallback links to original staging host for unapproved origins',()=>{
   assert.match(index,/href="https:\/\/sdl-staging\.pages\.dev\/"/);
   assert.match(index,/v-if="activeTab === 'videos' && !mediaOriginAllowed"/);
-  assert.ok(index.includes("v-if=\"activeTab === 'videos' && mediaOriginAllowed\""));
+  assert.ok(index.includes("v-if=\"activeTab === 'videos' && mediaOriginAllowed && ['team','mine','review'].includes(videoPage)\""));
   assert.ok(index.includes("activeTab === 'team' && mediaOriginAllowed && privateMediaController.mediaPlayers.value.some"));
 });
 
 test('approved live UX hostname enables the existing private-media panel without changing Worker calls', () => {
   assert.ok(appSource.includes('https://sdl-ux-live.pages.dev'));
   assert.match(appSource,/mediaOriginAllowed = computed/);
-  assert.ok(index.includes("v-if=\"activeTab === 'videos' && mediaOriginAllowed\""));
+  assert.ok(index.includes("v-if=\"activeTab === 'videos' && mediaOriginAllowed && ['team','mine','review'].includes(videoPage)\""));
   assert.ok(index.includes("activeTab === 'team' && mediaOriginAllowed && privateMediaController.mediaPlayers.value.some"));
   assert.match(index,/<private-media-panel/);
   assert.match(index,/v-if="activeTab === 'videos' && !mediaOriginAllowed"/);
@@ -358,3 +358,5 @@ test('UX-IA-05 groups account preferences and gated tools without changing role 
   assert.match(pilot,/private video availability depends on the media service and access checks/);
   assert.match(pilot,/:disabled="!enabled\|\|busy"/);
 });
+
+test('batch upload is a separate coach-only authorized destination',()=>{assert.match(index,/aria-label="Video destinations"/);assert.match(index,/<coach-batch-upload v-if="activeTab==='videos' && mediaOriginAllowed && videoPage==='batch' && isTeamCoach && workspaceMode==='coach' && !authError"/);assert.match(appSource,/coachMode\?\[\{id:'batch'/);});

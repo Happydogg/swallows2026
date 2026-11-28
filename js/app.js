@@ -409,7 +409,7 @@ createApp({
       const currentlyScoped = visibleStagingPlayers.value.some(row =>
         row.id === player.id && (workspaceMode.value !== 'coach' || row.team_id === player.team_id));
       if (!currentlyScoped) return;
-      navigateTab('videos');
+      if(navigateTab('videos')===false)return;
       openVideoPage(workspaceMode.value==='family'?'mine':'team');
       if (mediaOriginAllowed.value && privateMedia.mediaPlayers.value.some(row => row.id === player.id)) {
         void privateMedia.selectMediaPlayer(player.id);
@@ -531,7 +531,7 @@ createApp({
       else if(id==='mine')submissionWorkspace.changeTab('submissions');
     };
     const navigateTab = tab => {
-      if (!['home', 'team', 'stats', 'videos', 'me'].includes(tab)||!canLeaveBatch()) return;
+      if (!['home', 'team', 'stats', 'videos', 'me'].includes(tab)||!canLeaveBatch()) return false;
       videoPage.value='landing';
       clearProfileHistory();
       activeTab.value = tab;
