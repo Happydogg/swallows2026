@@ -27,9 +27,9 @@ export function publicAvatarOrFallback(value, player) {
   // Only replace the exact existing public DEMO illustration with its fictional portrait.
   // Private/signed/custom images and other players are never overridden.
   const jersey=String(player?.jersey||'');
-  if(/^DEMO\\s/.test(String(player?.preferred_name||'')) && /^(2[1-9]|3[0-5])$/.test(jersey)) {
+  if(/^DEMO\s/.test(String(player?.preferred_name||'')) && /^(2[1-9]|3[0-5])$/.test(jersey)) {
     const old='/assets/demo-players/'+jersey+'.svg';
-    if(value===old||value==='https://sdl-ux-live.pages.dev'+old) return '/assets/demo-players/'+jersey+'.jpg';
+    if(value===old||value==='https://sdl-ux-live.pages.dev'+old||value==='/assets/demo-players/'+jersey+'.jpg') return '/assets/demo-players/'+jersey+'.jpg';
   }
   if (typeof value === 'string' && /^https:\/\/[A-Za-z0-9]/.test(value)) return value;
   if (typeof value === 'string' && /^\/assets\/demo-players\/(2[1-9]|3[0-5])\.svg$/.test(value)) return value;
