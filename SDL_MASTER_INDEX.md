@@ -1,6 +1,16 @@
 # Swallows DataLab | Repository Master Index (Coordination Mirror)
 
-**Updated:** 2026-11-27. **Status:** Working GitHub coordination mirror. Reconcile against the independent SDL Master Directory before calling this authoritative.
+**Updated:** 2026-11-28. **Status:** Working GitHub coordination mirror. Reconcile against the independent SDL Master Directory before calling this authoritative.
+
+## SDL-000 | Videos UX design freeze (2026-11-28 HKT)
+
+**Owner-approved design; frozen, not implementation acceptance.** [Videos UX Design Freeze v1.0](docs/design/SDL-UX-002/videos/README.md), [design record commit `8944524`](https://github.com/Happydogg/swallows2026/commit/8944524421f15da0ac7776de863cdf54b51326ae). The public-safe specification is archived on `docs/SDL-UX-002-videos-freeze` under the existing SDL-UX-002 design archive. Full internal handoff and original renderings are retained separately.
+
+Scope: guardian and staff galleries, independent concurrent roles, multi-team selection, cross-team Review Videos, shared Watch/Analyze player and responsive layouts. Review uses simplified content-approval playback rather than biomechanics analysis. Future engagement and advanced capture/upload remain deferred.
+
+Ownership: SDL-UX-002 owns design fidelity and device QA; SDL-004B owns role/capability reconciliation (including Team Manager approval/delegation); SDL-004D owns submission review, SDL-004E secure media access, SDL-005 capture/upload integration, SDL-000 coordination and SDL-GOV release evidence. Confirm scope against the independent Master Directory. This design milestone neither supersedes the November 27 implementation/owner-acceptance evidence below nor clears outstanding media, authorization, or release gates. No new feature implementation, branch merge or deployment authorized.
+
+---
 
 ## SDL-000 UX-IA-05 deployed checkpoint (2026-11-27)
 

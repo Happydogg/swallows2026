@@ -1,6 +1,22 @@
 # Swallows DataLab | Roadmap Status (Evidence-based)
 
-**As of:** 2026-11-27. **Scope:** Current GitHub branch and independently checked staging services; not a production readiness certificate.
+**As of:** 2026-11-28. **Scope:** Current GitHub branch and independently checked staging services; not a production readiness certificate.
+
+## Videos UX design freeze checkpoint (2026-11-28 HKT)
+
+**Design: complete, owner approved and frozen.** [Videos UX Design Freeze v1.0](docs/design/SDL-UX-002/videos/README.md); [design record commit `8944524`](https://github.com/Happydogg/swallows2026/commit/8944524421f15da0ac7776de863cdf54b51326ae), archived on `docs/SDL-UX-002-videos-freeze`. This records the newly refined design scope only. It does not supersede historical evidence for implemented/deployed UX-IA batches or imply that the new specification is implemented or accepted on devices.
+
+| Workstream | Status / next gate |
+|---|---|
+| SDL-UX-002 | Frozen design; inspect current source before planning bounded implementation. Preserve existing Watch/Analyze controls, verify category labels and responsive/fullscreen behavior; complete synthetic-role device QA. |
+| SDL-004B | Confirm authoritative media role/capability matrix, Team Manager approval/delegation and exceptional multi-role access before implementing affected navigation. |
+| SDL-004D / SDL-004E | Review workflow and secure media access remain subject to existing authorization, consent and independent security acceptance gates. |
+| SDL-005 | Detailed upload/capture, recording and batch workflow remain deferred to their own workstream; verify integration with existing analyzer. |
+| SDL-000 / SDL-GOV | Record design freeze, retain historical acceptance evidence, reconcile independent project directory and release gates. |
+
+Comments and reactions are future presentation provisions only. Existing private-media blocker and all release restrictions remain in force; no production pilot, new capability activation or implementation authorization follows from this documentation update.
+
+---
 
 ## UX IA-01 through IA-05 checkpoint (2026-11-27)
 

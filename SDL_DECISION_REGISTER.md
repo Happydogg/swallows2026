@@ -1,6 +1,18 @@
 # Swallows DataLab | Decision Register (Working Mirror)
 
-**Updated:** 2026-11-27. Reconcile with original decisions and external SDL Master Directory; this is not a replacement for historical evidence.
+**Updated:** 2026-11-28. Reconcile with original decisions and external SDL Master Directory; this is not a replacement for historical evidence.
+
+## Decisions recorded 2026-11-28 HKT: Videos UX freeze
+
+| ID | Decision / owner direction | Classification | Evidence / remaining gate |
+|---|---|---|---|
+| SDL-D-20261128-01 | Freeze the approved Videos UX: role-adaptive navigation without manual mode switching; guardian/staff galleries, team selection and shared Watch/Analyze player; cross-team review queue with simple playback and approval actions. | Owner-approved design, implementation and testing pending | [Videos UX Design Freeze v1.0](docs/design/SDL-UX-002/videos/README.md); [design record commit `8944524`](https://github.com/Happydogg/swallows2026/commit/8944524421f15da0ac7776de863cdf54b51326ae). Preserve existing authorized functionality. |
+| SDL-D-20261128-02 | Reuse layouts for staff/admin roles; expose review only within independently verified authority; approval is distinct from publication, sharing and downloading. | Approved UX direction; capability reconciliation required | SDL-004B to reconcile the role/capability matrix before implementation, including Team Manager approval/delegation. No change to underlying permissions or release holds. |
+| SDL-D-20261128-03 | Reserve comments, positive reactions and enhanced capture/upload for future work; do not implement them under the freeze. Archive the public-safe write-up on a separate approved documentation branch. | Approved design and documentation scope only | `docs/SDL-UX-002-videos-freeze`; no application change, merge, deployment or permission expansion. Internal handoff and renderings remain separate. |
+
+These new register identifiers follow the existing dated sequence; retain earlier decision and test history. 
+
+---
 
 | ID | Decision and rationale | State | Evidence / consequence |
 |---|---|---|---|
