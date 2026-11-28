@@ -5,7 +5,7 @@ export function filterPrivateLibrary(rows,category='',status='') {
 }
 export const PrivateMediaPanel = {
   name: 'PrivateMediaPanel',
-  props: { controller: { type: Object, required: true }, profilePlayerId: { type: String, default: '' }, reviewOnly: {type:Boolean,default:false} },
+  props: { controller: { type: Object, required: true }, profilePlayerId: { type: String, default: '' }, reviewOnly: {type:Boolean,default:false}, restrictModeration: Boolean },
   emits:['close-review'],
   directives: {
     // Demand-driven previews: only visible cards fetch their authorized MP4.
@@ -132,8 +132,8 @@ export const PrivateMediaPanel = {
               class="min-h-10 w-full rounded-xl bg-blue-600 px-3 py-2 text-sm font-bold text-white hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:opacity-50">
               ▶ Play privately
             </button>
-            <p v-if="item.can_review===true" class="text-xs text-cyan-200">Play the clip to review it.</p>
-            <button v-if="item.can_archive === true" type="button" @click="archivePrivateMedia(item)" :disabled="mediaArchiving || mediaReviewing || mediaUploading || mediaPlaybackLoading"
+            <p v-if="!restrictModeration && item.can_review===true" class="text-xs text-cyan-200">Play the clip to review it.</p>
+            <button v-if="!restrictModeration && item.can_archive === true" type="button" @click="archivePrivateMedia(item)" :disabled="mediaArchiving || mediaReviewing || mediaUploading || mediaPlaybackLoading"
               class="min-h-10 w-full rounded-xl border border-rose-700 px-3 py-2 text-sm font-semibold text-rose-200 disabled:opacity-50">
               {{ mediaArchiving ? 'Deleting…' : 'Delete video' }}
             </button>
@@ -149,7 +149,7 @@ export const PrivateMediaPanel = {
         </div>
         <video :key="mediaPlaybackUrl" :src="mediaPlaybackUrl" controls playsinline preload="metadata"
           @error="reportPlaybackError" class="aspect-video w-full rounded-xl bg-black object-contain"></video>
-        <section v-if="reviewItem" class="space-y-3 rounded-xl border border-cyan-700 p-3" aria-label="Independent video review">
+        <section v-if="!restrictModeration && reviewItem" class="space-y-3 rounded-xl border border-cyan-700 p-3" aria-label="Independent video review">
           <h4 class="text-sm font-bold text-white">Independent video review</h4>
           <p class="text-xs text-slate-300">Watch the entire clip before deciding. Approval stays private. Subject confirmation is optional for private approval, but required for future team sharing.</p>
           <label class="flex items-start gap-2 text-sm text-slate-200"><input type="checkbox" v-model="reviewSingleSubject" :disabled="mediaReviewing">I confirm only this selected athlete is identifiable in the entire clip.</label>
