@@ -88,7 +88,7 @@ export function buildUxPreview(root = ROOT) {
 
   const commit = branchCommit();
   const meta = {
-    commit, branch: 'feature/SDL-UX-002-login-redesign',
+    commit, branch: process.env.CF_PAGES_BRANCH || 'local-preview',
     dataMode: 'synthetic', backendConnected: false
   };
   fs.writeFileSync(path.join(out,'meta.js'), 'window.SDL_UX_META = Object.freeze(' + JSON.stringify(meta) + ');\n');
