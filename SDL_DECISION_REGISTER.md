@@ -15,6 +15,22 @@
 | SDL-D-20261121-09 | Present the **same private, permission-enforced video room inside Player Profile** and retain Videos tab; never present the disabled legacy empty gallery in place of actual R2 clips. | Implemented, automated-tested, deployed to UX Live | `PlayerProfile.js` named slot and `index.html`; real coach/parent UAT pending |
 | SDL-D-20261121-10 | Select player history through the active role’s approved scope and invalidate pending profile results on navigation or identity changes. | Implemented and locally tested | Full suite 405/405. Signed-in staging acceptance pending. |
 
+## SDL-000 Videos UX freeze decision collision notice (2026-11-28)
+
+The [owner-approved Videos UX freeze v1.0](https://github.com/Happydogg/swallows2026/blob/docs/SDL-UX-002-videos-freeze/docs/design/SDL-UX-002/videos/README.md) and [documentation commit `8a8da95`](https://github.com/Happydogg/swallows2026/commit/8a8da9548d6b2a75524b5beca5efe3ac1a0c6afd) have been verified and accepted as a **design closure record**. The source branch `docs/SDL-UX-002-videos-freeze` independently introduced the following decision IDs, which **conflict with previously assigned UX-003 P0/P1 IDs in this coordination mirror**:
+
+| Source decision ID on Videos design branch | Videos design subject | Existing conflicting SDL-000 use | Disposition |
+|---|---|---|---|
+| `SDL-D-20261128-01` | Freeze Videos v1.0, role-aware galleries, Watch/Analyze, cross-team Review | Receive UX-003 PR #21 as P0/P1 source candidate | **Conflict OPEN**, original source decisions preserved |
+| `SDL-D-20261128-02` | Staff/admin review navigation restricted to verified capabilities | Loopback synthetic preview preparation, not approval | **Conflict OPEN**, Team Manager authority pending SDL-004B |
+| `SDL-D-20261128-03` | Reserve comments/reactions/capture for later; document freeze only | Locally reported 530/530 corrections and CI evidence distinction | **Conflict OPEN**, no new feature authorization |
+
+**Do not overwrite, silently reassign or reuse any of these IDs in an authoritative decision ledger.** At the next independent Master Directory/Decision Register reconciliation, verify all dated identifiers and obtain explicit governance approval for a unique final mapping, preserving the original ID, source branch, commit and replacement cross-reference. The independent Master Directory is not available from the current searched Project/Library sources, so no direct canonical update is claimed.
+
+**Design completion classification:** Approved/frozen (owner-reported approval documented, GitHub source verified). **Implementation/testing/deployment:** pending for this newly approved redesign. Previously deployed UX-003 application work remains a separate historical milestone. No permission, branch merge or production changes authorized.
+
+---
+
 ## SDL-000 P0/P1 UX fix checkpoint (2026-11-28)
 
 **Documentation of reviewed source and reported local tests, not approval to deploy or change authorization.**
