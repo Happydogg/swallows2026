@@ -324,19 +324,27 @@
       </template>
     </player-profile>
 
-    <!-- The same protected media state is available in the Videos tab. -->
-    <private-media-panel v-if="activeTab === 'videos' && mediaOriginAllowed"
+    <!-- SDL-005-BATCH-01: independent destination pages; retain the existing protected media controls. -->
+    <section v-if="activeTab==='videos' && mediaOriginAllowed && videoPage==='landing'" aria-label="Video destinations" class="space-y-3 mb-4">
+      <h1 class="text-2xl font-black text-white">Videos</h1>
+      <button v-for="d in videoDestinations" :key="d.id" @click="openVideoPage(d.id)" class="flex min-h-20 w-full items-center gap-4 rounded-2xl border border-slate-700 bg-slate-900 p-4 text-left">
+        <span aria-hidden="true" class="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-blue-950 text-xl text-blue-200">{{d.icon}}</span><span class="flex-1"><span class="block text-lg font-bold text-white">{{d.label}}</span><span class="block text-xs text-slate-400">{{d.description}}</span></span><span aria-hidden="true" class="text-slate-400">›</span>
+      </button><p v-if="!videoDestinations.length" class="text-sm text-slate-400">No authorized video destination.</p>
+    </section>
+    <button v-if="activeTab==='videos' && mediaOriginAllowed && videoPage!=='landing'" @click="openVideoPage('landing')" class="mb-4 min-h-11 rounded-lg px-3 text-blue-300">← Videos</button>
+    <coach-batch-upload v-if="activeTab==='videos' && mediaOriginAllowed && videoPage==='batch' && isTeamCoach && workspaceMode==='coach' && !authError" ref="batchPage" :auth="loginController" :roster="coachRosterDisplay"></coach-batch-upload>
+    <private-media-panel v-if="activeTab === 'videos' && mediaOriginAllowed && ['team','mine','review'].includes(videoPage)"
       :controller="privateMediaController"></private-media-panel>
     <!-- Narrow acceptance controls. SDL-UX-003 owns final library/Clubhouse navigation. -->
-    <media-publication-panel v-if="activeTab === 'videos' && mediaOriginAllowed && !authError && ['coach','admin'].includes(workspaceMode) && privateMediaController.mediaPlayerId.value"
+    <media-publication-panel v-if="activeTab === 'videos' && mediaOriginAllowed && videoPage==='team' && !authError && ['coach','admin'].includes(workspaceMode) && privateMediaController.mediaPlayerId.value"
       :key="authUser.id + ':' + workspaceMode + ':' + privateMediaController.mediaPlayerId.value" :auth="loginController" :controller="privateMediaController"></media-publication-panel>
-    <clubhouse-media-panel v-if="activeTab === 'videos' && mediaOriginAllowed && !authError && clubhouseMediaTeams.length"
+    <clubhouse-media-panel v-if="activeTab === 'videos' && mediaOriginAllowed && ['team','shared'].includes(videoPage) && !authError && clubhouseMediaTeams.length"
       :key="authUser.id + ':' + workspaceMode" :auth="loginController" :teams="clubhouseMediaTeams"></clubhouse-media-panel>
 
     <!-- Keep the existing gated workspace mounted and reachable, after the primary roster/library.
          The details disclosure changes presentation only; it does not enable any operation. -->
     <details :open="submissionController.enabled ? true : undefined"
-      :class="!isManagedWorkspace && (activeTab === 'team' || activeTab === 'stats' || (activeTab === 'videos' && mediaOriginAllowed)) && currentView !== 'player' ? 'mt-4 rounded-xl border border-slate-700 p-3 no-print' : 'hidden'">
+      :class="!isManagedWorkspace && (activeTab === 'team' || activeTab === 'stats' || (activeTab === 'videos' && mediaOriginAllowed && ['team','mine','review','shared'].includes(videoPage))) && currentView !== 'player' ? 'mt-4 rounded-xl border border-slate-700 p-3 no-print' : 'hidden'">
       <summary class="min-h-11 cursor-pointer py-3 text-sm font-semibold text-slate-300">{{ submissionController.enabled ? 'Submissions and Clubhouse' : 'Submissions and Clubhouse · currently unavailable' }}</summary>
       <submission-workspace :show-performance-review="activeTab !== 'stats'" :controller="submissionController" :pilot-controller="pilotController" :t="t"></submission-workspace>
     </details>

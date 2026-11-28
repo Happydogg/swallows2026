@@ -4,7 +4,7 @@ const {ref,computed,watch,onBeforeUnmount}=Vue;
 export const CoachBatchUpload={
  name:'CoachBatchUpload',
  props:{auth:{type:Object,required:true},roster:{type:Array,required:true}},
- setup(props){
+ setup(props,{expose}){
    const step=ref(0), state=ref({running:false,rows:[]}), error=ref(''), bulk=ref(''), team=ref('');
    const categories=['batting','pitching','throwing'];
    const teams=computed(()=>[...new Map(props.roster.map(p=>[p.team_id,p.team_name||'Team'])).entries()].filter(([id])=>id));
@@ -15,12 +15,13 @@ export const CoachBatchUpload={
    const ready=computed(()=>rows.value.length>0&&rows.value.every(r=>r.playerId&&categories.includes(r.category)));
    const saved=computed(()=>rows.value.filter(r=>r.state==='saved').length);
    const retryable=computed(()=>rows.value.some(r=>['queued','retry'].includes(r.state)));
-   const thumbnails=ref({}), localFiles=new Map();
-   const dispose=()=>{for(const u of localFiles.values())URL.revokeObjectURL(u);localFiles.clear();thumbnails.value={};};
+   const thumbnails=ref({}), localFiles=new Map(),previewId=ref('');
+   const dispose=()=>{for(const u of localFiles.values())URL.revokeObjectURL(u);localFiles.clear();thumbnails.value={};previewId.value='';};
    const reset=()=>{queue.clear();dispose();step.value=0;error.value='';bulk.value='';};
    watch(()=>props.roster.map(p=>p.team_id+':'+p.id).sort().join('|'),()=>{reset();if(!teams.value.some(([id])=>id===team.value))team.value=teams.value.length===1?teams.value[0][0]:'';},{immediate:true});
    watch(()=>props.auth.isTeamCoach.value,allowed=>{if(!allowed)reset();});
    watch(team,()=>{if(rows.value.length)reset();});
+   expose({hasPending:()=>running.value||rows.value.some(r=>['queued','retry','checking','uploading'].includes(r.state))});
    onBeforeUnmount(reset);
    function addFiles(event){
      error.value='';const files=Array.from(event.target.files||[]);event.target.value='';
@@ -33,7 +34,7 @@ export const CoachBatchUpload={
    async function start(){if(running.value)return;error.value='';step.value=3;try{await queue.run();}catch(e){error.value=e.message;}}
    function label(id){const p=players.value.find(p=>p.id===id);return p?(p.jersey?'#'+p.jersey+' · ':'')+(p.preferred_name||'Player'):'Player no longer in roster';}
    function restart(){if(!running.value&&(!retryable.value||window.confirm('Discard unfinished clips? Unconfirmed uploads may already have reached the server.')))reset();}
-   return {step,rows,running,error,bulk,team,teams,players,categories,sizeMiB,ready,saved,retryable,thumbnails,max:BATCH_MAX,addFiles,assign,applyBulk,remove,start,label,restart,cancel:queue.cancel};
+   return {step,rows,running,error,bulk,team,teams,players,categories,sizeMiB,ready,saved,retryable,thumbnails,previewId,max:BATCH_MAX,addFiles,assign,applyBulk,remove,start,label,restart,cancel:queue.cancel};
  },
  template:`
  <section class="space-y-4" aria-label="Coach batch video upload">
@@ -49,7 +50,7 @@ export const CoachBatchUpload={
  <h3 class="text-lg font-bold">Assign videos · {{rows.filter(r=>r.playerId).length}}/{{rows.length}}</h3>
  <div class="flex gap-2"><select v-model="bulk" class="min-w-0 flex-1 rounded-lg bg-slate-800 p-3"><option value="">Choose activity</option><option v-for="c in categories" :key="c">{{c}}</option></select><button @click="applyBulk" :disabled="!bulk" class="rounded-lg bg-slate-700 p-3">Apply to all</button></div>
  <article v-for="r in rows" :key="r.id" class="space-y-3 rounded-xl bg-slate-900 p-4">
- <div class="flex items-center gap-3"><video v-if="thumbnails[r.id]" :src="thumbnails[r.id]" preload="metadata" playsinline muted controls class="h-20 w-28 rounded bg-black object-contain"></video><div class="min-w-0 flex-1"><p class="break-all font-bold">{{r.name}}</p><p class="text-xs">{{(r.size/1048576).toFixed(1)}} MiB</p></div><button @click="remove(r)" :aria-label="'Remove '+r.name" class="rounded-lg bg-slate-800 p-3">×</button></div>
+ <div class="flex items-center gap-3"><video v-if="previewId===r.id && thumbnails[r.id]" :src="thumbnails[r.id]" preload="metadata" playsinline muted controls class="h-20 w-28 rounded bg-black object-contain"></video><button v-else @click="previewId=r.id" class="h-20 w-24 shrink-0 rounded bg-slate-800 text-sm">Preview clip</button><div class="min-w-0 flex-1"><p class="break-all font-bold">{{r.name}}</p><p class="text-xs">{{(r.size/1048576).toFixed(1)}} MiB</p></div><button @click="remove(r)" :aria-label="'Remove '+r.name" class="rounded-lg bg-slate-800 p-3">×</button></div>
  <label class="block">Player<select :value="r.playerId" @change="assign(r,{playerId:$event.target.value})" class="mt-1 w-full rounded-lg bg-slate-800 p-3"><option value="">Select player</option><option v-for="p in players" :key="p.id" :value="p.id">{{label(p.id)}}</option></select></label>
  <label class="block">Activity<select :value="r.category" @change="assign(r,{category:$event.target.value})" class="mt-1 w-full rounded-lg bg-slate-800 p-3"><option value="">Select activity</option><option v-for="c in categories" :key="c">{{c}}</option></select></label></article>
  <button @click="step=2" :disabled="!ready" class="w-full rounded-xl bg-blue-600 p-3 font-bold disabled:opacity-40">Review {{rows.length}} videos</button></div>
