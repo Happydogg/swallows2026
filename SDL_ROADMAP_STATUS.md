@@ -2,6 +2,27 @@
 
 **As of:** 2026-11-27. **Scope:** Current GitHub branch and independently checked staging services; not a production readiness certificate.
 
+## Videos UX design closure and next UX priority (2026-11-28)
+
+**Closed: SDL-UX-002 Videos UX visual/design phase v1.0.** Owner approval and dedicated documentation branch verified through [spec](https://github.com/Happydogg/swallows2026/blob/docs/SDL-UX-002-videos-freeze/docs/design/SDL-UX-002/videos/README.md), [freeze commit](https://github.com/Happydogg/swallows2026/commit/8944524421f15da0ac7776de863cdf54b51326ae), [mirror update](https://github.com/Happydogg/swallows2026/commit/8a8da9548d6b2a75524b5beca5efe3ac1a0c6afd). This newly approved design is **not implemented, tested, mobile-accepted or deployed**. Do not confuse it with existing synthetic staging UX-003 functionality already deployed.
+
+| Workstream | Assigned dependency / next verifiable outcome | Current state |
+|---|---|---|
+| **SDL-004B** | Confirm authoritative Team Manager review/approval/delegation and exceptional guardian-plus-staff effective capability matrix; no frontend-driven grants | **Pending contract reconciliation** |
+| **SDL-004D** | Map authorized content approval/rejection, next-item workflow, independent audit and failure paths to existing backend | **Design handoff; implementation not authorized** |
+| **SDL-004E** | Confirm private/shared media access, current team scope, standing consent, publication and controlled download enforcement | **Security acceptance separate; existing gates retained** |
+| **SDL-005** | Integrate existing high-FPS analyzer and video preparation without changing validated overlay/camera precision; advanced recording/batch upload deferred | **Future implementation dependency** |
+| **SDL-UX-002** | Follow approved gallery, responsive player hero, Watch/Analyze, simplified Review design; prepare device acceptance and implementation handoff only when authorized | **Design frozen; coding/device acceptance pending** |
+| **SDL-000 / SDL-GOV** | Reconcile original design/public references with independent Master Directory, resolve duplicate dated decision IDs, change control, rollback and formal release | **Documentation reconciliation outstanding** |
+
+**Implementation details explicitly unresolved by source specification:** fourth activity-filter label requires original approved reference/category schema; Team Manager review authority cannot be inferred from role label; rejection reason and exceptional guardian-only team destination require narrower implementation decisions. Do not treat comments, thumbs-up, reactions or advanced camera/batch workflows as approved scope.
+
+**Next UX priority recommended (not approved for coding):** SDL-UX-002 undertakes a separate, read-only **non-Videos interface clarity audit** of Home, Team, Stats, Me and Player Profile focused on reducing dense explanatory copy, repeated controls and mobile scroll length. Preserve consent disclosures and safety/error context, all accepted working flows, and the Videos freeze. Deliver a priority-ranked screen-by-screen proposal with before/after visual references; no application changes.
+
+**Governance warning:** `SDL-D-20261128-01..03` identifiers collide between the frozen Videos docs branch and the existing SDL-000 coordination mirror. Preserve both originals; resolve centrally before merging registers. The independent Master Directory could not be located in accessible Project/Library sources. The two documentation branches are divergent and must be reconciled with controlled changes, not merged wholesale. No new deployment or permission change authorized.
+
+---
+
 ## P0/P1 UX-003 remediation candidate (2026-11-28)
 
 **Current checkpoint, retaining all previous QA issues and history below.** [Draft PR #21](https://github.com/Happydogg/swallows2026/pull/21) remains **unmerged**; active accepted UX staging source still `4590f86c458cacc461f45a8e62aeeda470e8646e`. Reviewed remediation source `8f8c9813aef064bba0e9a782a865793934370d90`, handoff-only tip `f4b452105fd23c5e37a09bf41b32742da83e370f`. [Handoff](https://github.com/Happydogg/swallows2026/blob/f4b452105fd23c5e37a09bf41b32742da83e370f/docs/design/SDL-UX-003/P0P1-QA-HANDOFF.md).
