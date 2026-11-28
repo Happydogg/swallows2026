@@ -49,7 +49,7 @@ export const CoachHome = {
         <p v-if="loading" class="text-sm text-slate-400" role="status">Loading authorized players…</p>
         <p v-else-if="!roster.length" class="rounded-xl border border-dashed border-slate-700 p-5 text-sm text-slate-400">No players are available in your verified team roster yet.</p>
         <div v-else class="grid gap-3">
-<player-hero-card v-for="player in preview" :key="player.team_id+':'+player.id" :player="{...player,photo_url:avatarFor(player)}" variant="compact"><template #actions><div class="grid grid-cols-2 gap-2"><button @click="$emit('open-profile',player)" class="sdl-primary min-h-11 px-3 py-2 text-sm font-semibold">View profile</button><button @click="$emit('open-video',player)" class="sdl-secondary min-h-11 px-3 py-2 text-sm font-semibold">Videos</button></div></template></player-hero-card>
+<player-hero-card v-for="player in preview" :key="player.team_id+':'+player.id" :player="{...player,photo_url:avatarFor(player)}" variant="compact"><template #actions><div class="grid grid-cols-2 gap-2"><button type="button" @click="$emit('open-profile',player)" class="sdl-primary min-h-11 px-3 py-2 text-sm font-semibold">View profile</button><button type="button" @click="$emit('open-video',player)" class="sdl-secondary min-h-11 px-3 py-2 text-sm font-semibold">Videos</button></div></template></player-hero-card>
 </div>
       </div>
       <div class="sdl-panel space-y-3 p-4 lg:col-span-2">
