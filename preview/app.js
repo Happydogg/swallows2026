@@ -15,14 +15,14 @@ const { createApp, ref, computed } = Vue;
 // The same fifteen fictional names and jerseys used by the staging fixture.
 const demoRoster = Object.freeze(DEMO_GROWTH_SNAPSHOT.players.map((player, i) => ({
   id: 'demo-player-'+player.jersey,
-  team_id: 'demo-team',
-  team_name: 'Swallows Demo Team',
+  team_id: Number(player.jersey)<=27?'demo-team-a':'demo-team-b',
+  team_name: Number(player.jersey)<=27?'Swallows Demo A':'Swallows Demo B',
   preferred_name: player.name,
   jersey: player.jersey,
   position: ['SS','2B','P','C','CF','3B','LF','P','1B','RF','SS','C','2B','P','CF'][i],
   throws: i % 4 === 0 ? 'L' : 'R',
   bats: i % 3 === 0 ? 'L' : 'R',
-  photo_url: '/assets/demo-players/'+player.jersey+'.svg'
+  photo_url: '/assets/demo-players/'+player.jersey+'.jpg'
 })));
 const demoPlayers = Object.freeze(demoRoster.slice(0,2).map((player,i) => ({ ...player, athlete_id:'demo-athlete-'+(i+1) })));
 
@@ -83,6 +83,7 @@ function previewMediaController() {
 
  // UX-V02: synthetic-only visual fidelity candidate. No provider or media calls.
 const VideosFidelityPreview = {
+  components: { PlayerHeroCard },
   props: { role:String, roster:Array, children:Array, requestedPlayer:String },
   setup(props) {
     const {ref,computed,watch}=Vue;
@@ -148,12 +149,12 @@ const VideosFidelityPreview = {
       <template v-if="!player">
         <div class="flex flex-wrap items-center justify-between gap-2"><h2 class="text-xl font-bold">{{destination==='mine'?'My children':'Select player'}}</h2><label v-if="destination!=='mine'" class="text-sm">Team <select v-model="team" @change="changeTeam" class="rounded-lg border border-slate-700 bg-slate-900 p-2"><option value="A">Swallows Demo A</option><option value="B">Swallows Demo B</option></select></label></div>
         <input v-model="search" placeholder="Search name or jersey number" aria-label="Search name or jersey number" class="w-full rounded-xl border border-slate-700 bg-slate-900 p-3 text-base">
-        <div class="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6"><button v-for="p in visiblePlayers" :key="p.id" @click="pickPlayer(p)" class="min-w-0 rounded-2xl border border-slate-700 bg-slate-900 px-2 py-3 text-center hover:border-cyan-400"><img :src="p.photo_url" alt="" class="mx-auto h-16 w-16 rounded-full object-cover sm:h-20 sm:w-20"><p class="mt-2 text-lg font-black text-cyan-300">#{{p.jersey}}</p><p class="break-words text-xs font-semibold text-white">{{p.preferred_name}}</p></button></div>
+        <div class="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6"><button v-for="p in visiblePlayers" :key="p.id" @click="pickPlayer(p)" class="min-w-0 rounded-2xl border border-slate-700 bg-slate-900 px-2 py-3 text-center hover:border-cyan-400"><img :src="p.photo_url" alt="" class="aspect-square w-full rounded-xl object-cover object-center" loading="lazy"><p class="mt-2 text-lg font-black text-cyan-300">#{{p.jersey}}</p><p class="break-words text-xs font-semibold text-white">{{p.preferred_name}}</p></button></div>
         <p v-if="!visiblePlayers.length" class="text-sm text-slate-400">No matching demo players.</p>
       </template>
       <template v-else-if="!clip">
         <button @click="selectedId=''" class="text-sm font-bold text-cyan-300">‹ Switch player</button>
-        <div class="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-700 bg-slate-900 p-3"><img :src="player.photo_url" alt="" class="h-16 w-16 rounded-xl"><div class="min-w-0 flex-1"><h2 class="font-black">{{player.preferred_name}}</h2><p class="text-xs text-slate-400">#{{player.jersey}} · {{teamLabel(player)}}</p></div><button v-if="destination!=='shared'" disabled class="rounded-xl bg-blue-700 px-3 py-3 text-xs font-bold opacity-70" title="Visual only">+ Upload Video</button></div>
+        <player-hero-card :player="player" variant="video" :team-label="teamLabel(player)"><template v-if="destination!=='shared'" #actions><button disabled class="min-h-12 w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white opacity-80" title="Visual only">+ Upload Video</button></template></player-hero-card>
         <div class="flex flex-wrap gap-2" aria-label="Activity filters"><button v-for="kind in activity" :key="kind" @click="category=kind" :aria-pressed="category===kind" :class="category===kind?'bg-blue-600':'bg-slate-800'" class="rounded-xl px-3 py-2 text-sm font-bold">{{kind}}</button></div>
         <div v-if="gallery.length" class="grid gap-3 lg:grid-cols-2">
           <button @click="openClip(gallery[0])" class="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 text-left"><div class="grid aspect-video place-content-center bg-slate-800 text-center"><span class="text-4xl">▶</span><span class="text-xs text-slate-400">Fictional thumbnail</span></div><div class="p-3"><p class="text-xs font-bold text-cyan-300">Latest video</p><p class="font-bold">{{gallery[0].kind}} · {{gallery[0].date}}</p><p class="text-xs text-slate-400">{{gallery[0].duration}}</p></div></button>
@@ -201,23 +202,23 @@ createApp({
       previewMediaControllerState.selectMediaPlayer(allowed.id);
       screen.value='profile';
     };
+    const openPreviewStatsProfile = id => {
+      const p=demoRoster.find(row=>row.id===id);
+      if(p) openPreviewProfile(p);
+    };
     const openPreviewVideos = player => {
       requestedVideoPlayer.value=player.id;
       previewMediaControllerState.selectMediaPlayer(player.id);
       activeTab.value = 'videos';
     };
     // Fictional numbers on the explicitly labeled synthetic site.
-    const previewFamilyStats = Object.freeze([
-      { athlete_id: 'demo-athlete-1', name: 'Sample Player A', profiles: [
-        { id: 'demo-player-1', clubLabel: 'Swallows Demo Team', jersey: '12',
-          position: 'SS / P', statsAvailable: true, latestExitVelo: 74,
-          latestThrowingVelo: 67, latestSprintTime: 4.2, sessionCount: 6 }
-      ] },
-      { athlete_id: 'demo-athlete-2', name: 'Sample Player B', profiles: [
-        { id: 'demo-player-2', clubLabel: 'Swallows Demo Team', jersey: '08',
-          position: 'OF', statsAvailable: false }
-      ] }
-    ]);
+    const previewFamilyStats = Object.freeze(demoPlayers.map((p,i)=>({
+      athlete_id:p.athlete_id, name:p.preferred_name, profiles:[{
+        id:p.id,clubLabel:p.team_name,team_name:p.team_name,jersey:p.jersey,position:p.position,
+        preferred_name:p.preferred_name,photo_url:p.photo_url,bats:p.bats,throws:p.throws,
+        statsAvailable:i===0,...(i===0?{latestExitVelo:74,latestThrowingVelo:67,latestSprintTime:4.2,sessionCount:6}:{})
+      }]
+    })));
     const previewTranslate = key => ({
       throws:'Throws',bats:'Bats',officialName:'Official name',
       dob:'DOB',jumpRatioLabel:'Jump ratio',batSpec:'Bat specification',
@@ -260,7 +261,7 @@ createApp({
     }
     return {
       previewViews, screen, role, activeTab, tabTitle, version, branch,
-      demoPlayers, demoRoster, previewSelectedPlayer, previewEditOpen, openPreviewProfile, openPreviewVideos, loginController, invitationController,
+      demoPlayers, demoRoster, previewSelectedPlayer, previewEditOpen, openPreviewProfile, openPreviewStatsProfile, openPreviewVideos, loginController, invitationController,
       previewMediaControllerState, requestedVideoPlayer, previewFamilyStats, previewTranslate, demoMeasurements,
       reportOpen, issue, reportText, copyReport, copyNotice, manualReport
     };

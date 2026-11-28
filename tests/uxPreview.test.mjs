@@ -10,21 +10,21 @@ import { buildUxPreview } from '../scripts/build-ux-preview.mjs';
 const EXPECTED = [
   'index.html','app.js','logo.png','components/AppShell.js',
   'components/CoachHome.js','components/CoachTeamRoster.js','components/ParentHome.js',
-  'assets/demo-players/21.svg',
-  'assets/demo-players/22.svg',
-  'assets/demo-players/23.svg',
-  'assets/demo-players/24.svg',
-  'assets/demo-players/25.svg',
-  'assets/demo-players/26.svg',
-  'assets/demo-players/27.svg',
-  'assets/demo-players/28.svg',
-  'assets/demo-players/29.svg',
-  'assets/demo-players/30.svg',
-  'assets/demo-players/31.svg',
-  'assets/demo-players/32.svg',
-  'assets/demo-players/33.svg',
-  'assets/demo-players/34.svg',
-  'assets/demo-players/35.svg',
+  'assets/demo-players/21.jpg',
+  'assets/demo-players/22.jpg',
+  'assets/demo-players/23.jpg',
+  'assets/demo-players/24.jpg',
+  'assets/demo-players/25.jpg',
+  'assets/demo-players/26.jpg',
+  'assets/demo-players/27.jpg',
+  'assets/demo-players/28.jpg',
+  'assets/demo-players/29.jpg',
+  'assets/demo-players/30.jpg',
+  'assets/demo-players/31.jpg',
+  'assets/demo-players/32.jpg',
+  'assets/demo-players/33.jpg',
+  'assets/demo-players/34.jpg',
+  'assets/demo-players/35.jpg',
   'components/PlayerHeroCard.js','components/PrivateMediaPanel.js','components/StatsHub.js','components/DemoGrowthLab.js','js/demoGrowthFixture.js',
   'components/LoginLanding.js','components/InviteOnboarding.js',
   'js/config.js','meta.js','_headers','404.html'
@@ -54,7 +54,7 @@ test('preview excludes staging credentials, APIs, private media and user records
     '.supabase.co','workers.dev','sb_secret_','signInWithPassword','createClient(']) {
     assert.equal(values.toLowerCase().includes(forbidden.toLowerCase()), false, forbidden);
   }
-  assert.match(values,/Sample Player A/);
+  assert.match(values,/demoPlayers\.map/);
   assert.match(values,/backendConnected":false/);
   assert.match(fs.readFileSync(new URL('js/config.js',dir),'utf8'),/SUBMISSION_FEATURES_ENABLED = false/);
 });
@@ -129,4 +129,21 @@ test('synthetic family cards drill into selected player and show one staged Edit
   assert.ok(html.includes('@open-profile="openPreviewProfile"'));
   assert.ok(html.includes('preview-edit-player-heading'));
   assert.ok(html.includes('Design preview only. No actual photo or player record can be edited here.'));
+});
+
+
+test('all 15 fictional portraits are distinct valid JPEG assets and wired to the shared preview hero',()=>{
+  const dir=new URL('../dist-ux-preview/',import.meta.url);
+  const seen=new Set();
+  for(let n=21;n<=35;n++){
+    const pic=fs.readFileSync(new URL('assets/demo-players/'+n+'.jpg',dir));
+    assert.ok(pic.length>10000 && pic[0]===255 && pic[1]===216 && pic.at(-2)===255 && pic.at(-1)===217,'JPEG '+n);
+    const bytes=pic.toString('base64'); assert.ok(!seen.has(bytes),'duplicate '+n);seen.add(bytes);
+  }
+  const app=fs.readFileSync(new URL('app.js',dir),'utf8');
+  const hero=fs.readFileSync(new URL('components/PlayerHeroCard.js',dir),'utf8');
+  assert.ok(app.includes("'/assets/demo-players/'+player.jersey+'.jpg'"));
+  assert.ok(app.includes('variant="video"'));
+  assert.ok(hero.includes('Athlete hero card') && hero.includes('w-[58%]'));
+  assert.ok(hero.includes('Fictional portrait'));
 });
