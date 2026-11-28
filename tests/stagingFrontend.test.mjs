@@ -12,6 +12,7 @@ test('Pages static export contains only frontend assets, root ES modules, safe h
     assert.match(fs.readFileSync(src,'utf8'),/>DEMO<\/text>/);
     const jpg=fs.readFileSync(path.join(r.directory,'assets','demo-players',n+'.jpg'));assert.equal(jpg[0],255);assert.equal(jpg[1],216);
   }
+  for(const n of ['00','07','10','12','60','61','62','63','64','65','99']){const jpg=fs.readFileSync(path.join(r.directory,'assets','demo-players',n+'.jpg'));assert.equal(jpg[0],255);assert.equal(jpg[1],216);assert.equal(jpg.at(-2),255);assert.equal(jpg.at(-1),217);}
   const config=path.join(tmp,'js/config.js');fs.writeFileSync(config,fs.readFileSync(config,'utf8').replace('SUBMISSION_FEATURES_ENABLED = false','SUBMISSION_FEATURES_ENABLED = true'));assert.throws(()=>buildStagingFrontend(tmp),/disabled frontend gate/);
  }finally{fs.rmSync(tmp,{recursive:true,force:true});}
 });

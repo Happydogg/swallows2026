@@ -53,6 +53,7 @@ export const PlayerHeroCard = {
     <div v-else class="absolute inset-y-0 right-0 flex w-[58%] items-center justify-center bg-blue-950 text-5xl font-black text-sky-400/50" aria-hidden="true">#{{player.jersey||'–'}}</div>
     <div class="pointer-events-none absolute inset-0 bg-gradient-to-r from-slate-950 via-blue-950/90 via-40% to-transparent" aria-hidden="true"></div>
     <div class="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-slate-950/90 to-transparent" aria-hidden="true"></div>
+    <span v-if="player.photo_url && player.photo_url.startsWith('/assets/demo-players/') && !photoFailed && !failedImgs[player.id]" class="absolute bottom-2 right-2 z-10 rounded bg-slate-950/85 px-2 py-1 text-[10px] font-bold text-amber-200">Fictional demo portrait</span>
     <div class="relative flex min-h-[inherit] w-[55%] flex-col justify-center gap-2 px-4 py-5 sm:px-6">
       <p class="text-[10px] font-black uppercase tracking-widest text-cyan-200">Swallows DataLab</p><p class="text-4xl font-black leading-none text-white sm:text-5xl">#{{player.jersey||'–'}}</p>
       <h2 class="break-words text-xl font-black leading-tight text-white sm:text-3xl">{{getPlayerDisplayName(player)}}</h2>

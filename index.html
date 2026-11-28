@@ -139,7 +139,7 @@
         :roster="coachRosterDisplay" :authorized-team-count="coachTeamCount" :loading="coachRosterLoading" :error="coachRosterError" @navigate="navigateTab" @open-profile="selectCoachRosterPlayer" @open-video="openAuthorizedPlayerVideos"></coach-home>
       <parent-home v-else-if="activeTab === 'home' && workspaceMode === 'family'"
         :players="familyPlayers" :loading="loading" @navigate="navigateTab" @open-profile="openFamilyPlayerProfile" @open-video="openAuthorizedPlayerVideos"></parent-home>
-      <managed-roster v-else-if="activeTab === 'home' && isManagedWorkspace" :key="workspaceMode + ':' + managedRosterController.organizationId.value + ':' + managedRosterController.teamId.value" :controller="managedRosterController" :home="true"
+      <managed-roster v-else-if="activeTab === 'home' && isManagedWorkspace" :key="workspaceMode + ':' + managedRosterController.organizationId.value + ':' + managedRosterController.teamId.value" :controller="managedRosterController" :portrait-for="managedPortraitFor" :home="true"
         @organization="changeManagedOrganization" @team="changeManagedTeam" @retry="retryManagedRoster" @more="loadMoreManagedRoster" @open-profile="openManagedPlayerProfile" @navigate="navigateTab"></managed-roster>
       <section v-else-if="activeTab === 'home'" class="rounded-2xl border border-slate-700 bg-slate-800 p-6" aria-label="Account home">
         <h1 class="text-2xl font-black">Welcome to Swallows DataLab</h1>
@@ -174,7 +174,7 @@
         :mode="workspaceMode" :coach-roster="coachRosterDisplay" :family-cards="statsFamilyCards"
         :loading="loading" :enabled="submissionController.enabled" :show-synthetic="false"
         @navigate="navigateTab" @open-player="submissionController.showProfile($event)"></stats-hub>
-      <managed-roster v-if="activeTab === 'team' && currentView === 'overview' && isManagedWorkspace" :key="workspaceMode + ':' + managedRosterController.organizationId.value + ':' + managedRosterController.teamId.value" :controller="managedRosterController"
+      <managed-roster v-if="activeTab === 'team' && currentView === 'overview' && isManagedWorkspace" :key="workspaceMode + ':' + managedRosterController.organizationId.value + ':' + managedRosterController.teamId.value" :controller="managedRosterController" :portrait-for="managedPortraitFor"
         @organization="changeManagedOrganization" @team="changeManagedTeam" @retry="retryManagedRoster" @more="loadMoreManagedRoster" @open-profile="openManagedPlayerProfile" @navigate="navigateTab"></managed-roster>
 
       <staging-data-browser v-if="activeTab === 'team' && currentView === 'overview' && workspaceMode === 'family'"

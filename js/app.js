@@ -42,7 +42,7 @@ import { useAuthorizedStatsBoard } from '../composables/useAuthorizedStatsBoard.
 import { StagingDataBrowser } from '../components/StagingDataBrowser.js';
 import { AvatarManager } from '../components/AvatarManager.js';
 import { useAvatarManager } from '../composables/useAvatarManager.js';
-import { publicAvatarOrFallback } from './avatarService.js';
+import { publicAvatarOrFallback, fictionalPortraitFor } from './avatarService.js';
 import { InviteOnboarding } from '../components/InviteOnboarding.js';
 import { AppHeader } from '../components/AppHeader.js';
 import { TeamOverview } from '../components/TeamOverview.js';
@@ -112,6 +112,7 @@ createApp({
       if (!player) return '';
       return avatarManager.photos.value[player.id] || publicAvatarOrFallback(player.photo_url,player);
     };
+    const managedPortraitFor = player => workspaceMode.value === 'admin' ? avatarForPlayer(player) : fictionalPortraitFor(player);
     const coachRosterDisplay = computed(() => coachRoster.value.map(row => ({
       ...row, photo_url: avatarForPlayer(row)
     })));
@@ -215,7 +216,7 @@ createApp({
       getPlayerDisplayName: playerFeature.getPlayerDisplayName
     });
     const arAnalyzer = createArAnalyzerController({ selectedPlayer });
-    const videoRosterDisplay=computed(()=>videoPage.value==='mine'?familyPlayers.value:workspaceMode.value==='coach'?coachRosterDisplay.value:isManagedWorkspace.value?managedRoster.rows.value.map(p=>({...p,photo_url:workspaceMode.value==='admin'?avatarForPlayer(p):''})):familyPlayers.value);
+    const videoRosterDisplay=computed(()=>videoPage.value==='mine'?familyPlayers.value:workspaceMode.value==='coach'?coachRosterDisplay.value:isManagedWorkspace.value?managedRoster.rows.value.map(p=>({...p,photo_url:managedPortraitFor(p)})):familyPlayers.value);
     const privateMedia = usePrivateMedia({
       auth, analyzer: arAnalyzer,
       players: computed(() => workspaceMode.value === 'family' || (activeTab.value==='videos' && videoPage.value==='mine' && workspaceMode.value==='coach') ? familyPlayers.value : []),
@@ -450,7 +451,7 @@ createApp({
       if (!managed) return;
       clearProfileHistory();
       drillVideos.value=[];
-      playerFeature.selectPlayer({...managed,photo_url:workspaceMode.value==='admin'?avatarForPlayer(managed):''});
+      playerFeature.selectPlayer({...managed,photo_url:managedPortraitFor(managed)});
       if (mediaOriginAllowed.value) void privateMedia.selectMediaPlayer(managed.id);
       activeTab.value='team';
     };
@@ -581,7 +582,7 @@ createApp({
       privateMediaController: markRaw(privateMedia),
       statsBoardController: markRaw(statsBoard), performancePlayers, performanceReviewTeams, refreshPerformanceHistory,
        avatarController: markRaw(avatarManager),
-      managedRosterController: markRaw(managedRoster), workspaceOptions, isManagedWorkspace,
+      managedRosterController: markRaw(managedRoster), managedPortraitFor, workspaceOptions, isManagedWorkspace,
       changeManagedOrganization, changeManagedTeam, retryManagedRoster, loadMoreManagedRoster,
       coachOrganizations, coachTeams, coachOrganizationId, coachTeamId, coachTeamCount,
       changeCoachOrganization, changeCoachTeam, ordinaryOrganizations, ordinaryTeams, clubhouseMediaTeams,
